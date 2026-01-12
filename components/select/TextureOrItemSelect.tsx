@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Radio, Space, Upload, Button, Modal, Input, Card } from 'antd';
-import { CloudUploadOutlined } from '@ant-design/icons';
+import { Radio, Modal, Input, Card } from 'antd';
 import { Alert } from '@mui/material';
 import { Snackbar } from '@mui/material';
 import { Texture, Item } from '@/types';
@@ -9,6 +8,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/stores/store';
 import { imageCache } from '@/utils/imageCache';
 import { imageDownloadUrlToBase64 } from '@/utils';
+import { Timestamp } from 'firebase/firestore';
 import {
   setSelectedTexture,
   selectSelectedTexture,
@@ -19,19 +19,21 @@ import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
 } from '@/constants/constants';
-import { CheckCircle as CheckmarkBadgeIcon } from '@mui/icons-material';
+import UploadCard from '../ui/UploadCard';
+import ImageDisplayModal from '../modal/ImageDisplayModal';
+import AssetCard from '@/components/ui/AssetCard';
 
 type AssetType = 'texture' | 'item';
 type Asset = Texture | Item;
 
-interface TextureOrItemSelectorProps {
+interface TextureOrItemSelectProps {
   type: AssetType;
   title?: string;
   onSelect?: (asset: Asset | null) => void;
   onError?: (error: string) => void;
 }
 
-const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
+const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   type,
   title,
   onSelect,
@@ -65,6 +67,8 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
     severity: 'success' | 'error';
   }>({ open: false, message: '', severity: 'success' });
   const [base64Map, setBase64Map] = useState<Map<string, string>>(new Map());
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedAssetForView, setSelectedAssetForView] = useState<Asset | null>(null);
 
   // Load asset previews from cache
   useEffect(() => {
@@ -205,35 +209,42 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
     }
   };
 
-  const defaultTitle = isTexture ? 'Textures' : 'Items';
-  const uploadButtonLabel = isTexture ? 'Upload Texture' : 'Upload Item';
+  const defaultTitle = isTexture ? 'Textures' : 'Objects';
   const modalTitle = isTexture ? 'Add Texture' : 'Add Home Item';
-  const modalOkText = isTexture ? 'Upload Texture' : 'Upload Home Item';
+  const modalOkText = isTexture ? 'Upload Texture' : 'Upload Objects';
   const selectorRadioClassName = isTexture ? 'texture-selector-radio' : 'item-selector-radio';
   const namePlaceholder = isTexture
     ? 'Enter texture name (e.g., Faux Brick)'
-    : 'Enter item name (e.g., Modern Sofa)';
+    : 'Enter object name (e.g., Modern Sofa)';
   const descriptionPlaceholder = isTexture
     ? 'Add description about this texture (e.g., For accent walls)'
-    : 'Add description about this item (e.g., Gray fabric sectional sofa)';
-  const previewAlt = isTexture ? 'Texture preview' : 'Item preview';
+    : 'Add description about this object (e.g., Gray fabric sectional sofa)';
+  const previewAlt = isTexture ? 'Texture preview' : 'Object preview';
+
+  const handleUploadError = (message: string) => {
+    setUploadError(message);
+    onError?.(message);
+  };
+
+  // Calculate current asset index for navigation
+  const currentAssetIndex = selectedAssetForView
+    ? customAssets.findIndex((asset) => asset.id === selectedAssetForView.id)
+    : -1;
+
+  const handlePrevious = useCallback(() => {
+    if (currentAssetIndex > 0) {
+      setSelectedAssetForView(customAssets[currentAssetIndex - 1]);
+    }
+  }, [currentAssetIndex, customAssets]);
+
+  const handleNext = useCallback(() => {
+    if (currentAssetIndex >= 0 && currentAssetIndex < customAssets.length - 1) {
+      setSelectedAssetForView(customAssets[currentAssetIndex + 1]);
+    }
+  }, [currentAssetIndex, customAssets]);
 
   return (
-    <Card
-      title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{title || defaultTitle}</span>
-          <Upload
-            beforeUpload={handleFileSelect}
-            accept="image/*"
-            maxCount={1}
-            showUploadList={false}
-          >
-            <Button icon={<CloudUploadOutlined />}>{uploadButtonLabel}</Button>
-          </Upload>
-        </div>
-      }
-    >
+    <Card title={<span>{title || defaultTitle}</span>}>
       {(uploadError || loadAssetsError) && (
         <Alert
           title="Error"
@@ -250,11 +261,6 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
           <span className="ml-2 text-gray-600">Loading {isTexture ? 'textures' : 'items'}...</span>
         </div>
-      ) : customAssets.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px', color: '#999', fontStyle: 'italic' }}>
-          No {isTexture ? 'textures' : 'items'} available. Click "Upload{' '}
-          {isTexture ? 'Texture' : 'Item'}" to add one.
-        </div>
       ) : (
         <>
           <style>{`
@@ -264,8 +270,21 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
             .${selectorRadioClassName} .ant-radio {
               margin-right: 0 !important;
             }
+            .${selectorRadioClassName} .ant-radio-label {
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              padding: 0 !important;
+            }
           `}</style>
-          <Space orientation="vertical" style={{ width: '100%' }} size="small">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            <UploadCard onImageUpload={handleFileSelect} onError={handleUploadError} />
             <Radio.Group
               value={selectedAsset?.id || undefined}
               onChange={(e) => {
@@ -289,193 +308,46 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
                   }
                 }
               }}
-              style={{ width: '100%', display: 'flex', flexDirection: 'column' }}
+              style={{ width: '100%', display: 'contents' }}
               className={selectorRadioClassName}
             >
-              <div
-                style={{
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  paddingBottom: '8px',
-                }}
-              >
-                <div
+              {customAssets.map((asset) => (
+                <Radio
+                  key={asset.id}
+                  value={asset.id}
+                  onClick={(e) => {
+                    // Toggle logic: if clicking the same asset, deselect it
+                    if (selectedAsset?.id === asset.id) {
+                      e.preventDefault();
+                      if (isTexture) {
+                        dispatch(setSelectedTexture(null));
+                      } else {
+                        dispatch(setSelectedItem(null));
+                      }
+                      if (onSelect) onSelect(null);
+                    }
+                  }}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(auto-fit, minmax(160px, 200px))`,
-                    gap: '8px',
-                    minWidth: 'min-content',
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '160px',
+                    margin: 0,
+                    padding: 0,
                   }}
                 >
-                  {customAssets.map((asset) => (
-                    <div
-                      key={asset.id}
-                      style={{
-                        minWidth: '160px',
-                        minHeight: '160px',
-                        position: 'relative',
-                      }}
-                    >
-                      <Radio
-                        value={asset.id}
-                        onClick={(e) => {
-                          // Toggle logic: if clicking the same asset, deselect it
-                          if (selectedAsset?.id === asset.id) {
-                            e.preventDefault();
-                            if (isTexture) {
-                              dispatch(setSelectedTexture(null));
-                            } else {
-                              dispatch(setSelectedItem(null));
-                            }
-                            if (onSelect) onSelect(null);
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          padding: '0',
-                          border:
-                            selectedAsset?.id === asset.id
-                              ? '2px solid #6366f1'
-                              : '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#f9fafb',
-                          transition: 'all 0.3s ease',
-                          overflow: 'hidden',
-                          position: 'relative',
-                        }}
-                      >
-                        {/* Asset preview */}
-                        {base64Map.has(asset.id) ? (
-                          <img
-                            src={`data:image/jpeg;base64,${base64Map.get(asset.id)}`}
-                            alt={asset.name}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              position: 'absolute',
-                              inset: 0,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: '#e5e7eb',
-                              position: 'absolute',
-                              inset: 0,
-                            }}
-                          >
-                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                              Loading...
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Asset name overlay - bottom left */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '0',
-                            left: '0',
-                            right: '0',
-                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                            color: '#ffffff',
-                            padding: '8px',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            textAlign: 'left',
-                            zIndex: 2,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {asset.name}
-                        </div>
-
-                        {/* Checkmark - top right corner when selected */}
-                        {selectedAsset?.id === asset.id && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '8px',
-                              right: '8px',
-                              zIndex: 10,
-                            }}
-                          >
-                            <CheckmarkBadgeIcon
-                              style={{
-                                fontSize: '24px',
-                                color: '#6366f1',
-                                fontWeight: 'bold',
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Hover overlay with description */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            opacity: 0,
-                            transition: 'opacity 0.3s ease',
-                            padding: '16px',
-                            zIndex: 1,
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.opacity = '1';
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.opacity = '0';
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: '#ffffff',
-                              fontSize: '1rem',
-                              fontWeight: 600,
-                              marginBottom: '8px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            {asset.name}
-                          </div>
-                          {asset.description && (
-                            <div
-                              style={{
-                                color: '#d1d5db',
-                                fontSize: '0.75rem',
-                                fontStyle: 'italic',
-                                textAlign: 'center',
-                              }}
-                            >
-                              {asset.description}
-                            </div>
-                          )}
-                        </div>
-                      </Radio>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  <AssetCard
+                    asset={asset}
+                    isSelected={selectedAsset?.id === asset.id}
+                    base64={base64Map.get(asset.id)}
+                    onViewExpand={() => {
+                      setSelectedAssetForView(asset);
+                      setShowImageModal(true);
+                    }}
+                  />
+                </Radio>
+              ))}
             </Radio.Group>
-          </Space>
+          </div>
         </>
       )}
 
@@ -495,6 +367,37 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
           {toast.message}
         </Alert>
       </Snackbar>
+
+      {/* Image Display Modal */}
+      {selectedAssetForView && (
+        <ImageDisplayModal
+          isOpen={showImageModal}
+          image={{
+            id: selectedAssetForView.id,
+            name: selectedAssetForView.name,
+            imageDownloadUrl: isTexture
+              ? (selectedAssetForView as Texture).textureImageDownloadUrl
+              : (selectedAssetForView as Item).itemImageDownloadUrl,
+            mimeType: 'image/jpeg',
+            createdAt: Timestamp.fromDate(new Date()),
+            updatedAt: Timestamp.fromDate(new Date()),
+            spaceId: '',
+            evolutionChain: [],
+            parentImageId: null,
+            storageFilePath: '',
+            isDeleted: false,
+            deletedAt: null,
+          }}
+          onClose={() => {
+            setShowImageModal(false);
+            setSelectedAssetForView(null);
+          }}
+          currentImageIndex={currentAssetIndex}
+          totalImages={customAssets.length}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+        />
+      )}
 
       {/* Asset Name Input Modal */}
       <Modal
@@ -589,4 +492,4 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
   );
 };
 
-export default TextureOrItemSelector;
+export default TextureOrItemSelect;

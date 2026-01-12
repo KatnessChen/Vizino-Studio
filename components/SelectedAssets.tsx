@@ -262,7 +262,7 @@ const SelectedAssets: React.FC = () => {
   return (
     <div>
       <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
-        Asset to Redesign
+        Design Material
       </Typography.Title>
       {renderContent()}
     </div>

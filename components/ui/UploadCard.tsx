@@ -80,9 +80,9 @@ const UploadCard: React.FC<UploadCardProps> = ({
         disabled={isLimitReached}
       />
 
-      {/* Upload area matching ImageCard height */}
+      {/* Upload area matching AssetCard height */}
       <div
-        className={`w-full h-48 flex flex-col items-center justify-center border-2 border-dashed rounded-t-lg transition-all duration-200 ${
+        className={`w-full h-full flex flex-col items-center justify-center border-2 border-dashed rounded-lg transition-all duration-200 ${
           isLimitReached
             ? 'bg-gray-100 border-gray-300 text-gray-500'
             : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-300 hover:border-blue-400 hover:from-blue-50 hover:to-blue-100'
@@ -106,17 +106,6 @@ const UploadCard: React.FC<UploadCardProps> = ({
         </p>
         <p className={`text-xs mt-1 ${isLimitReached ? 'text-gray-500' : 'text-gray-500'}`}>
           {isLimitReached ? 'Delete images to upload more' : `${MAX_FILE_SIZE_MB} MB max`}
-        </p>
-      </div>
-
-      {/* Info section matching ImageCard layout */}
-      <div className="p-3">
-        <p
-          className={`text-sm font-medium text-center ${
-            isLimitReached ? 'text-gray-500' : 'text-gray-800'
-          }`}
-        >
-          {isLimitReached ? 'Limit Reached' : 'Add Photo'}
         </p>
       </div>
     </div>

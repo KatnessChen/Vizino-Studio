@@ -27,15 +27,15 @@ export const useGenerateButtonState = ({
   } else if (savingImage) {
     disableReason = 'Saving image...';
   } else if (!canAddOperation) {
-    disableReason = 'Operation limit reached for this image.';
+    disableReason = 'Generation limit reached for this image.';
   } else if (!activeTaskName) {
-    disableReason = 'Please select a task first.';
+    disableReason = 'Please select a goal.';
   } else if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
     disableReason = 'Please select a color to remix.';
   } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
     disableReason = 'Please select a texture to remix.';
   } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
-    disableReason = 'Please select a home item to remix.';
+    disableReason = 'Please select an object to remix.';
   }
 
   const isDisabled = disableReason !== '';

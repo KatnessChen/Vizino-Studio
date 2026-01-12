@@ -5,7 +5,7 @@ import type { MenuProps } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
-import GenericConfirmModal from './GenericConfirmModal';
+import GenericConfirmModal from '../modal/GenericConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   checkProjectLimit,
@@ -50,6 +50,7 @@ import {
   setLoadTexturesError,
 } from '@/stores/customAssetsStore';
 import { setSelectedColor, setSelectedTexture } from '@/stores/taskStore';
+import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 
 export const ModalMode = {
   ADD_PROJECT: 'add-project',
@@ -102,6 +103,11 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
     autoFetchSpaceImages();
   }, [activeProjectId, activeSpaceId, user, dispatch]);
 
+  useEffect(() => {
+    // Reset image selections when space changes
+    dispatch(setSelectedOriginalImageIds(new Set()));
+    dispatch(setSelectedUpdatedImageIds(new Set()));
+  }, [activeSpaceId, dispatch]);
   const handleSelectProject = useCallback(
     (projectId: string) => {
       if (!user || activeProjectId === projectId) return;
@@ -288,6 +294,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
     activeProject,
     editingEntityIds,
     projects,
+    adminSettings,
   ]);
 
   const handleCloseModal = useCallback(() => {

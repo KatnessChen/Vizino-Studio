@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { ImageData } from '@/types';
-import ImageCard from './ImageCard';
-import UploadCard from './UploadCard';
-import ImageDisplayModal from './ImageDisplayModal';
-import ViewMoreDisplayModal from './ViewMoreDisplayModal';
+import AssetCard from './ui/AssetCard';
+import UploadCard from './ui/UploadCard';
+import ImageDisplayModal from './modal/ImageDisplayModal';
+import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
 import { Card, Button, Tooltip, Space } from 'antd';
 import { DeleteOutlined, DownloadOutlined, ClearOutlined, CopyOutlined } from '@ant-design/icons';
 
@@ -46,7 +46,6 @@ const Gallery: React.FC<GalleryProps> = ({
   onBulkCopy,
   onClearSelection,
   onSelectAll,
-  userId,
   isImageLimitReached = false,
 }) => {
   // State for ImageDisplayModal
@@ -57,7 +56,7 @@ const Gallery: React.FC<GalleryProps> = ({
   const [showViewMoreModal, setShowViewMoreModal] = useState<boolean>(false);
   const [imageForViewMore, setImageForViewMore] = useState<ImageData | null>(null);
 
-  const handleViewPhotoImage = useCallback((imageData: ImageData) => {
+  const handleExpandPhotoImage = useCallback((imageData: ImageData) => {
     setImageToDisplayInModal(imageData);
     setShowImageDisplayModal(true);
   }, []);
@@ -168,14 +167,13 @@ const Gallery: React.FC<GalleryProps> = ({
             />
           )}
           {images.map((image) => (
-            <ImageCard
+            <AssetCard
               key={image.id}
-              image={image}
+              asset={image}
               isSelected={selectedImageIds.has(image.id)}
-              onSelect={onSelectMultiple}
-              onViewPhotoButtonClick={handleViewPhotoImage}
-              onViewMoreButtonClick={onViewMoreButtonClick}
-              userId={userId}
+              onSelect={() => onSelectMultiple?.(image.id)}
+              onViewExpand={() => handleExpandPhotoImage(image)}
+              onViewDetails={() => onViewMoreButtonClick(image)}
             />
           ))}
         </div>

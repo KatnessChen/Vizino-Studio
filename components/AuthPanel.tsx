@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Stack, Divider } from '@mui/material';
-import GoogleLoginButton from './GoogleLoginButton';
-import LogoutButton from './LogoutButton';
+import GoogleLoginButton from './button/GoogleLoginButton';
+import LogoutButton from './button/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AuthPanel: React.FC = () => {

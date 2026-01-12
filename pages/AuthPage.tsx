@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Container, Box, Typography, Stack, Paper, Divider, useTheme } from '@mui/material';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { ROUTES } from '@/constants/routes';
-import GoogleLoginButton from '@/components/GoogleLoginButton';
+import GoogleLoginButton from '@/components/button/GoogleLoginButton';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AuthPage: React.FC = () => {

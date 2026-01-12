@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Tooltip } from '@mui/material';
 import { CompareArrows as CompareIcon } from '@mui/icons-material';
 import { Button } from 'antd';
-import ImagesComparingModal from './ImagesComparingModal';
+import ImagesComparingModal from '../modal/ImagesComparingModal';
 import { ImageData } from '@/types';
 
 interface ImagesComparingButtonProps {

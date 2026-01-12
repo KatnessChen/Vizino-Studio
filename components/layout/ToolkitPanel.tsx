@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { ChevronRight as ChevronRightIcon } from '@mui/icons-material';
 import { IconButton } from '@mui/material';
-import ImagesComparingButton from '@/components/ImagesComparingButton';
+import ImagesComparingButton from '@/components/button/ImagesComparingButton';
 import {
   selectSelectedOriginalImageIds,
   selectSelectedUpdatedImageIds,

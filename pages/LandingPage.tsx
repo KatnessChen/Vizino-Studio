@@ -2,17 +2,17 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Timestamp } from 'firebase/firestore';
 import { message, Tag } from 'antd';
-import ConfirmImageUpdateModal from '@/components/ConfirmImageUpdateModal';
-import GenerateMoreModal from '@/components/GenerateMoreModal';
+import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
+import GenerateMoreModal from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
 import EmptyState from '@/components/EmptyState';
-import GenericConfirmModal from '@/components/GenericConfirmModal';
-import CopyImageModal from '@/components/CopyImageModal';
-import MyBreadcrumb from '@/components/MyBreadcrumb';
+import GenericConfirmModal from '@/components/modal/GenericConfirmModal';
+import CopyImageModal from '@/components/modal/CopyImageModal';
+import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
 import Footer from '@/components/layout/Footer';
 import AsideSection from '@/components/layout/AsideSection';
-import ColorSelector from '@/components/ColorSelector';
-import TextureOrItemSelector from '@/components/TextureOrItemSelector';
+import ColorSelect from '@/components/select/ColorSelect';
+import TextureOrItemSelect from '@/components/select/TextureOrItemSelect';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, ImageOperation } from '@/types';
 import {
@@ -467,7 +467,7 @@ const LandingPage: React.FC = () => {
       }
 
       setDeleteConfirmConfig({
-        title: 'Delete Photo',
+        title: 'Delete Image',
         message: `Are you sure you want to delete ${selectedImageIds.size} selected ${imageType} photo(s)?\n\nThis action cannot be undone.`,
         onConfirm: async () => {
           try {
@@ -762,7 +762,7 @@ const LandingPage: React.FC = () => {
                 {activeSpaceId && (
                   <div className="flex flex-col gap-6">
                     <Gallery
-                      title="Original Photos"
+                      title="Original Images"
                       images={originalImages}
                       selectedImageIds={selectedOriginalImageIds}
                       onSelectImage={handleSelectOriginalImage}
@@ -784,17 +784,17 @@ const LandingPage: React.FC = () => {
                     />
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
-                      <ColorSelector selectedColor={selectedColor} />
+                      <ColorSelect selectedColor={selectedColor} />
                     )}
                     {selectedTaskNames[0] === GEMINI_TASKS.ADD_TEXTURE.task_name && (
-                      <TextureOrItemSelector type="texture" onError={setErrorMessage} />
+                      <TextureOrItemSelect type="texture" onError={setErrorMessage} />
                     )}
                     {selectedTaskNames[0] === GEMINI_TASKS.ADD_HOME_ITEM.task_name && (
-                      <TextureOrItemSelector type="item" onError={setErrorMessage} />
+                      <TextureOrItemSelect type="item" onError={setErrorMessage} />
                     )}
 
                     <Gallery
-                      title="Generated Photos"
+                      title="Generated Images"
                       images={updatedImages}
                       selectedImageIds={selectedUpdatedImageIds}
                       onSelectMultiple={handleSelectUpdatedImage}

@@ -38,7 +38,7 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
         <h3 className="text-xl font-bold text-gray-800 mb-4">
-          Copy Photo{numberOfImages > 1 ? 's' : ''}
+          Copy Image{numberOfImages > 1 ? 's' : ''}
         </h3>
 
         {imageType === 'updated' && (

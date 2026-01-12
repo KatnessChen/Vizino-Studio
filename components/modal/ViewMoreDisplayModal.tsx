@@ -105,7 +105,7 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
         {/* Section B: Evolution Chain */}
         {hasEvolutionChain && (
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
               Generation History
             </h3>
 
@@ -126,16 +126,15 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                   </div>
 
                   <div className="flex flex-col md:flex-row">
-                    {/* Left Column - Source Image (60%) */}
+                    {/* Left Column - Target Image (60%) */}
                     {operation.imageDownloadUrl && (
                       <div className="md:w-[60%] p-4 bg-gray-100">
                         <div className="space-y-2">
-                          <span className="text-sm font-medium text-gray-600">Source Image:</span>
                           <img
                             src={
                               imageSources[operation.imageDownloadUrl] || operation.imageDownloadUrl
                             }
-                            alt="Source image"
+                            alt="Target image"
                             className="w-full object-contain rounded-md border border-gray-300 bg-white"
                           />
                         </div>

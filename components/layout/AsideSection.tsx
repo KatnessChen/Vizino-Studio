@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Alert, Typography } from 'antd';
-import TaskSelector from '@/components/TaskSelector';
+import TaskSelect from '@/components/select/TaskSelect';
 import SelectedAssets from '@/components/SelectedAssets';
 import ToolkitPanel from './ToolkitPanel';
 import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
@@ -120,16 +120,12 @@ const AsideSection: React.FC = () => {
       className="h-full w-[250px] bg-white flex flex-col shadow-lg border-r border-gray-200 overflow-y-auto gap-6"
       style={{ height: 'calc(100vh - var(--header-height))' }}
     >
-      <TaskSelector />
-
-      <div className="px-6">
-        <SelectedAssets />
-      </div>
+      <TaskSelect />
 
       {/* Selected Image Display */}
       <div className="px-6">
         <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
-          Image to Redesign
+          Target Image
         </Typography.Title>
         {selectionMessage ? (
           <div
@@ -158,15 +154,12 @@ const AsideSection: React.FC = () => {
                 marginBottom: '8px',
               }}
             />
-            <div style={{ fontSize: '0.875rem', color: '#374151' }}>
-              <div style={{ fontWeight: 500, marginBottom: '4px' }}>{selectedImage.name}</div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                {selectedImage.evolutionChain.length} operation
-                {selectedImage.evolutionChain.length > 1 ? 's' : ''}
-              </div>
-            </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="px-6">
+        <SelectedAssets />
       </div>
 
       {/* Generate Button */}
@@ -186,7 +179,7 @@ const AsideSection: React.FC = () => {
           }}
         >
           <AutoAwesomeIcon sx={{ fontSize: 20, marginRight: 1, color: 'inherit' }} />
-          Redesign
+          Generate
         </button>
         {isDisabled && disableReason && selectedImage && (
           <Alert title={disableReason} type="warning" style={{ marginTop: '8px' }} />

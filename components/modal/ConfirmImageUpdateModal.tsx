@@ -59,7 +59,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           setCachedImageSrc(`data:${originalImage.mimeType};base64,${base64}`);
         }
       } catch (error) {
-        console.warn('[ImageCard] Failed to load cached image:', error);
+        console.warn('[AssetCard] Failed to load cached image:', error);
       }
     };
 
@@ -189,12 +189,12 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
     >
       {/* Image Comparison Section */}
       <div style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
-        {/* Original Photo */}
+        {/* Original Image */}
         <div
           style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', minHeight: 400 }}
         >
           <Typography.Title level={5} style={{ marginBottom: 12 }}>
-            Original Photo
+            Original Image
           </Typography.Title>
           <div
             style={{
@@ -215,12 +215,12 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           </div>
         </div>
 
-        {/* Recolored Photo */}
+        {/* Recolored Image */}
         <div
           style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', minHeight: 400 }}
         >
           <Typography.Title level={5} style={{ marginBottom: 12 }}>
-            Redesigned Photo
+            Generated Image
           </Typography.Title>
           <div
             style={{
@@ -235,7 +235,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           >
             <img
               src={`data:${generatedImage.mimeType};base64,${generatedImage.base64}`}
-              alt="Redesigned Photo"
+              alt="Generated Image"
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
             />
           </div>

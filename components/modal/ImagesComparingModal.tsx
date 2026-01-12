@@ -27,7 +27,7 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({ isOpen, image
           }
         }
       } catch (error) {
-        console.warn('[ImageCard] Failed to load cached image:', error);
+        console.warn('[AssetCard] Failed to load cached image:', error);
       }
     };
 

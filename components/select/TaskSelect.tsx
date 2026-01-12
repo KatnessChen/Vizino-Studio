@@ -5,14 +5,14 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { selectSelectedTaskNames, setSelectedTaskNames } from '@/stores/taskStore';
 
-interface TaskSelectorProps {
+interface TaskSelectProps {
   multiSelect?: boolean;
   onTaskChange?: (taskNames: GeminiTaskName[]) => void;
   onError?: (message: string | null) => void;
   onModalStateChange?: (isOpen: boolean) => void;
 }
 
-const TaskSelector: React.FC<TaskSelectorProps> = ({
+const TaskSelect: React.FC<TaskSelectProps> = ({
   multiSelect = false,
   onTaskChange,
   onError,
@@ -89,7 +89,7 @@ const TaskSelector: React.FC<TaskSelectorProps> = ({
   return (
     <div className="space-y-2 px-6 pt-6">
       <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
-        Redesign task
+        Design Goal
       </Typography.Title>
 
       <div className="flex flex-col justify-center gap-2 max-w-2xl mx-auto">
@@ -134,4 +134,4 @@ const TaskSelector: React.FC<TaskSelectorProps> = ({
   );
 };
 
-export default TaskSelector;
+export default TaskSelect;

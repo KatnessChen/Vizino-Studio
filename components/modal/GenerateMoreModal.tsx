@@ -214,7 +214,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
 
     // Check if a task is selected
     if (!activeTaskName) {
-      setValidationError('Please select a task first.');
+      setValidationError('Please select a design goal.');
       return;
     }
 
@@ -470,8 +470,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     return "Enter any specific instructions for the AI... (e.g., 'Make the walls lighter', 'Add more warmth to the color')";
   };
 
-  const sharedTip =
-    'The more specific your description is, the better the AI can generate an image that matches what you’re looking for. Try to clearly specify: ';
+  const sharedTip = 'Try to clearly specify: ';
 
   const getPromptWritingGuide = () => {
     if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
@@ -480,7 +479,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
           {
             text:
               sharedTip +
-              "which wall(s) to recolor? (e.g., 'only the accent wall', 'all walls except the ceiling').",
+              "which wall to recolor? (e.g., 'only the accent wall', 'all walls except the ceiling').",
             hasButton: false,
           },
         ],
@@ -491,7 +490,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
           {
             text:
               sharedTip +
-              "which wall(s) to apply it to? (e.g., 'the lower half only', 'behind the sofa')",
+              "which wall to apply it to? (e.g., 'the lower half only', 'behind the sofa')",
             hasButton: false,
           },
         ],
@@ -502,7 +501,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
           {
             text:
               sharedTip +
-              "where to place the item and what angle? (e.g., 'corner by the window', 'center of the room facing left')",
+              "where to place the object and what angle? (e.g., 'corner by the window', 'center of the room facing left')",
             hasButton: false,
           },
         ],
@@ -567,7 +566,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
             <div
               style={{ minWidth: 0, flex: '1 1 400px', display: 'flex', flexDirection: 'column' }}
             >
-              <Typography.Title level={5}>Source Image</Typography.Title>
+              <Typography.Title level={5}>Target Image</Typography.Title>
 
               {/* Image Info */}
               <div style={{ marginBottom: 16 }}>
@@ -595,7 +594,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
               {lastOperation && (
                 <div style={{ marginBottom: 16 }}>
                   <Typography.Title level={5} style={{ marginBottom: 8 }}>
-                    Last Operation
+                    Last Generation
                   </Typography.Title>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
@@ -673,7 +672,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
 
                   {/* Search Input */}
                   <Input
-                    placeholder="Search prompts..."
+                    placeholder="Filter prompts..."
                     value={searchPrompts}
                     onChange={(e) => setSearchPrompts(e.target.value)}
                     allowClear
@@ -831,26 +830,25 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                       >
                         <h6>
                           <BulbOutlined className="mr-2" style={{ color: '#1890ff' }} />
-                          Tips to write custom prompt:
+                          {tip.text}.
+                          <span>
+                            {' '}
+                            See{' '}
+                            <Button
+                              type="link"
+                              onClick={() => setIsDefaultPromptExpanded(true)}
+                              style={{
+                                padding: '0',
+                                margin: '0 4px',
+                                height: 'auto',
+                              }}
+                            >
+                              default prompt
+                              <InfoCircleOutlined />
+                            </Button>{' '}
+                          </span>{' '}
+                          to understand what’s behind.
                         </h6>
-                        <span>{tip.text}.</span>
-                        <br />
-                        <span>
-                          You can also review the{' '}
-                          <Button
-                            type="link"
-                            onClick={() => setIsDefaultPromptExpanded(true)}
-                            style={{
-                              padding: '0',
-                              margin: '0 6px',
-                              height: 'auto',
-                            }}
-                          >
-                            default prompt
-                            <InfoCircleOutlined />
-                          </Button>{' '}
-                        </span>{' '}
-                        to understand what’s applied behind the scenes.
                       </div>
                     ))}
                   </div>

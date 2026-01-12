@@ -16,7 +16,7 @@ export const GEMINI_TASKS = {
   },
   ADD_HOME_ITEM: {
     task_name: 'add_home_item',
-    label_name: 'Add Item',
+    label_name: 'Add Object',
     customPromptRequired: true,
   },
 } as const;
