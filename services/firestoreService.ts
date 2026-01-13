@@ -501,7 +501,33 @@ export async function createImage(
     const imageDownloadUrl = await getDownloadURL(storageRef);
     console.log('Image download URL obtained:', imageDownloadUrl);
 
-    // Step 2: Create the image document in Firestore with storage information
+    // Step 2: Calculate order value for the new image
+    // Query existing images in the same space to find the maximum order
+    const imagesCollectionRef = collection(
+      db,
+      'users',
+      userId,
+      'projects',
+      projectId,
+      'spaces',
+      spaceId,
+      'images'
+    );
+    const imagesQuery = query(imagesCollectionRef, where('isDeleted', '==', false));
+    const imagesSnapshot = await getDocs(imagesQuery);
+
+    let maxOrder = 0;
+    imagesSnapshot.forEach((doc) => {
+      const imageData = doc.data() as ImageData;
+      if (imageData.order && imageData.order > maxOrder) {
+        maxOrder = imageData.order;
+      }
+    });
+
+    // Set new image order to max + 1, or 1 if no images exist
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Step 3: Create the image document in Firestore with storage information
     const now = Timestamp.fromDate(new Date());
 
     // Build evolution chain by spreading parent chain and appending current operation
@@ -517,6 +543,7 @@ export async function createImage(
       parentImageId: parentImage?.id || null,
       imageDownloadUrl,
       storageFilePath,
+      order: newImageOrder,
       isDeleted: false,
       deletedAt: null,
       createdAt: now,
@@ -1507,4 +1534,59 @@ export async function fetchAllCustomPrompts(
         ...doc.data(),
       }) as CustomPrompt
   );
+}
+
+/**
+ * Batch update the order property of multiple images
+ * @param userId The ID of the user
+ * @param projectId The ID of the project
+ * @param spaceId The ID of the space
+ * @param updates Array of {imageId, order} objects to update
+ */
+export async function batchUpdateImagesOrder(
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  updates: Array<{ imageId: string; order: number }>
+): Promise<void> {
+  if (!userId || !projectId || !spaceId) {
+    throw new Error('User ID, Project ID, and Space ID are required.');
+  }
+
+  if (!updates || updates.length === 0) {
+    return; // Nothing to update
+  }
+
+  try {
+    const batch = writeBatch(db);
+    const now = Timestamp.fromDate(new Date());
+
+    for (const { imageId, order } of updates) {
+      const imageDocRef = doc(
+        db,
+        'users',
+        userId,
+        'projects',
+        projectId,
+        'spaces',
+        spaceId,
+        'images',
+        imageId
+      );
+
+      batch.update(imageDocRef, {
+        order,
+        updatedAt: now,
+      });
+    }
+
+    await batch.commit();
+    console.log(`Successfully updated order for ${updates.length} images`);
+  } catch (error) {
+    console.error('Failed to batch update images order:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to update images order: ${error.message}`);
+    }
+    throw new Error('Failed to update images order in Firestore.');
+  }
 }

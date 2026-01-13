@@ -19,6 +19,10 @@ export interface ImageData {
   // Other metadata
   mimeType: string;
 
+  // User-defined ordering (100, 200, 300...)
+  // null for legacy images created before ordering feature
+  order: number | null;
+
   // Soft delete
   isDeleted: boolean;
   deletedAt: Timestamp | null;

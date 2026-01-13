@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, ReactElement } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Timestamp } from 'firebase/firestore';
 import { message, Tag } from 'antd';
@@ -46,6 +46,7 @@ import {
   removeImagesOptimistic,
   updateImageOptimistic,
 } from '@/stores/projectStore';
+import { reorderImagesWithDebounce } from '@/stores/imageOrderThunks';
 import {
   selectSelectedTaskNames,
   selectSelectedColor,
@@ -174,6 +175,10 @@ const LandingPage: React.FC = () => {
       const tempImageId = crypto.randomUUID();
       const now = Timestamp.fromDate(new Date());
 
+      // Calculate optimistic order value (max current order + 1)
+      const currentMaxOrder = Math.max(0, ...originalImages.map((img) => img.order ?? 0));
+      const optimisticOrder = currentMaxOrder + 1;
+
       // Optimistic update - add image immediately to UI
       const optimisticImage = {
         id: tempImageId,
@@ -184,6 +189,7 @@ const LandingPage: React.FC = () => {
         parentImageId: null,
         imageDownloadUrl: URL.createObjectURL(file), // Temporary local URL
         storageFilePath: '',
+        order: optimisticOrder,
         isDeleted: false,
         deletedAt: null,
         createdAt: now,
@@ -316,6 +322,10 @@ const LandingPage: React.FC = () => {
         selectedItem
       );
 
+      // Calculate optimistic order value (max current order + 1) for generated images
+      const currentMaxOrder = Math.max(0, ...updatedImages.map((img) => img.order ?? 0));
+      const optimisticOrder = currentMaxOrder + 1;
+
       // Optimistic update - show processed image immediately
       const optimisticImage = {
         id: tempImageId,
@@ -326,6 +336,7 @@ const LandingPage: React.FC = () => {
         parentImageId: processingContext.selectedImage.id,
         imageDownloadUrl: `data:${processedImageResult.mimeType};base64,${processedImageResult.base64}`,
         storageFilePath: '',
+        order: optimisticOrder,
         isDeleted: false,
         deletedAt: null,
         createdAt: now,
@@ -387,6 +398,7 @@ const LandingPage: React.FC = () => {
       selectedColor,
       selectedTexture,
       selectedItem,
+      updatedImages,
       selectedTaskNames,
       processingContext,
       activeProjectId,
@@ -695,6 +707,34 @@ const LandingPage: React.FC = () => {
     ]
   );
 
+  const handleReorderOriginalImages = useCallback(
+    (newOrderedImageIds: string[]) => {
+      if (!user || !activeProjectId || !activeSpaceId) return;
+      reorderImagesWithDebounce(
+        user.uid,
+        activeProjectId,
+        activeSpaceId,
+        newOrderedImageIds,
+        originalImages
+      )(dispatch);
+    },
+    [user, activeProjectId, activeSpaceId, originalImages, dispatch]
+  );
+
+  const handleReorderGeneratedImages = useCallback(
+    (newOrderedImageIds: string[]) => {
+      if (!user || !activeProjectId || !activeSpaceId) return;
+      reorderImagesWithDebounce(
+        user.uid,
+        activeProjectId,
+        activeSpaceId,
+        newOrderedImageIds,
+        updatedImages
+      )(dispatch);
+    },
+    [user, activeProjectId, activeSpaceId, updatedImages, dispatch]
+  );
+
   const getEmptyStateComponent = useMemo(() => {
     const hasNoProject = projects.length === 0 || !activeProjectId;
     const hasNoSpace = !activeSpaceId;
@@ -746,6 +786,7 @@ const LandingPage: React.FC = () => {
                 <div className="text-center max-w-md p-6">
                   <div className="text-red-600 text-5xl mb-4">🤯</div>
                   <h2 className="text-xl text-gray-600 mb-2">Sorry, something went wrong.</h2>
+                  <span>{initError}</span>
                   <button
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-blue-700 transition"
@@ -780,6 +821,8 @@ const LandingPage: React.FC = () => {
                       onGenerateMoreSuccess={handleGenerateMoreSuccess}
                       userId={user?.uid}
                       isImageLimitReached={!imageLimitCheck.canAdd}
+                      enableReordering={true}
+                      onReorder={handleReorderOriginalImages}
                     />
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
@@ -807,6 +850,8 @@ const LandingPage: React.FC = () => {
                       onGenerateMoreSuccess={handleGenerateMoreSuccess}
                       userId={user?.uid}
                       isImageLimitReached={!imageLimitCheck.canAdd}
+                      enableReordering={true}
+                      onReorder={handleReorderGeneratedImages}
                     />
                   </div>
                 )}

@@ -1,6 +1,18 @@
 import React, { useState, useCallback } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { ImageData } from '@/types';
 import AssetCard from './ui/AssetCard';
+import SortableAssetCard from './ui/SortableAssetCard';
 import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
@@ -31,6 +43,9 @@ interface GalleryProps {
   onGenerateMoreSuccess?: () => void;
   userId?: string | undefined;
   isImageLimitReached?: boolean;
+  onReorder?: (newOrderedImageIds: string[]) => void;
+  enableReordering?: boolean;
+  isLoading?: boolean;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
@@ -48,6 +63,9 @@ const Gallery: React.FC<GalleryProps> = ({
   onClearSelection,
   onSelectAll,
   isImageLimitReached = false,
+  onReorder,
+  enableReordering = false,
+  isLoading = false,
 }) => {
   // State for ImageDisplayModal
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
@@ -56,6 +74,17 @@ const Gallery: React.FC<GalleryProps> = ({
   // State for ViewMoreDisplayModal
   const [showViewMoreModal, setShowViewMoreModal] = useState<boolean>(false);
   const [imageForViewMore, setImageForViewMore] = useState<ImageData | null>(null);
+
+  // Drag and drop state
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start dragging (prevents accidental drags)
+      },
+    })
+  );
 
   const handleExpandPhotoImage = useCallback((imageData: ImageData) => {
     setImageToDisplayInModal(imageData);
@@ -93,6 +122,38 @@ const Gallery: React.FC<GalleryProps> = ({
       setImageToDisplayInModal(images[currentImageIndex + 1]);
     }
   }, [currentImageIndex, images]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+
+      if (!over || active.id === over.id) {
+        return;
+      }
+
+      const oldIndex = images.findIndex((img) => img.id === active.id);
+      const newIndex = images.findIndex((img) => img.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newImages = [...images];
+        const [movedImage] = newImages.splice(oldIndex, 1);
+        newImages.splice(newIndex, 0, movedImage);
+
+        const newOrderedImageIds = newImages.map((img) => img.id);
+        onReorder?.(newOrderedImageIds);
+      }
+    },
+    [images, onReorder]
+  );
+
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
 
   const hasSelection = selectedImageIds.size > 0;
 
@@ -146,9 +207,16 @@ const Gallery: React.FC<GalleryProps> = ({
     </div>
   );
 
-  return (
-    <Card title={cardTitle}>
-      {images.length === 0 && !showUploadCard ? (
+  const activeImage = activeId ? images.find((img) => img.id === activeId) : null;
+
+  const galleryContent = (
+    <>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading images...</span>
+        </div>
+      ) : images.length === 0 && !showUploadCard ? (
         <MyEmpty description={emptyMessage} />
       ) : (
         <div
@@ -165,17 +233,63 @@ const Gallery: React.FC<GalleryProps> = ({
               isLimitReached={isImageLimitReached}
             />
           )}
-          {images.map((image) => (
-            <AssetCard
-              key={image.id}
-              asset={image}
-              isSelected={selectedImageIds.has(image.id)}
-              onSelect={() => onSelectMultiple?.(image.id)}
-              onViewExpand={() => handleExpandPhotoImage(image)}
-              onViewDetails={() => onViewMoreButtonClick(image)}
-            />
-          ))}
+          {enableReordering ? (
+            <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+              {images.map((image) => (
+                <SortableAssetCard
+                  key={image.id}
+                  asset={image}
+                  isSelected={selectedImageIds.has(image.id)}
+                  onSelect={() => onSelectMultiple?.(image.id)}
+                  onViewExpand={() => handleExpandPhotoImage(image)}
+                  onViewDetails={() => onViewMoreButtonClick(image)}
+                />
+              ))}
+            </SortableContext>
+          ) : (
+            images.map((image) => (
+              <AssetCard
+                key={image.id}
+                asset={image}
+                isSelected={selectedImageIds.has(image.id)}
+                onSelect={() => onSelectMultiple?.(image.id)}
+                onViewExpand={() => handleExpandPhotoImage(image)}
+                onViewDetails={() => onViewMoreButtonClick(image)}
+              />
+            ))
+          )}
         </div>
+      )}
+    </>
+  );
+
+  return (
+    <Card title={cardTitle}>
+      {enableReordering && onReorder ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {galleryContent}
+          <DragOverlay>
+            {activeImage ? (
+              <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
+                <AssetCard
+                  asset={activeImage}
+                  isSelected={selectedImageIds.has(activeImage.id)}
+                  onSelect={() => {}}
+                  onViewExpand={() => {}}
+                  onViewDetails={() => {}}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        galleryContent
       )}
 
       {/* Image Display Modal */}
