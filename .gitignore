@@ -25,3 +25,9 @@ dist-ssr
 
 # project setting
 cors.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
