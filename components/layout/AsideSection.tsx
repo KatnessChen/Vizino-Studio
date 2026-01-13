@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Alert, Typography } from 'antd';
+import { Alert, Typography, Drawer } from 'antd';
+import { MenuOutlined } from '@ant-design/icons';
 import TaskSelector from '@/components/TaskSelector';
 import SelectedAssets from '@/components/SelectedAssets';
 import ToolkitPanel from './ToolkitPanel';
@@ -38,6 +39,7 @@ const AsideSection: React.FC = () => {
   const selectedItem = useSelector(selectSelectedItem);
 
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Use image processing hook to get sourceImage state
   const { processingImage } = useImageProcessing({
@@ -115,11 +117,9 @@ const AsideSection: React.FC = () => {
     }
   };
 
-  return (
-    <aside
-      className="h-full w-[250px] bg-white flex flex-col shadow-lg border-r border-gray-200 overflow-y-auto gap-6"
-      style={{ height: 'calc(100vh - var(--header-height))' }}
-    >
+  // Render the sidebar content
+  const sidebarContent = (
+    <div className="h-full flex flex-col gap-6">
       <TaskSelector />
 
       <div className="px-6">
@@ -197,7 +197,43 @@ const AsideSection: React.FC = () => {
       <div className="mt-auto border-t border-gray-200">
         <ToolkitPanel />
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile Menu Button - Fixed position, only visible on mobile */}
+      <button
+        onClick={() => setIsMobileDrawerOpen(true)}
+        className="lg:hidden fixed bottom-4 right-4 z-40 bg-purple-600 text-white rounded-full p-4 shadow-lg hover:bg-purple-700 transition-colors"
+        aria-label="Open menu"
+      >
+        <MenuOutlined style={{ fontSize: '24px' }} />
+      </button>
+
+      {/* Desktop Sidebar - Hidden on mobile, visible on lg and up */}
+      <aside
+        className="hidden lg:flex h-full w-[250px] bg-white flex-col shadow-lg border-r border-gray-200 overflow-y-auto"
+        style={{ height: 'calc(100vh - var(--header-height))' }}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer - Only visible on mobile */}
+      <Drawer
+        title="Menu"
+        placement="left"
+        onClose={() => setIsMobileDrawerOpen(false)}
+        open={isMobileDrawerOpen}
+        className="lg:hidden"
+        width={280}
+        styles={{
+          body: { padding: 0, height: '100%' },
+        }}
+      >
+        {sidebarContent}
+      </Drawer>
+    </>
   );
 };
 

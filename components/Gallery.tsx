@@ -97,9 +97,9 @@ const Gallery: React.FC<GalleryProps> = ({
   const hasSelection = selectedImageIds.size > 0;
 
   const cardTitle = (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
-      <Space size="small">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+      <h2 className="m-0 text-base sm:text-lg font-semibold">{title}</h2>
+      <Space size="small" wrap>
         {hasSelection && (
           <span style={{ fontSize: '14px', color: '#666' }}>{selectedImageIds.size} selected</span>
         )}
@@ -109,24 +109,42 @@ const Gallery: React.FC<GalleryProps> = ({
               <Button
                 onClick={onSelectAll}
                 icon={<ClearOutlined style={{ transform: 'scaleY(-1)' }} />}
+                size="small"
+                className="hidden sm:inline-flex"
               >
                 Select All
               </Button>
             )}
             {onClearSelection && (
-              <Button onClick={onClearSelection} disabled={!hasSelection} icon={<ClearOutlined />}>
+              <Button 
+                onClick={onClearSelection} 
+                disabled={!hasSelection} 
+                icon={<ClearOutlined />}
+                size="small"
+                className="hidden sm:inline-flex"
+              >
                 Deselect All
               </Button>
             )}
             {onBulkDownload && (
-              <Button onClick={onBulkDownload} disabled={!hasSelection} icon={<DownloadOutlined />}>
-                Download
+              <Button 
+                onClick={onBulkDownload} 
+                disabled={!hasSelection} 
+                icon={<DownloadOutlined />}
+                size="small"
+              >
+                <span className="hidden sm:inline">Download</span>
               </Button>
             )}
             {onBulkCopy && (
               <Tooltip title="Copy the selected photos">
-                <Button onClick={onBulkCopy} disabled={!hasSelection} icon={<CopyOutlined />}>
-                  Duplicate
+                <Button 
+                  onClick={onBulkCopy} 
+                  disabled={!hasSelection} 
+                  icon={<CopyOutlined />}
+                  size="small"
+                >
+                  <span className="hidden sm:inline">Duplicate</span>
                 </Button>
               </Tooltip>
             )}
@@ -136,8 +154,9 @@ const Gallery: React.FC<GalleryProps> = ({
                 disabled={!hasSelection}
                 danger
                 icon={<DeleteOutlined />}
+                size="small"
               >
-                Delete
+                <span className="hidden sm:inline">Delete</span>
               </Button>
             )}
           </>
@@ -153,13 +172,7 @@ const Gallery: React.FC<GalleryProps> = ({
           {emptyMessage}
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '16px',
-          }}
-        >
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {showUploadCard && onUploadImage && onUploadError && (
             <UploadCard
               onImageUpload={onUploadImage}

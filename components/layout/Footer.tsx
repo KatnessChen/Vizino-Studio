@@ -6,9 +6,9 @@ const Footer: React.FC = () => {
 
   return (
     <footer className="bg-white border-t border-gray-200">
-      <div className="mx-auto py-4 px-6">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <p>© {currentYear} Vizion Studio. All rights reserved.</p>
+      <div className="mx-auto py-4 px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
+          <p className="text-center sm:text-left">© {currentYear} Vizion Studio. All rights reserved.</p>
           <p className="font-semibold">
             <Tag>v.0.6.0</Tag>
           </p>
