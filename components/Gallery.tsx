@@ -106,25 +106,50 @@ const Gallery: React.FC<GalleryProps> = ({
         {images.length > 0 && (
           <>
             {onSelectAll && (
-              <Button
-                onClick={onSelectAll}
-                icon={<ClearOutlined style={{ transform: 'scaleY(-1)' }} />}
-                size="small"
-                className="hidden sm:inline-flex"
-              >
-                Select All
-              </Button>
+              <>
+                {/* Desktop version with text */}
+                <Button
+                  onClick={onSelectAll}
+                  icon={<ClearOutlined style={{ transform: 'scaleY(-1)' }} />}
+                  size="small"
+                  className="hidden sm:inline-flex"
+                >
+                  Select All
+                </Button>
+                {/* Mobile version icon-only */}
+                <Tooltip title="Select All">
+                  <Button
+                    onClick={onSelectAll}
+                    icon={<ClearOutlined style={{ transform: 'scaleY(-1)' }} />}
+                    size="small"
+                    className="sm:hidden"
+                  />
+                </Tooltip>
+              </>
             )}
             {onClearSelection && (
-              <Button 
-                onClick={onClearSelection} 
-                disabled={!hasSelection} 
-                icon={<ClearOutlined />}
-                size="small"
-                className="hidden sm:inline-flex"
-              >
-                Deselect All
-              </Button>
+              <>
+                {/* Desktop version with text */}
+                <Button 
+                  onClick={onClearSelection} 
+                  disabled={!hasSelection} 
+                  icon={<ClearOutlined />}
+                  size="small"
+                  className="hidden sm:inline-flex"
+                >
+                  Deselect All
+                </Button>
+                {/* Mobile version icon-only */}
+                <Tooltip title="Deselect All">
+                  <Button 
+                    onClick={onClearSelection} 
+                    disabled={!hasSelection} 
+                    icon={<ClearOutlined />}
+                    size="small"
+                    className="sm:hidden"
+                  />
+                </Tooltip>
+              </>
             )}
             {onBulkDownload && (
               <Button 
