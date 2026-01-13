@@ -73,11 +73,11 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
   return (
     <Card
       title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <span>{title}</span>
-          <Button onClick={() => setIsAddColorModalOpen(true)}>
+          <Button onClick={() => setIsAddColorModalOpen(true)} size="small">
             <PlusOutlined />
-            Custom Color
+            <span className="hidden sm:inline ml-1">Custom Color</span>
           </Button>
         </div>
       }
@@ -137,10 +137,11 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: `repeat(auto-fit, minmax(200px, 1fr))`,
+                    gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))`,
                     minWidth: 'min-content',
                     gap: '2px',
                   }}
+                  className="sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]"
                 >
                   {sortedColors.map((color) => (
                     <div
