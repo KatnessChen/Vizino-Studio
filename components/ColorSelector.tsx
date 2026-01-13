@@ -134,15 +134,20 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
                   paddingBottom: '8px',
                 }}
               >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))`,
-                    minWidth: 'min-content',
-                    gap: '2px',
-                  }}
-                  className="sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]"
-                >
+                <style>{`
+                  .color-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                    min-width: min-content;
+                    gap: 2px;
+                  }
+                  @media (min-width: 640px) {
+                    .color-grid {
+                      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    }
+                  }
+                `}</style>
+                <div className="color-grid">
                   {sortedColors.map((color) => (
                     <div
                       key={color.id}
