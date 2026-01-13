@@ -1,4 +1,47 @@
-## Configure Firebase Storage CORS
+# Vizion Studio - Interior Painting Designer
+
+Recolor your interior photos with paint codes using AI.
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run development server
+pnpm run dev
+
+# Build for production
+pnpm run build
+```
+
+## 🧪 E2E Testing
+
+This project includes an **AI-powered automated E2E testing workflow** that:
+
+- 🤖 Automatically generates E2E tests based on your code
+- 🌐 Runs tests in virtual browsers (Chromium, Firefox, WebKit)
+- 🔧 Auto-fixes failing tests using AI analysis
+- 📊 Provides comprehensive test reports
+
+### Running Tests
+
+```bash
+# Run E2E tests
+pnpm run test:e2e
+
+# Run tests in UI mode
+pnpm run test:e2e:ui
+
+# Debug tests
+pnpm run test:e2e:debug
+```
+
+For detailed information about the AI testing workflow, see [E2E Testing Documentation](./docs/E2E_TESTING.md).
+
+## ⚙️ Configure Firebase Storage CORS
 
 To enable your environment to access images from Firebase Storage, you need to configure CORS (Cross-Origin Resource Sharing) settings.
 
