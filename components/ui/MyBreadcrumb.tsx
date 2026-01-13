@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Breadcrumb, Dropdown, Space, Tooltip, Button, Modal, Alert } from 'antd';
-import type { MenuProps } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Breadcrumb, Dropdown, Space, Tooltip, Button, Modal, Alert, MenuProps } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
@@ -52,6 +52,7 @@ import {
 } from '@/stores/customAssetsStore';
 import { setSelectedColor, setSelectedTexture } from '@/stores/taskStore';
 import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
+import { generateRoute } from '@/constants/routes';
 
 export const ModalMode = {
   ADD_PROJECT: 'add-project',
@@ -70,6 +71,7 @@ interface BreadcrumbProps {
 const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSelected }) => {
   const { user, adminSettings } = useAuth();
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const projects = useSelector(selectProjects);
   const activeProjectId = useSelector(selectActiveProjectId);
   const activeProject = useSelector(selectActiveProject);
@@ -123,6 +125,15 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
       dispatch(setSelectedColor(null));
       dispatch(setSelectedTexture(null));
 
+      // Navigate to the new project/space URL
+      if (selectedProject && firstSpace) {
+        navigate(
+          generateRoute.space(selectedProject.name, projectId, firstSpace.name, firstSpace.id)
+        );
+      } else if (selectedProject) {
+        navigate(generateRoute.project(selectedProject.name, projectId));
+      }
+
       // Fetch custom assets for new project
       const loadCustomAssets = async () => {
         try {
@@ -155,7 +166,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
 
       loadCustomAssets();
     },
-    [user, dispatch, projects, activeProjectId, onProjectSelected]
+    [user, dispatch, projects, activeProjectId, onProjectSelected, navigate]
   );
 
   const handleSelectSpace = useCallback(
@@ -163,8 +174,15 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
       if (!user || !activeProjectId || activeSpaceId === spaceId) return;
       dispatch(setActiveSpaceId(spaceId));
       onSpaceSelected?.(activeProjectId, spaceId);
+
+      // Navigate to the new space URL
+      const project = projects.find((p) => p.id === activeProjectId);
+      const space = project?.spaces.find((s) => s.id === spaceId);
+      if (project && space) {
+        navigate(generateRoute.space(project.name, activeProjectId, space.name, spaceId));
+      }
     },
-    [user, activeProjectId, activeSpaceId, dispatch, onSpaceSelected]
+    [user, activeProjectId, activeSpaceId, dispatch, onSpaceSelected, navigate, projects]
   );
 
   const handleDeleteProject = useCallback(
@@ -178,6 +196,27 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           try {
             await deleteProject(user.uid, projectId);
             dispatch(removeProject(projectId));
+
+            // Navigate to home or first available project after deletion
+            const remainingProjects = projects.filter((p) => p.id !== projectId);
+            if (remainingProjects.length > 0) {
+              const firstProject = remainingProjects[0];
+              const firstSpace = firstProject.spaces[0];
+              if (firstSpace) {
+                navigate(
+                  generateRoute.space(
+                    firstProject.name,
+                    firstProject.id,
+                    firstSpace.name,
+                    firstSpace.id
+                  )
+                );
+              } else {
+                navigate(generateRoute.project(firstProject.name, firstProject.id));
+              }
+            } else {
+              navigate('/');
+            }
           } catch (error) {
             console.error('Error deleting project:', error);
           } finally {
@@ -186,7 +225,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
         },
       });
     },
-    [user, dispatch, confirmModal]
+    [user, dispatch, confirmModal, projects, navigate]
   );
 
   const handleDeleteSpace = useCallback(
@@ -200,6 +239,20 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           try {
             await deleteSpace(user.uid, projectId, spaceId);
             dispatch(removeSpace({ projectId, spaceId }));
+
+            // Navigate to first available space or project after deletion
+            const project = projects.find((p) => p.id === projectId);
+            if (project) {
+              const remainingSpaces = project.spaces.filter((s) => s.id !== spaceId);
+              if (remainingSpaces.length > 0) {
+                const firstSpace = remainingSpaces[0];
+                navigate(
+                  generateRoute.space(project.name, projectId, firstSpace.name, firstSpace.id)
+                );
+              } else {
+                navigate(generateRoute.project(project.name, projectId));
+              }
+            }
           } catch (error) {
             console.error('Error deleting space:', error);
           } finally {
@@ -208,7 +261,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
         },
       });
     },
-    [user, dispatch, confirmModal]
+    [user, dispatch, confirmModal, projects, navigate]
   );
 
   const handleModalSubmit = useCallback(async () => {
@@ -234,6 +287,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           dispatch(addProject(newProject));
           dispatch(setActiveProjectId(newProject.id));
           dispatch(resetTaskState());
+          // Navigate to the new project
+          navigate(generateRoute.project(newProject.name, newProject.id));
           break;
         }
         case ModalMode.ADD_SPACE: {
@@ -251,6 +306,12 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           dispatch(addSpace({ projectId: activeProjectId, space: newSpace }));
           dispatch(setActiveSpaceId(newSpace.id));
           dispatch(resetTaskState());
+          // Navigate to the new space
+          if (activeProject) {
+            navigate(
+              generateRoute.space(activeProject.name, activeProjectId, newSpace.name, newSpace.id)
+            );
+          }
           break;
         }
         case ModalMode.EDIT_PROJECT: {
@@ -298,6 +359,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
     editingEntityIds,
     projects,
     adminSettings,
+    navigate,
   ]);
 
   const handleCloseModal = useCallback(() => {
@@ -572,9 +634,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
   if (!isAppInitiated) {
     return (
       <Box display="flex" alignItems="center" gap={2} p={2}>
-        <Skeleton variant="rounded" width={200} height={56} />
-        <Skeleton variant="rounded" width={200} height={56} />
-        <Skeleton variant="circular" width={40} height={40} />
+        <Skeleton variant="rounded" width={200} height={40} />
+        <Skeleton variant="rounded" width={200} height={40} />
       </Box>
     );
   }

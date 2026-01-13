@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppDispatch } from '@/stores/store';
 import {
@@ -11,17 +12,30 @@ import {
   setInitError,
 } from '@/stores/projectStore';
 import { fetchProjects, fetchSpaceImages } from '@/services/firestoreService';
+import { generateRoute } from '@/constants/routes';
+import { extractShortId } from '@/utils/stringUtils';
 
 /**
  * Custom hook to handle app initialization:
  * - Fetch user projects
- * - Auto-select first project and space
+ * - Auto-select project and space from URL slug-id params or default to first
  * - Fetch images for the selected space
  * - Updates isAppInitiated state in Redux store
+ *
+ * URL format: /project/{name-slug}-{shortId}/space/{name-slug}-{shortId}
+ * The hook extracts the shortId from the slug-id and matches it with project/space IDs
  */
 export const useAppInit = () => {
   const { user } = useAuth();
   const dispatch = useDispatch<AppDispatch>();
+  const { slugId: projectSlugId, spaceSlugId } = useParams<{
+    slugId?: string;
+    spaceSlugId?: string;
+  }>();
+  const navigate = useNavigate();
+
+  // Track if initial load has been completed to prevent re-initialization
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -29,6 +43,12 @@ export const useAppInit = () => {
       dispatch(setActiveProjectId(null));
       dispatch(setActiveSpaceId(null));
       dispatch(setIsAppInitiated(false));
+      hasInitialized.current = false;
+      return;
+    }
+
+    // Only run initialization once when user is first logged in
+    if (hasInitialized.current) {
       return;
     }
 
@@ -41,37 +61,82 @@ export const useAppInit = () => {
         const projects = await fetchProjects(user.uid);
         dispatch(setProjects(projects));
 
-        // Auto-select the first project if available
-        if (projects.length > 0) {
-          const firstProject = projects[0];
-          dispatch(setActiveProjectId(firstProject.id));
+        if (projects.length === 0) {
+          dispatch(setIsAppInitiated(true));
+          hasInitialized.current = true;
+          return;
+        }
 
-          // Auto-select the first space if available
-          const firstSpace = firstProject?.spaces?.[0];
-          if (firstSpace) {
-            dispatch(setActiveSpaceId(firstSpace.id));
+        let selectedProject = null;
+        let selectedSpace = null;
 
-            // Fetch images for the first space
-            const images = await fetchSpaceImages(user.uid, firstProject.id, firstSpace.id);
-            dispatch(
-              setSpaceImages({
-                projectId: firstProject.id,
-                spaceId: firstSpace.id,
-                images,
-              })
-            );
+        // Extract short ID from URL slug-id and find matching project
+        if (projectSlugId) {
+          const shortId = extractShortId(projectSlugId);
+          selectedProject = projects.find((p) => p.id.startsWith(shortId));
+        }
+
+        // If URL project doesn't exist or no URL param, use first project
+        if (!selectedProject) {
+          selectedProject = projects[0];
+        }
+
+        dispatch(setActiveProjectId(selectedProject.id));
+
+        // Extract short ID from URL slug-id and find matching space
+        if (spaceSlugId && selectedProject) {
+          const shortId = extractShortId(spaceSlugId);
+          selectedSpace = selectedProject.spaces.find((s) => s.id.startsWith(shortId));
+        }
+
+        // If URL space doesn't exist or no URL param, use first space
+        if (!selectedSpace && selectedProject.spaces.length > 0) {
+          selectedSpace = selectedProject.spaces[0];
+        }
+
+        if (selectedSpace) {
+          dispatch(setActiveSpaceId(selectedSpace.id));
+
+          // Fetch images for the selected space
+          const images = await fetchSpaceImages(user.uid, selectedProject.id, selectedSpace.id);
+          dispatch(
+            setSpaceImages({
+              projectId: selectedProject.id,
+              spaceId: selectedSpace.id,
+              images,
+            })
+          );
+
+          // Update URL to correct slug-id format if needed
+          const expectedUrl = generateRoute.space(
+            selectedProject.name,
+            selectedProject.id,
+            selectedSpace.name,
+            selectedSpace.id
+          );
+          if (window.location.pathname !== expectedUrl) {
+            navigate(expectedUrl, { replace: true });
+          }
+        } else {
+          // No spaces available, navigate to project route
+          const expectedUrl = generateRoute.project(selectedProject.name, selectedProject.id);
+          if (window.location.pathname !== expectedUrl) {
+            navigate(expectedUrl, { replace: true });
           }
         }
 
         dispatch(setIsAppInitiated(true));
+        hasInitialized.current = true;
       } catch (error) {
         console.error('Error initializing app:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to initialize app';
         dispatch(setInitError(errorMessage));
         dispatch(setIsAppInitiated(true));
+        hasInitialized.current = true;
       }
     };
 
     initializeApp();
-  }, [user?.uid, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 };

@@ -35,6 +35,8 @@ const ProtectedLayout: React.FC = () => {
       <div className="flex-1 overflow-scroll">
         <Routes>
           <Route path={ROUTES.HOME} element={<LandingPage />} />
+          <Route path={ROUTES.PROJECT} element={<LandingPage />} />
+          <Route path={ROUTES.SPACE} element={<LandingPage />} />
           <Route path={ROUTES.ADMIN_SETTING} element={<AdminSettingPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

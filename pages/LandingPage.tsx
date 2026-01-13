@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, ReactElement } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Timestamp } from 'firebase/firestore';
 import { message, Tag } from 'antd';
@@ -746,7 +746,6 @@ const LandingPage: React.FC = () => {
                 <div className="text-center max-w-md p-6">
                   <div className="text-red-600 text-5xl mb-4">🤯</div>
                   <h2 className="text-xl text-gray-600 mb-2">Sorry, something went wrong.</h2>
-                  <p className="text-gray-600 mb-4">{initError}</p>
                   <button
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-blue-700 transition"
