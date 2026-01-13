@@ -5,6 +5,7 @@ import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
 import { Card, Button, Tooltip, Space } from 'antd';
+import MyEmpty from '@/components/ui/MyEmpty';
 import { DeleteOutlined, DownloadOutlined, ClearOutlined, CopyOutlined } from '@ant-design/icons';
 
 interface GalleryProps {
@@ -148,9 +149,7 @@ const Gallery: React.FC<GalleryProps> = ({
   return (
     <Card title={cardTitle}>
       {images.length === 0 && !showUploadCard ? (
-        <div style={{ textAlign: 'center', padding: '0 32px', color: '#999', fontStyle: 'italic' }}>
-          {emptyMessage}
-        </div>
+        <MyEmpty description={emptyMessage} />
       ) : (
         <div
           style={{

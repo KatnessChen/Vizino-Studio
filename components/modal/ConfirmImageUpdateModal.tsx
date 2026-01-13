@@ -138,23 +138,6 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
     onConfirm(generatedImage, finalName);
   };
 
-  const getModalDescription = () => {
-    if (taskName === GEMINI_TASKS.RECOLOR_WALL.task_name && colorName) {
-      return (
-        <>
-          The walls have been recolored to <strong>{colorName}</strong>.
-        </>
-      );
-    } else if (taskName === GEMINI_TASKS.ADD_TEXTURE.task_name && textureName) {
-      return (
-        <>
-          The <strong>{textureName}</strong> texture has been applied to the walls.
-        </>
-      );
-    }
-    return 'The image has been processed.';
-  };
-
   if (!generatedImage || !originalImage) return null;
 
   return (
@@ -162,9 +145,8 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
       title={
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
-            Is this result satisfactory?
+            Transformation complete. Save this result?
           </Typography.Title>
-          <Typography.Text type="secondary">{getModalDescription()}</Typography.Text>
         </div>
       }
       open={isOpen}
@@ -174,7 +156,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
       zIndex={1500}
       footer={[
         <Button key="cancel" onClick={onCancel} size="large">
-          No, refine
+          Refine
         </Button>,
         <Button
           key="confirm"
@@ -183,7 +165,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           disabled={!!nameError}
           size="large"
         >
-          Yes, save
+          Save
         </Button>,
       ]}
     >

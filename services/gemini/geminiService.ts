@@ -2,6 +2,7 @@ import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
 import { ImageData } from '@/types';
 import { getPromptByTask } from './prompts';
 import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
+import { GEMINI_ERRORS } from './geminiApiErrors';
 import { ref } from 'firebase/storage';
 import { getBytes } from 'firebase/storage';
 import { storage } from '../firestoreService';
@@ -10,14 +11,14 @@ export { GEMINI_TASKS };
 export type { GeminiTask };
 
 // TODO: explore more model solutions and make this selectable to users
-const defaultModel = 'gemini-2.5-flash-image';
+const defaultModel = 'gemini-3-pro-image-preview';
 
 const getBase64FromImageData = async (userId: string | undefined, imageData: ImageData) => {
   // Fetch the image from Firebase Storage using SDK
   const storageFilePath = imageData.storageFilePath;
 
   if (!storageFilePath) {
-    throw new Error(`Image storageFilePath is missing for image ${imageData.id}`);
+    throw new Error(GEMINI_ERRORS.IMAGE_STORAGE_PATH_MISSING(imageData.id));
   }
 
   try {
@@ -29,7 +30,7 @@ const getBase64FromImageData = async (userId: string | undefined, imageData: Ima
   } catch (error) {
     console.error(`Failed to fetch image from Storage path: ${storageFilePath}`, error);
     throw new Error(
-      `Failed to fetch image: ${error instanceof Error ? error.message : String(error)}`
+      GEMINI_ERRORS.FAILED_TO_FETCH_IMAGE(error instanceof Error ? error.message : String(error))
     );
   }
 };
@@ -112,13 +113,29 @@ export const generateItemPlacedImage = async (
   });
 };
 
+export const generateCustomPromptImage = async (
+  userId: string,
+  imageData: ImageData,
+  customPrompt: string
+): Promise<{ base64: string; mimeType: string }> => {
+  const image = {
+    base64String: await getBase64FromImageData(userId, imageData),
+    mimeType: imageData.mimeType,
+  };
+
+  return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, {
+    customPrompt,
+    userId,
+  });
+};
+
 /**
  * Fetch image from URL and convert to base64
  */
 async function fetchImageAsBase64(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
+    throw new Error(GEMINI_ERRORS.FAILED_TO_FETCH_FROM_URL(response.statusText));
   }
   const blob = await response.blob();
   return await blobToBase64(blob);
@@ -156,7 +173,7 @@ export const processImageWithTask = async (
   } = {}
 ): Promise<{ base64: string; mimeType: string }> => {
   if (!process.env.API_KEY) {
-    throw new Error('API_KEY is not set in environment variables.');
+    throw new Error(GEMINI_ERRORS.API_KEY_NOT_SET);
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -166,7 +183,7 @@ export const processImageWithTask = async (
 
   try {
     // Build parts array
-    const parts: any[] = [];
+    const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [];
 
     // For ADD_TEXTURE task, texture image comes first
     if (task.task_name === GEMINI_TASKS.ADD_TEXTURE.task_name && options.textureImage) {
@@ -209,17 +226,25 @@ export const processImageWithTask = async (
       },
     });
 
+    // Check if request was blocked by safety filters or other reasons
+    // Reference: https://ai.google.dev/docs/safety_ratings
+    if (response.promptFeedback?.blockReason) {
+      const blockReason = response.promptFeedback.blockReason;
+      const errorMessage = GEMINI_ERRORS.BLOCKED_BY_SAFETY_POLICY(blockReason);
+      throw new Error(errorMessage);
+    }
+
     const generatedImagePart = response.candidates?.[0]?.content?.parts?.[0];
 
     if (!generatedImagePart || !generatedImagePart.inlineData) {
-      throw new Error('No image data received from Gemini API.');
+      throw new Error(GEMINI_ERRORS.NO_IMAGE_DATA_RECEIVED);
     }
 
     const newImageBase64: string = generatedImagePart.inlineData.data ?? '';
     const newImageMimeType: string = generatedImagePart.inlineData.mimeType ?? 'image/png';
 
     if (!newImageBase64) {
-      throw new Error('No base64 image data received from Gemini API.');
+      throw new Error(GEMINI_ERRORS.NO_BASE64_DATA_RECEIVED);
     }
 
     return {
@@ -229,7 +254,7 @@ export const processImageWithTask = async (
   } catch (error) {
     console.error('Error processing image with Gemini API:', error);
     throw new Error(
-      `Failed to process image: ${error instanceof Error ? error.message : String(error)}`
+      GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
     );
   }
 };

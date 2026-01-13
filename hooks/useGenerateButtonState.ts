@@ -9,6 +9,8 @@ interface UseGenerateButtonStateProps {
   selectedColor: Color | null;
   selectedTexture: Texture | null;
   selectedItem: Item | null;
+  customPrompt?: string;
+  isCustomPromptRequired?: boolean;
 }
 
 export const useGenerateButtonState = ({
@@ -19,6 +21,8 @@ export const useGenerateButtonState = ({
   selectedColor,
   selectedTexture,
   selectedItem,
+  customPrompt = '',
+  isCustomPromptRequired = false,
 }: UseGenerateButtonStateProps) => {
   let disableReason = '';
 
@@ -36,6 +40,8 @@ export const useGenerateButtonState = ({
     disableReason = 'Please select a texture to remix.';
   } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
     disableReason = 'Please select an object to remix.';
+  } else if (isCustomPromptRequired && !customPrompt.trim()) {
+    disableReason = 'Please enter a custom prompt.';
   }
 
   const isDisabled = disableReason !== '';

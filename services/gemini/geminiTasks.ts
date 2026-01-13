@@ -12,11 +12,16 @@ export const GEMINI_TASKS = {
   ADD_TEXTURE: {
     task_name: 'add_texture',
     label_name: 'Add Texture',
-    customPromptRequired: true,
+    customPromptRequired: false,
   },
   ADD_HOME_ITEM: {
     task_name: 'add_home_item',
     label_name: 'Add Object',
+    customPromptRequired: false,
+  },
+  CUSTOM_PROMPT: {
+    task_name: 'custom_prompt',
+    label_name: 'Prompt',
     customPromptRequired: true,
   },
 } as const;

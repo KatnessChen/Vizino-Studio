@@ -47,6 +47,11 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       label: GEMINI_TASKS.ADD_HOME_ITEM.label_name,
       icon: '🛋️',
     },
+    {
+      value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
+      label: GEMINI_TASKS.CUSTOM_PROMPT.label_name,
+      icon: '💬',
+    },
   ];
 
   const handleTaskChange = (taskValue: GeminiTaskName) => (e: CheckboxChangeEvent) => {

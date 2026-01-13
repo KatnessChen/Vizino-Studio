@@ -30,6 +30,7 @@ import {
   selectIsAppInitiated,
   selectActiveProject,
 } from '@/stores/projectStore';
+import { resetTaskState } from '@/stores/taskStore';
 import {
   createProject,
   updateProject,
@@ -232,6 +233,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           const newProject = await createProject(user.uid, userInputValue);
           dispatch(addProject(newProject));
           dispatch(setActiveProjectId(newProject.id));
+          dispatch(resetTaskState());
           break;
         }
         case ModalMode.ADD_SPACE: {
@@ -248,6 +250,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           const newSpace = await createSpace(user.uid, activeProjectId, userInputValue);
           dispatch(addSpace({ projectId: activeProjectId, space: newSpace }));
           dispatch(setActiveSpaceId(newSpace.id));
+          dispatch(resetTaskState());
           break;
         }
         case ModalMode.EDIT_PROJECT: {

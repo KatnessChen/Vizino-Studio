@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Modal,
@@ -11,22 +11,24 @@ import {
   Typography,
   message,
   Skeleton,
-  Empty,
 } from 'antd';
-import { InfoCircleOutlined, BulbOutlined, CloseOutlined } from '@ant-design/icons';
+import { BulbOutlined, CloseOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
+import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
+import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
 import { ImageData, ImageOperation, CustomPrompt } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import {
-  getWallRecolorPrompt,
-  getAddTexturePrompt,
-  getItemPrompt,
+  getRecolorTaskDefaultPrompt,
+  getAddTextureDefaultPrompt,
+  getAddObjectDefaultPrompt,
+  getUseCustomPromptDefaultPrompt,
 } from '@/services/gemini/prompts';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
-import { formatImageOperationData, formatTaskName } from '@/utils';
+import { formatImageOperationData } from '@/utils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
   selectActiveProjectId,
@@ -132,6 +134,16 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
   // Check operation limit
   const operationLimitCheck = checkOperationLimit(sourceImage, adminSettings.mock_limit_reached);
 
+  // Helper function to get customPromptRequired for a task
+  const getCustomPromptRequired = (taskName: string | null): boolean => {
+    if (!taskName) return false;
+    const taskEntry = Object.entries(GEMINI_TASKS).find(([, task]) => task.task_name === taskName);
+    return taskEntry?.[1]?.customPromptRequired ?? false;
+  };
+
+  // Determine if custom prompt is required for current task
+  const isCustomPromptRequired = getCustomPromptRequired(activeTaskName);
+
   // Use image processing hook
   const { processImage, processingImage, errorMessage, setErrorMessage } = useImageProcessing({
     userId,
@@ -152,6 +164,8 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     selectedColor,
     selectedTexture,
     selectedItem,
+    customPrompt,
+    isCustomPromptRequired,
   });
 
   // Calculate default prompt based on active task
@@ -159,11 +173,13 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     if (!activeTaskName) return '';
 
     if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
-      return getWallRecolorPrompt(selectedColor?.name, selectedColor?.hex, undefined);
+      return getRecolorTaskDefaultPrompt(selectedColor?.name, selectedColor?.hex, undefined);
     } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name) {
-      return getAddTexturePrompt(selectedTexture?.name || '', undefined);
+      return getAddTextureDefaultPrompt(selectedTexture?.name || '', undefined);
     } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
-      return getItemPrompt(selectedItem?.name || '', undefined);
+      return getAddObjectDefaultPrompt(selectedItem?.name || '', undefined);
+    } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+      return getUseCustomPromptDefaultPrompt('USER CUSTOM PROMPTS');
     }
     return '';
   }, [activeTaskName, selectedColor, selectedTexture, selectedItem]);
@@ -234,6 +250,12 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       return;
     }
 
+    // Check if custom prompt is required for current task
+    if (isCustomPromptRequired && !customPrompt.trim()) {
+      setValidationError('Please enter a custom prompt.');
+      return;
+    }
+
     if (!sourceImage) {
       setValidationError('No source image available.');
       return;
@@ -270,6 +292,15 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       setShowConfirmationModal(true);
     }
   };
+
+  const handlePickHistoricalCustomPrompt = useCallback(
+    (e: React.MouseEvent, customPrompt: string) => {
+      e.stopPropagation();
+      setCustomPrompt(customPrompt);
+      message.success('Prompt applied!');
+    },
+    []
+  );
 
   const handleClose = () => {
     if (!savingImage) {
@@ -442,7 +473,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     setGeneratedImage(null);
   };
 
-  const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
+  // const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
 
   // Dynamic modal title based on task
   const getModalTitle = () => {
@@ -454,6 +485,8 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       return 'Apply Texture to Specified Surfaces';
     } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
       return 'Add New Elements';
+    } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+      return 'Transform Image with Custom Prompts';
     }
     return 'Generate More Images';
   };
@@ -466,6 +499,8 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       return "Describe how to apply the texture... (e.g., 'Apply to the upper half only', 'Make the pattern smaller')";
     } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
       return "Describe what you want to add... (e.g., 'A person reading on the sofa', 'A cat sleeping near the window', 'A modern floor lamp')";
+    } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+      return 'Enter your detailed instructions for the AI image transformation... (required)';
     }
     return "Enter any specific instructions for the AI... (e.g., 'Make the walls lighter', 'Add more warmth to the color')";
   };
@@ -502,6 +537,15 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
             text:
               sharedTip +
               "where to place the object and what angle? (e.g., 'corner by the window', 'center of the room facing left')",
+            hasButton: false,
+          },
+        ],
+      };
+    } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+      return {
+        tips: [
+          {
+            text: 'Be specific and detailed about what changes you want. Include: what elements to modify, how to modify them, and any specific style or aesthetic preferences',
             hasButton: false,
           },
         ],
@@ -591,7 +635,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
               </div>
 
               {/* Last Operation Info */}
-              {lastOperation && (
+              {/* {lastOperation && (
                 <div style={{ marginBottom: 16 }}>
                   <Typography.Title level={5} style={{ marginBottom: 8 }}>
                     Last Generation
@@ -610,7 +654,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Source Image Preview */}
               <div
@@ -647,7 +691,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                 minWidth: 0,
               }}
             >
-              <SelectedAssets />
+              {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && <SelectedAssets />}
 
               {/* Custom Prompt & Historical Prompts */}
               <div
@@ -665,9 +709,17 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <Typography.Title
                     level={5}
-                    style={{ margin: 0, marginBottom: '4px', padding: '12px 12px 0 12px' }}
+                    style={{
+                      margin: 0,
+                      marginBottom: '4px',
+                      padding: '12px 12px 0 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
                   >
                     Saved Prompts
+                    <InfoIconWithTooltip title="Historical custom prompts of all saved images" />
                   </Typography.Title>
 
                   {/* Search Input */}
@@ -691,7 +743,6 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                     style={{
                       flex: 1,
                       overflow: 'auto',
-                      borderRight: '1px solid #e5e7eb',
                       borderBottom: 'none',
                       maxHeight: '300px',
                     }}
@@ -712,7 +763,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                           height: '100%',
                         }}
                       >
-                        <Empty description="No prompts found" style={{ margin: 0 }} />
+                        <MyEmpty description="No historical prompts" />
                       </div>
                     ) : (
                       <List
@@ -734,7 +785,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                                 backgroundColor: '#f5f5f5',
                               },
                             }}
-                            onClick={() => setCustomPrompt(prompt.content)}
+                            onClick={(e) => handlePickHistoricalCustomPrompt(e, prompt.content)}
                           >
                             <Box
                               sx={{
@@ -749,11 +800,9 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                               <MuiTooltip title="Use this prompt">
                                 <IconButton
                                   size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCustomPrompt(prompt.content);
-                                    message.success('Prompt applied!');
-                                  }}
+                                  onClick={(e) =>
+                                    handlePickHistoricalCustomPrompt(e, prompt.content)
+                                  }
                                   sx={{ flexShrink: 0 }}
                                 >
                                   <CopyIcon sx={{ fontSize: '1rem' }} />
@@ -782,7 +831,16 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                     level={5}
                     style={{ margin: 0, marginBottom: '4px', padding: '12px 12px 0 12px' }}
                   >
-                    Custom Prompt (Optional)
+                    Custom Prompt
+                    <span
+                      style={{
+                        color: isCustomPromptRequired ? '#ff4d4f' : '#999',
+                        fontSize: '0.85em',
+                        marginLeft: '4px',
+                      }}
+                    >
+                      ({isCustomPromptRequired ? 'Required' : 'Optional'})
+                    </span>
                   </Typography.Title>
 
                   {/* Custom Prompt Input */}

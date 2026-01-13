@@ -4,6 +4,7 @@ import {
   generateRecoloredImage,
   generateRetexturedImage,
   generateItemPlacedImage,
+  generateCustomPromptImage,
 } from '@/services/gemini/geminiService';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { incrementTaskUsage } from '@/services/userService';
@@ -101,6 +102,13 @@ export const useImageProcessing = ({
             selectedItem.name,
             customPrompt
           );
+        } else if (selectedTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+          if (!customPrompt || customPrompt.trim() === '') {
+            setErrorMessage('Please enter a custom prompt first.');
+            setProcessingImage(false);
+            return null;
+          }
+          result = await generateCustomPromptImage(userId, imageData, customPrompt);
         } else {
           throw new Error('Unknown task type');
         }
@@ -149,7 +157,7 @@ export const useImageProcessing = ({
         return null;
       }
     },
-    [userId, selectedTaskName, selectedColor, selectedTexture]
+    [userId, selectedTaskName, selectedColor, selectedTexture, selectedItem]
   );
 
   return {

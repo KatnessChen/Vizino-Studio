@@ -9,7 +9,7 @@ import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
 // PROMPTS
 // ═══════════════════════════════════════════════════════════
 
-export const getWallRecolorPrompt = (
+export const getRecolorTaskDefaultPrompt = (
   colorName: string | undefined,
   colorHex: string | undefined,
   customPrompt: string | undefined
@@ -37,7 +37,10 @@ export const getWallRecolorPrompt = (
   Deliver: A high-quality, photorealistic recolored image where ALL walls display ${colorName} (${colorHex}) with maximum visual distinction from the original.
 `;
 
-export const getAddTexturePrompt = (textureName: string, customPrompt: string | undefined) => `
+export const getAddTextureDefaultPrompt = (
+  textureName: string,
+  customPrompt: string | undefined
+) => `
   You are an expert interior designer and professional image editor specializing in applying textures to wall surfaces.
 
   You will receive TWO images:
@@ -64,7 +67,7 @@ export const getAddTexturePrompt = (textureName: string, customPrompt: string | 
   Deliver: A high-quality, photorealistic image where the wall surface(s) display the ${textureName} texture (sampled from the first image) applied seamlessly and professionally, following the user's scope or defaulting to all walls.
 `;
 
-export const getItemPrompt = (itemName: string, customPrompt: string | undefined) => `
+export const getAddObjectDefaultPrompt = (itemName: string, customPrompt: string | undefined) => `
   You are an expert interior designer and professional image editor specializing in seamlessly placing objects, characters, or elements into interior spaces.
 
   You will receive TWO images:
@@ -90,6 +93,27 @@ export const getItemPrompt = (itemName: string, customPrompt: string | undefined
 
   FINAL OUTPUT REQUIREMENT:
   Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.
+`;
+
+export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
+  You are an expert interior designer and professional image editor with advanced capabilities in transforming interior spaces.
+
+  Your task is to modify the provided interior photo according to the user's custom instructions below.
+
+  CRITICAL QUALITY STANDARDS:
+  1. Maintain photorealistic quality and natural appearance
+  2. Preserve proper lighting, shadows, and perspective
+  3. Ensure all modifications blend seamlessly with the original environment
+  4. Keep architectural elements and proportions realistic
+  5. Maintain image resolution and clarity
+  6. Apply changes only as specified in the user instructions
+  7. Preserve the overall composition and aesthetic quality
+
+  USER INSTRUCTIONS:
+  ${customPrompt}
+
+  FINAL OUTPUT REQUIREMENT:
+  Deliver: A high-quality, photorealistic modified image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -119,21 +143,28 @@ export const getPromptByTask = (
       if (!colorName || !colorHex) {
         throw new Error('colorName and colorHex are required for RECOLOR_WALL task');
       }
-      return getWallRecolorPrompt(colorName, colorHex, customPrompt);
+      return getRecolorTaskDefaultPrompt(colorName, colorHex, customPrompt);
 
     case GEMINI_TASKS.ADD_TEXTURE.task_name:
       if (!textureName) {
         throw new Error('textureName is required for ADD_TEXTURE task');
       }
-      return getAddTexturePrompt(textureName, customPrompt);
+      return getAddTextureDefaultPrompt(textureName, customPrompt);
 
     case GEMINI_TASKS.ADD_HOME_ITEM.task_name:
       if (!itemName) {
         throw new Error('itemName is required for ADD_HOME_ITEM task');
       }
-      return getItemPrompt(itemName, customPrompt);
+      return getAddObjectDefaultPrompt(itemName, customPrompt);
+
+    case GEMINI_TASKS.CUSTOM_PROMPT.task_name:
+      if (!customPrompt) {
+        throw new Error('customPrompt is required for CUSTOM_PROMPT task');
+      }
+      return getUseCustomPromptDefaultPrompt(customPrompt);
 
     default:
-      throw new Error(`Unknown task: ${(task as any).task_name}`);
+      // Exhaustive check - all task types should be handled above
+      return getUseCustomPromptDefaultPrompt('Unsupported task type');
   }
 };

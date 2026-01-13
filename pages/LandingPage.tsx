@@ -769,7 +769,7 @@ const LandingPage: React.FC = () => {
                       onSelectMultiple={handleSelectMultipleOriginal}
                       onRenameImage={handleRenameImage}
                       showRemoveButtons={selectedOriginalImageIds.size === 0}
-                      emptyMessage="No photos uploaded yet."
+                      emptyMessage="No images uploaded yet."
                       onUploadImage={handleImageUpload}
                       showUploadCard={true}
                       onBulkDownload={() => handleBulkDownload('original')}
@@ -799,7 +799,7 @@ const LandingPage: React.FC = () => {
                       selectedImageIds={selectedUpdatedImageIds}
                       onSelectMultiple={handleSelectUpdatedImage}
                       onRenameImage={handleRenameImage}
-                      emptyMessage="Satisfied recolored photos will appear here."
+                      emptyMessage="No generated images yet."
                       onBulkDelete={() => handleBulkDelete('updated')}
                       onBulkCopy={() => handleBulkCopy('updated')}
                       onClearSelection={handleClearUpdatedSelection}

@@ -158,16 +158,19 @@ const AsideSection: React.FC = () => {
         ) : null}
       </div>
 
-      <div className="px-6">
-        <SelectedAssets />
-      </div>
+      {/* Only show SelectedAssets if not using Custom Prompt task */}
+      {selectedTaskNames[0] !== 'custom_prompt' && (
+        <div className="px-6">
+          <SelectedAssets />
+        </div>
+      )}
 
       {/* Generate Button */}
       <div className="px-6">
         <button
           disabled={isDisabled || !selectedImage}
           onClick={handleGenerate}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full ${
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full cursor-pointer ${
             isDisabled || !selectedImage
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : 'text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500'
