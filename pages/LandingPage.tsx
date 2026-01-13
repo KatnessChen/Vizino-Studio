@@ -718,17 +718,17 @@ const LandingPage: React.FC = () => {
     originalImages.find((img) => img.id === selectedOriginalImageId) || null;
 
   return (
-    <div className="flex bg-gray-50">
+    <div className="flex flex-col lg:flex-row bg-gray-50">
       <AsideSection />
       <main
-        className="flex-1 overflow-scroll"
+        className="flex-1 overflow-scroll w-full"
         style={{ height: 'calc(100vh - var(--header-height))' }}
       >
         <div
           className="bg-gray-100"
           style={{ minHeight: 'calc(100vh - var(--header-height) - var(--footer-height))' }}
         >
-          <div className="flex items-end justify-between pr-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between px-4 sm:px-6 gap-2 sm:gap-0">
             <MyBreadcrumb />
             {imageLimitInfo && (
               <Tag variant="outlined" color="purple">
@@ -736,7 +736,7 @@ const LandingPage: React.FC = () => {
               </Tag>
             )}
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {!isAppInitiated ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

@@ -221,7 +221,7 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
   return (
     <Card
       title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <span>{title || defaultTitle}</span>
           <Upload
             beforeUpload={handleFileSelect}
@@ -229,7 +229,9 @@ const TextureOrItemSelector: React.FC<TextureOrItemSelectorProps> = ({
             maxCount={1}
             showUploadList={false}
           >
-            <Button icon={<CloudUploadOutlined />}>{uploadButtonLabel}</Button>
+            <Button icon={<CloudUploadOutlined />} size="small">
+              <span className="hidden sm:inline ml-1">{uploadButtonLabel}</span>
+            </Button>
           </Upload>
         </div>
       }

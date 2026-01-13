@@ -73,11 +73,11 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
   return (
     <Card
       title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <span>{title}</span>
-          <Button onClick={() => setIsAddColorModalOpen(true)}>
+          <Button onClick={() => setIsAddColorModalOpen(true)} size="small">
             <PlusOutlined />
-            Custom Color
+            <span className="hidden sm:inline ml-1">Custom Color</span>
           </Button>
         </div>
       }
@@ -107,6 +107,17 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
             .color-selector-radio .ant-radio {
               margin-right: 0 !important;
             }
+            .color-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+              min-width: min-content;
+              gap: 2px;
+            }
+            @media (min-width: 640px) {
+              .color-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              }
+            }
           `}</style>
           <Space orientation="vertical" style={{ width: '100%' }} size="small">
             <Radio.Group
@@ -134,14 +145,7 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
                   paddingBottom: '8px',
                 }}
               >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(auto-fit, minmax(200px, 1fr))`,
-                    minWidth: 'min-content',
-                    gap: '2px',
-                  }}
-                >
+                <div className="color-grid">
                   {sortedColors.map((color) => (
                     <div
                       key={color.id}

@@ -43,11 +43,11 @@ const Header: React.FC = () => {
     <>
       {/* Header Bar */}
       <nav className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-indigo-400 to-purple-600 shadow-lg">
-        <div className="flex items-center justify-between px-6 py-2">
+        <div className="flex items-center justify-between px-4 md:px-6 py-2">
           {/* Brand Section */}
           <div className="flex items-center cursor-pointer" onClick={() => navigate(ROUTES.HOME)}>
             <div className="text-xl text-white/85">Vizion</div>
-            <div className="text-white/70 font-light mt-1 ml-2">Your AI Image Designer</div>
+            <div className="hidden sm:block text-white/70 font-light mt-1 ml-2">Your AI Image Designer</div>
           </div>
           {/* Right Section - Profile */}
           <div className="flex items-center gap-2">
@@ -56,6 +56,7 @@ const Header: React.FC = () => {
                 type="link"
                 onClick={() => navigate(ROUTES.ADMIN_SETTING)}
                 style={{ color: 'rgba(255,255,255,0.75)' }}
+                className="hidden sm:inline-flex"
               >
                 Admin Settings
               </Button>
@@ -83,7 +84,7 @@ const Header: React.FC = () => {
       {isAuthPanelOpen && (
         <div
           ref={authPanelRef}
-          className="absolute right-6 bg-white rounded-lg shadow-xl border border-gray-200"
+          className="absolute right-2 sm:right-6 bg-white rounded-lg shadow-xl border border-gray-200"
           style={{ top: 48, width: 400, maxWidth: '90vw', zIndex: 1000 }}
         >
           <AuthPanel />
