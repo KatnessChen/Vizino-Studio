@@ -107,6 +107,17 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
             .color-selector-radio .ant-radio {
               margin-right: 0 !important;
             }
+            .color-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+              min-width: min-content;
+              gap: 2px;
+            }
+            @media (min-width: 640px) {
+              .color-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              }
+            }
           `}</style>
           <Space orientation="vertical" style={{ width: '100%' }} size="small">
             <Radio.Group
@@ -134,19 +145,6 @@ const ColorSelector: React.FC<ColorSelectorProps> = ({
                   paddingBottom: '8px',
                 }}
               >
-                <style>{`
-                  .color-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                    min-width: min-content;
-                    gap: 2px;
-                  }
-                  @media (min-width: 640px) {
-                    .color-grid {
-                      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    }
-                  }
-                `}</style>
                 <div className="color-grid">
                   {sortedColors.map((color) => (
                     <div
