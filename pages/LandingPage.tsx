@@ -735,6 +735,51 @@ const LandingPage: React.FC = () => {
     [user, activeProjectId, activeSpaceId, updatedImages, dispatch]
   );
 
+  // Single image operations
+  const handleSingleRename = useCallback(
+    (imageId: string) => {
+      const image = [...originalImages, ...updatedImages].find((img) => img.id === imageId);
+      if (!image) return;
+
+      const newName = prompt('Enter new name for the image:', image.name);
+      if (newName && newName.trim()) {
+        handleRenameImage(imageId, newName.trim());
+      }
+    },
+    [originalImages, updatedImages, handleRenameImage]
+  );
+
+  const handleSingleDuplicate = useCallback(
+    (imageId: string) => {
+      const image = [...originalImages, ...updatedImages].find((img) => img.id === imageId);
+      if (!image) return;
+
+      // Select this image and trigger bulk copy
+      const isOriginal = originalImages.some((img) => img.id === imageId);
+      const imageType = isOriginal ? 'original' : 'updated';
+
+      // Temporarily set selection to this single image
+      if (isOriginal) {
+        dispatch(setSelectedOriginalImageIds(new Set([imageId])));
+      } else {
+        dispatch(setSelectedUpdatedImageIds(new Set([imageId])));
+      }
+
+      // Show copy modal
+      setImageTypeToCopy(imageType);
+      setShowCopyModal(true);
+    },
+    [originalImages, updatedImages, dispatch]
+  );
+
+  const handleSingleCopy = useCallback(
+    (imageId: string) => {
+      // Same as duplicate for now - can be customized later
+      handleSingleDuplicate(imageId);
+    },
+    [handleSingleDuplicate]
+  );
+
   const getEmptyStateComponent = useMemo(() => {
     const hasNoProject = projects.length === 0 || !activeProjectId;
     const hasNoSpace = !activeSpaceId;
@@ -823,6 +868,9 @@ const LandingPage: React.FC = () => {
                       isImageLimitReached={!imageLimitCheck.canAdd}
                       enableReordering={true}
                       onReorder={handleReorderOriginalImages}
+                      onSingleRename={handleSingleRename}
+                      onSingleDuplicate={handleSingleDuplicate} // TODO: consolidate onSingleDuplicate & onSingleCopy
+                      onSingleCopy={handleSingleCopy} // TODO: consolidate onSingleDuplicate & onSingleCopy
                     />
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
@@ -852,6 +900,9 @@ const LandingPage: React.FC = () => {
                       isImageLimitReached={!imageLimitCheck.canAdd}
                       enableReordering={true}
                       onReorder={handleReorderGeneratedImages}
+                      onSingleRename={handleSingleRename}
+                      onSingleDuplicate={handleSingleDuplicate}
+                      onSingleCopy={handleSingleCopy}
                     />
                   </div>
                 )}

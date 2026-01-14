@@ -7,9 +7,12 @@ import { ImageData } from '@/types';
 interface SortableAssetCardProps {
   asset: ImageData;
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (event?: React.MouseEvent) => void;
   onViewExpand: () => void;
   onViewDetails: () => void;
+  onRename?: () => void;
+  onDuplicate?: () => void;
+  onCopy?: () => void;
 }
 
 const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
@@ -18,6 +21,9 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
   onSelect,
   onViewExpand,
   onViewDetails,
+  onRename,
+  onDuplicate,
+  onCopy,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: asset.id,
@@ -38,6 +44,9 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
         onSelect={onSelect}
         onViewExpand={onViewExpand}
         onViewDetails={onViewDetails}
+        onRename={onRename}
+        onDuplicate={onDuplicate}
+        onCopy={onCopy}
       />
     </div>
   );

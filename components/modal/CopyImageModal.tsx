@@ -50,7 +50,7 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
                 control={<Radio />}
                 label={
                   <div>
-                    <p className="font-medium text-gray-800">Duplicate as original image</p>
+                    <p className="font-medium text-gray-800">Copy as original image</p>
                     <p className="text-sm text-gray-600">
                       The operation history will not be kept. Take the updated image as a brand new
                       image
@@ -64,8 +64,8 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
                 control={<Radio />}
                 label={
                   <div>
-                    <p className="font-medium text-gray-800">Simply duplicate the image</p>
-                    <p className="text-sm text-gray-600">Keeping its operation history</p>
+                    <p className="font-medium text-gray-800">Simply copy the image</p>
+                    <p className="text-sm text-gray-600">Keeping its generation history</p>
                   </div>
                 }
               />
@@ -76,7 +76,9 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
         {imageType === 'original' && (
           <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-200">
             <p className="text-sm text-gray-700">
-              The original image will be duplicated as a brand new image.
+              {numberOfImages > 1
+                ? `${numberOfImages} images will be copied as brand new images.`
+                : `The selected image will be copied as a brand new image.`}
             </p>
           </div>
         )}

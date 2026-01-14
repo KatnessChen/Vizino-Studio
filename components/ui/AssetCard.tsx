@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle as CheckmarkBadgeIcon, Info as InfoIcon } from '@mui/icons-material';
-import { EyeFilled } from '@ant-design/icons';
+import { EyeFilled, SettingOutlined } from '@ant-design/icons';
+import { Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
 import { Texture, Item, ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import MyButton from '../button/MyButton';
+import './AssetCard.css';
 
 type Asset = Texture | Item | ImageData;
 
@@ -13,7 +15,10 @@ interface AssetCardProps {
   base64?: string | undefined;
   onViewExpand?: () => void;
   onViewDetails?: () => void;
-  onSelect?: () => void;
+  onSelect?: (event?: React.MouseEvent) => void;
+  onRename?: () => void;
+  onDuplicate?: () => void;
+  onCopy?: () => void;
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -23,6 +28,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
   onViewExpand,
   onViewDetails,
   onSelect,
+  onRename,
+  onDuplicate,
+  onCopy,
 }) => {
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
   const [isLoadingCache, setIsLoadingCache] = useState(false);
@@ -64,74 +72,196 @@ const AssetCard: React.FC<AssetCardProps> = ({
   const imageSrc = getImageSrc();
 
   const [showButtons, setShowButtons] = useState(false);
+
+  // Menu items for gear dropdown
+  const menuItems = [
+    onRename && {
+      key: 'rename',
+      label: 'Rename',
+      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+        domEvent.stopPropagation();
+        onRename();
+      },
+    },
+    onDuplicate && {
+      key: 'duplicate',
+      label: 'Duplicate',
+      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+        domEvent.stopPropagation();
+        onDuplicate();
+      },
+    },
+    onCopy && {
+      key: 'copy',
+      label: 'Copy',
+      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+        domEvent.stopPropagation();
+        onCopy();
+      },
+    },
+    onViewDetails && {
+      key: 'details',
+      label: 'Details',
+      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+        domEvent.stopPropagation();
+        onViewDetails();
+      },
+    },
+  ].filter(Boolean) as Exclude<MenuProps['items'], undefined>;
+
+  // Show gear icon if any operation is available
+  const hasOperations = onRename || onDuplicate || onCopy;
+
   return (
     <div
-      onClick={onSelect}
+      onClick={(e) => onSelect?.(e)}
       onMouseEnter={() => setShowButtons(true)}
       onMouseLeave={() => setShowButtons(false)}
       style={{
         width: '100%',
         height: '100%',
         minWidth: '160px',
-        minHeight: '160px',
+        minHeight: '200px',
         position: 'relative',
-        border: isSelected ? '2px solid #6366f1' : '2px solid #d1d5db',
+        borderWidth: '2px',
+        borderStyle: 'solid',
+        borderColor: isSelected ? '#6366f1' : '#d1d5db',
         borderRadius: '6px',
         cursor: 'pointer',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        flexDirection: 'column',
         backgroundColor: '#f9fafb',
         transition: 'all 0.3s ease',
         overflow: 'hidden',
+        boxShadow: isSelected
+          ? '0 8px 24px rgba(99, 102, 241, 0.25)'
+          : '0 2px 8px rgba(0, 0, 0, 0.08)',
       }}
     >
-      {/* Asset preview */}
-      {imageSrc ? (
-        <img
-          src={imageSrc}
-          alt={asset.name}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            position: 'absolute',
-            inset: 0,
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#e5e7eb',
-            position: 'absolute',
-            inset: 0,
-          }}
-        >
-          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-            {isLoadingCache ? 'Loading...' : 'Loading...'}
-          </span>
-        </div>
-      )}
-
-      {/* Asset name overlay - bottom left */}
+      {/* Image container */}
       <div
         style={{
-          position: 'absolute',
-          bottom: '0',
-          left: '0',
-          right: '0',
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          color: '#ffffff',
-          padding: '8px',
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: '140px',
+        }}
+      >
+        {/* Asset preview */}
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={asset.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              position: 'absolute',
+              inset: 0,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#e5e7eb',
+              position: 'absolute',
+              inset: 0,
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+              {isLoadingCache && 'Loading...'}
+            </span>
+          </div>
+        )}
+
+        {/* Action buttons toolbar - top right corner (View + Gear) */}
+        {(onViewExpand || onViewDetails || hasOperations) && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              zIndex: 10,
+              opacity: showButtons ? 1 : 0,
+              visibility: showButtons ? 'visible' : 'hidden',
+              transition: 'opacity 0.3s ease, visibility 0.3s ease',
+              pointerEvents: showButtons ? 'auto' : 'none',
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center',
+              padding: '4px 6px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            {/* View button */}
+            {onViewExpand && (
+              <MyButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewExpand();
+                }}
+                icon={<EyeFilled style={{ fontSize: '16px' }} />}
+              >
+                View
+              </MyButton>
+            )}
+
+            {/* Divider */}
+            {onViewExpand && (onViewDetails || hasOperations) && (
+              <div
+                style={{
+                  width: '1px',
+                  height: '24px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  margin: '0 2px',
+                }}
+              />
+            )}
+
+            {/* Gear icon dropdown */}
+            {(onViewDetails || hasOperations) && (
+              <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="gear-button"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <SettingOutlined style={{ fontSize: '16px', color: '#374151' }} />
+                </div>
+              </Dropdown>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Asset name - below image */}
+      <div
+        style={{
+          padding: '8px 12px',
+          backgroundColor: '#ffffff',
+          borderTop: '1px solid #e5e7eb',
           fontSize: '0.875rem',
           fontWeight: 500,
+          color: '#374151',
           textAlign: 'left',
-          zIndex: 2,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
@@ -139,65 +269,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
       >
         {asset.name}
       </div>
-
-      {/* Checkmark - top right corner when selected */}
-      {isSelected && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            zIndex: 10,
-          }}
-        >
-          <CheckmarkBadgeIcon
-            style={{
-              fontSize: '24px',
-              color: '#6366f1',
-              fontWeight: 'bold',
-            }}
-          />
-        </div>
-      )}
-
-      {/* Buttons for ImageData type - top left corner */}
-      {(onViewExpand || onViewDetails) && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '8px',
-            left: '8px',
-            display: 'flex',
-            gap: '8px',
-            zIndex: 10,
-            opacity: showButtons ? 1 : 0,
-            transition: 'opacity 0.3s ease',
-          }}
-        >
-          {onViewExpand && (
-            <MyButton
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewExpand();
-              }}
-              icon={<EyeFilled style={{ fontSize: '16px' }} />}
-            >
-              View
-            </MyButton>
-          )}
-          {onViewDetails && (
-            <MyButton
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewDetails();
-              }}
-              icon={<InfoIcon style={{ fontSize: '16px' }} />}
-            >
-              Details
-            </MyButton>
-          )}
-        </div>
-      )}
     </div>
   );
 };

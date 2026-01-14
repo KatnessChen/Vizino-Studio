@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -16,9 +16,9 @@ import SortableAssetCard from './ui/SortableAssetCard';
 import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
-import { Card, Button, Tooltip, Space } from 'antd';
+import { Card, Button, Tooltip } from 'antd';
 import MyEmpty from '@/components/ui/MyEmpty';
-import { DeleteOutlined, DownloadOutlined, ClearOutlined, CopyOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
 
 interface GalleryProps {
   title: string;
@@ -46,6 +46,9 @@ interface GalleryProps {
   onReorder?: (newOrderedImageIds: string[]) => void;
   enableReordering?: boolean;
   isLoading?: boolean;
+  onSingleRename?: (imageId: string) => void;
+  onSingleDuplicate?: (imageId: string) => void;
+  onSingleCopy?: (imageId: string) => void;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
@@ -61,11 +64,13 @@ const Gallery: React.FC<GalleryProps> = ({
   onBulkDownload,
   onBulkCopy,
   onClearSelection,
-  onSelectAll,
   isImageLimitReached = false,
   onReorder,
   enableReordering = false,
   isLoading = false,
+  onSingleRename,
+  onSingleDuplicate,
+  onSingleCopy,
 }) => {
   // State for ImageDisplayModal
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
@@ -77,6 +82,20 @@ const Gallery: React.FC<GalleryProps> = ({
 
   // Drag and drop state
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Selection state for shift-click and drag selection
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -155,55 +174,232 @@ const Gallery: React.FC<GalleryProps> = ({
     setActiveId(null);
   }, []);
 
+  // Handle shift-click for range selection
+  const handleCardClick = useCallback(
+    (imageId: string, event?: React.MouseEvent) => {
+      const currentIndex = images.findIndex((img) => img.id === imageId);
+
+      if (event?.shiftKey && lastSelectedIndex !== null && onSelectMultiple) {
+        // Shift-click: select range
+        const start = Math.min(lastSelectedIndex, currentIndex);
+        const end = Math.max(lastSelectedIndex, currentIndex);
+
+        // Select all images in range
+        for (let i = start; i <= end; i++) {
+          if (!selectedImageIds.has(images[i].id)) {
+            onSelectMultiple(images[i].id);
+          }
+        }
+      } else {
+        // Normal click
+        onSelectMultiple?.(imageId);
+        setLastSelectedIndex(currentIndex);
+      }
+    },
+    [images, lastSelectedIndex, onSelectMultiple, selectedImageIds]
+  );
+
+  // Drag selection handlers
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = galleryRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      console.log('Starting drag selection');
+
+      // Clear selection when starting a drag selection (like file managers)
+      onClearSelection?.();
+
+      setIsSelecting(true);
+      setSelectionStart({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setSelectionBox(null);
+    },
+    [onClearSelection]
+  );
+
+  // Add/remove mouse event listeners for drag selection
+  useEffect(() => {
+    if (!isSelecting) return;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!selectionStart || !galleryRef.current) return;
+
+      const rect = galleryRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+
+      const box = {
+        x: Math.min(selectionStart.x, currentX),
+        y: Math.min(selectionStart.y, currentY),
+        width: Math.abs(currentX - selectionStart.x),
+        height: Math.abs(currentY - selectionStart.y),
+      };
+
+      setSelectionBox(box);
+
+      // Check which cards intersect with selection box
+      if (onSelectMultiple) {
+        cardRefs.current.forEach((cardElement, imageId) => {
+          const cardRect = cardElement.getBoundingClientRect();
+          const galleryRect = galleryRef.current!.getBoundingClientRect();
+
+          const cardBox = {
+            x: cardRect.left - galleryRect.left,
+            y: cardRect.top - galleryRect.top,
+            width: cardRect.width,
+            height: cardRect.height,
+          };
+
+          const intersects =
+            box.x < cardBox.x + cardBox.width &&
+            box.x + box.width > cardBox.x &&
+            box.y < cardBox.y + cardBox.height &&
+            box.y + box.height > cardBox.y;
+
+          if (intersects && !selectedImageIds.has(imageId)) {
+            onSelectMultiple(imageId);
+          }
+        });
+      }
+    };
+
+    const onMouseUp = () => {
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionBox(null);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isSelecting, selectionStart, onSelectMultiple, selectedImageIds]);
+
   const hasSelection = selectedImageIds.size > 0;
 
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
-      <Space size="small">
-        {hasSelection && (
-          <span style={{ fontSize: '14px', color: '#666' }}>{selectedImageIds.size} selected</span>
-        )}
-        {images.length > 0 && (
-          <>
-            {onSelectAll && (
+
+      {/* Selection toolbar - only show when images are selected */}
+      {hasSelection && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 8px',
+            backgroundColor: '#f0f0f0',
+            borderRadius: '8px',
+            height: '32px',
+          }}
+        >
+          {/* Selection count */}
+          <span style={{ fontSize: '13px', color: '#333', fontWeight: 500 }}>
+            {selectedImageIds.size} selected
+          </span>
+
+          {/* Close/Deselect button */}
+          {onClearSelection && (
+            <Tooltip title="Deselect all">
               <Button
-                onClick={onSelectAll}
-                icon={<ClearOutlined style={{ transform: 'scaleY(-1)' }} />}
-              >
-                Select All
-              </Button>
-            )}
-            {onClearSelection && (
-              <Button onClick={onClearSelection} disabled={!hasSelection} icon={<ClearOutlined />}>
-                Deselect All
-              </Button>
-            )}
-            {onBulkDownload && (
-              <Button onClick={onBulkDownload} disabled={!hasSelection} icon={<DownloadOutlined />}>
-                Download
-              </Button>
-            )}
-            {onBulkCopy && (
-              <Tooltip title="Copy the selected photos">
-                <Button onClick={onBulkCopy} disabled={!hasSelection} icon={<CopyOutlined />}>
-                  Duplicate
-                </Button>
-              </Tooltip>
-            )}
-            {onBulkDelete && (
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={onClearSelection}
+                style={{
+                  minWidth: '28px',
+                  width: '28px',
+                  height: '28px',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                }}
+              />
+            </Tooltip>
+          )}
+
+          {/* Divider */}
+          <div
+            style={{
+              width: '1px',
+              height: '18px',
+              backgroundColor: '#d0d0d0',
+              margin: '0 2px',
+            }}
+          />
+
+          {/* Action buttons - icon only */}
+          {onBulkDownload && (
+            <Tooltip title="Download">
               <Button
-                onClick={onBulkDelete}
-                disabled={!hasSelection}
-                danger
+                type="text"
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={onBulkDownload}
+                style={{
+                  minWidth: '28px',
+                  width: '28px',
+                  height: '28px',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              />
+            </Tooltip>
+          )}
+
+          {onBulkCopy && (
+            <Tooltip title="Copy">
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={onBulkCopy}
+                style={{
+                  minWidth: '28px',
+                  width: '28px',
+                  height: '28px',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              />
+            </Tooltip>
+          )}
+
+          {onBulkDelete && (
+            <Tooltip title="Delete">
+              <Button
+                type="text"
+                size="small"
                 icon={<DeleteOutlined />}
-              >
-                Delete
-              </Button>
-            )}
-          </>
-        )}
-      </Space>
+                onClick={onBulkDelete}
+                style={{
+                  minWidth: '28px',
+                  width: '28px',
+                  height: '28px',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#000',
+                }}
+              />
+            </Tooltip>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -220,10 +416,14 @@ const Gallery: React.FC<GalleryProps> = ({
         <MyEmpty description={emptyMessage} />
       ) : (
         <div
+          ref={galleryRef}
+          onMouseDown={handleMouseDown}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: '16px',
+            position: 'relative',
+            userSelect: 'none',
           }}
         >
           {showUploadCard && onUploadImage && onUploadError && (
@@ -236,27 +436,72 @@ const Gallery: React.FC<GalleryProps> = ({
           {enableReordering ? (
             <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
               {images.map((image) => (
-                <SortableAssetCard
+                <div
                   key={image.id}
-                  asset={image}
-                  isSelected={selectedImageIds.has(image.id)}
-                  onSelect={() => onSelectMultiple?.(image.id)}
-                  onViewExpand={() => handleExpandPhotoImage(image)}
-                  onViewDetails={() => onViewMoreButtonClick(image)}
-                />
+                  data-card-id={image.id}
+                  ref={(el) => {
+                    if (el) {
+                      cardRefs.current.set(image.id, el);
+                    } else {
+                      cardRefs.current.delete(image.id);
+                    }
+                  }}
+                >
+                  <SortableAssetCard
+                    asset={image}
+                    isSelected={selectedImageIds.has(image.id)}
+                    onSelect={(e: React.MouseEvent) => handleCardClick(image.id, e)}
+                    onViewExpand={() => handleExpandPhotoImage(image)}
+                    onViewDetails={() => onViewMoreButtonClick(image)}
+                    onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
+                    onDuplicate={onSingleDuplicate ? () => onSingleDuplicate(image.id) : undefined}
+                    onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
+                  />
+                </div>
               ))}
             </SortableContext>
           ) : (
             images.map((image) => (
-              <AssetCard
+              <div
                 key={image.id}
-                asset={image}
-                isSelected={selectedImageIds.has(image.id)}
-                onSelect={() => onSelectMultiple?.(image.id)}
-                onViewExpand={() => handleExpandPhotoImage(image)}
-                onViewDetails={() => onViewMoreButtonClick(image)}
-              />
+                data-card-id={image.id}
+                ref={(el) => {
+                  if (el) {
+                    cardRefs.current.set(image.id, el);
+                  } else {
+                    cardRefs.current.delete(image.id);
+                  }
+                }}
+              >
+                <AssetCard
+                  asset={image}
+                  isSelected={selectedImageIds.has(image.id)}
+                  onSelect={(e) => handleCardClick(image.id, e)}
+                  onViewExpand={() => handleExpandPhotoImage(image)}
+                  onViewDetails={() => onViewMoreButtonClick(image)}
+                  onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
+                  onDuplicate={onSingleDuplicate ? () => onSingleDuplicate(image.id) : undefined}
+                  onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
+                />
+              </div>
             ))
+          )}
+
+          {/* Selection box overlay */}
+          {selectionBox && (
+            <div
+              style={{
+                position: 'absolute',
+                left: selectionBox.x,
+                top: selectionBox.y,
+                width: selectionBox.width,
+                height: selectionBox.height,
+                border: '2px dashed #cccccc',
+                backgroundColor: 'rgba(204, 204, 204, 0.1)',
+                pointerEvents: 'none',
+                zIndex: 1000,
+              }}
+            />
           )}
         </div>
       )}
