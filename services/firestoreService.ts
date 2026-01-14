@@ -41,6 +41,44 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 /**
+ * Gets the maximum order value for images in a space.
+ * Used to determine the order for newly created or duplicated images.
+ *
+ * @param userId The ID of the user.
+ * @param projectId The ID of the project.
+ * @param spaceId The ID of the space.
+ * @returns The maximum order value, or 0 if no images exist.
+ */
+async function getMaxImageOrder(
+  userId: string,
+  projectId: string,
+  spaceId: string
+): Promise<number> {
+  const imagesCollectionRef = collection(
+    db,
+    'users',
+    userId,
+    'projects',
+    projectId,
+    'spaces',
+    spaceId,
+    'images'
+  );
+  const imagesQuery = query(imagesCollectionRef, where('isDeleted', '==', false));
+  const imagesSnapshot = await getDocs(imagesQuery);
+
+  let maxOrder = 0;
+  imagesSnapshot.forEach((doc) => {
+    const imageData = doc.data() as ImageData;
+    if (imageData.order && imageData.order > maxOrder) {
+      maxOrder = imageData.order;
+    }
+  });
+
+  return maxOrder;
+}
+
+/**
  * Creates a new project in Firestore for a user.
  *
  * @param userId The ID of the user.
@@ -502,29 +540,7 @@ export async function createImage(
     console.log('Image download URL obtained:', imageDownloadUrl);
 
     // Step 2: Calculate order value for the new image
-    // Query existing images in the same space to find the maximum order
-    const imagesCollectionRef = collection(
-      db,
-      'users',
-      userId,
-      'projects',
-      projectId,
-      'spaces',
-      spaceId,
-      'images'
-    );
-    const imagesQuery = query(imagesCollectionRef, where('isDeleted', '==', false));
-    const imagesSnapshot = await getDocs(imagesQuery);
-
-    let maxOrder = 0;
-    imagesSnapshot.forEach((doc) => {
-      const imageData = doc.data() as ImageData;
-      if (imageData.order && imageData.order > maxOrder) {
-        maxOrder = imageData.order;
-      }
-    });
-
-    // Set new image order to max + 1, or 1 if no images exist
+    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Step 3: Create the image document in Firestore with storage information
@@ -745,8 +761,7 @@ export async function duplicateImage(
   projectId: string,
   spaceId: string,
   sourceImageId: string,
-  newImageName: string,
-  mode: 'keep-history' | 'duplicate-as-original'
+  newImageName: string
 ): Promise<ImageData> {
   if (!userId || !projectId || !spaceId || !sourceImageId) {
     throw new Error('User ID, Project ID, Space ID, and Source Image ID are required.');
@@ -757,8 +772,6 @@ export async function duplicateImage(
   }
 
   try {
-    console.log(`Duplicating image ${sourceImageId} in mode: ${mode}`);
-
     // Fetch the source image
     const sourceDocRef = doc(
       db,
@@ -783,27 +796,21 @@ export async function duplicateImage(
     const newImageId = crypto.randomUUID();
     const now = Timestamp.fromDate(new Date());
 
-    // Determine the new image's evolution chain
-    const buildEvolutionChain = (): ImageOperation[] => {
-      if (mode === 'duplicate-as-original') {
-        // Start fresh without history
-        return [];
-      } else {
-        // Keep the entire evolution chain from the source image
-        return sourceImageData.evolutionChain || [];
-      }
-    };
+    // Get the maximum order for the new image
+    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Create the new image document
     const newImageData: ImageData = {
       id: newImageId,
       name: newImageName.trim(),
       spaceId,
-      evolutionChain: buildEvolutionChain(),
-      parentImageId: mode === 'duplicate-as-original' ? null : sourceImageData.parentImageId,
+      evolutionChain: sourceImageData.evolutionChain || [],
+      parentImageId: sourceImageData.parentImageId,
       imageDownloadUrl: sourceImageData.imageDownloadUrl,
       storageFilePath: sourceImageData.storageFilePath,
       mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
       isDeleted: false,
       deletedAt: null,
       createdAt: now,

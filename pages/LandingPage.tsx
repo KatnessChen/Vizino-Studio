@@ -615,97 +615,93 @@ const LandingPage: React.FC = () => {
     [selectedOriginalImageIds, selectedUpdatedImageIds]
   );
 
-  const handleCopyConfirm = useCallback(
-    async (copyMode: 'duplicate-as-original' | 'keep-history') => {
-      if (!user) {
-        setErrorMessage('Please log in to copy images.');
-        return;
+  const handleCopyConfirm = useCallback(async () => {
+    if (!user) {
+      setErrorMessage('Please log in to copy images.');
+      return;
+    }
+
+    if (!activeProjectId || !activeSpaceId || !imageTypeToCopy) {
+      setErrorMessage('No project and space selected. Please try again.');
+      return;
+    }
+
+    const selectedImageIds =
+      imageTypeToCopy === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
+    const imagesToCopy = imageTypeToCopy === 'original' ? originalImages : updatedImages;
+
+    if (selectedImageIds.size === 0) return;
+
+    setIsCopyingImages(true);
+    try {
+      // Copy each selected image
+      const imagesToCopyArray = imagesToCopy.filter((img) => selectedImageIds.has(img.id));
+
+      for (const sourceImage of imagesToCopyArray) {
+        // Generate name by appending " Copy" to the original image name
+        const finalName = `${sourceImage.name} Copy`;
+
+        const newImage = await duplicateImage(
+          user.uid,
+          activeProjectId,
+          activeSpaceId,
+          sourceImage.id,
+          finalName
+        );
+
+        // Optimistic update - add the new image immediately to UI
+        dispatch(
+          addImageOptimistic({
+            projectId: activeProjectId,
+            spaceId: activeSpaceId,
+            image: newImage,
+          })
+        );
       }
 
-      if (!activeProjectId || !activeSpaceId || !imageTypeToCopy) {
-        setErrorMessage('No project and space selected. Please try again.');
-        return;
+      // Fetch updated space images to sync with server
+      const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+      dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+
+      // Clear selection and close modal
+      if (imageTypeToCopy === 'original') {
+        dispatch(setSelectedOriginalImageIds(new Set()));
+      } else {
+        dispatch(setSelectedUpdatedImageIds(new Set()));
       }
 
-      const selectedImageIds =
-        imageTypeToCopy === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
-      const imagesToCopy = imageTypeToCopy === 'original' ? originalImages : updatedImages;
+      setShowCopyModal(false);
+      setImageTypeToCopy(null);
+      setErrorMessage(null);
 
-      if (selectedImageIds.size === 0) return;
+      message.success(`${imagesToCopyArray.length} image(s) copied successfully!`);
+    } catch (error) {
+      console.error('Failed to copy images:', error);
 
-      setIsCopyingImages(true);
+      // Rollback - refresh from server
       try {
-        // Copy each selected image
-        const imagesToCopyArray = imagesToCopy.filter((img) => selectedImageIds.has(img.id));
-
-        for (const sourceImage of imagesToCopyArray) {
-          // Generate name by appending " Copy" to the original image name
-          const finalName = `${sourceImage.name} Copy`;
-
-          const newImage = await duplicateImage(
-            user.uid,
-            activeProjectId,
-            activeSpaceId,
-            sourceImage.id,
-            finalName,
-            copyMode
-          );
-
-          // Optimistic update - add the new image immediately to UI
-          dispatch(
-            addImageOptimistic({
-              projectId: activeProjectId,
-              spaceId: activeSpaceId,
-              image: newImage,
-            })
-          );
-        }
-
-        // Fetch updated space images to sync with server
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
-
-        // Clear selection and close modal
-        if (imageTypeToCopy === 'original') {
-          dispatch(setSelectedOriginalImageIds(new Set()));
-        } else {
-          dispatch(setSelectedUpdatedImageIds(new Set()));
-        }
-
-        setShowCopyModal(false);
-        setImageTypeToCopy(null);
-        setErrorMessage(null);
-
-        message.success(`${imagesToCopyArray.length} image(s) copied successfully!`);
-      } catch (error) {
-        console.error('Failed to copy images:', error);
-
-        // Rollback - refresh from server
-        try {
-          const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
-          dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
-        } catch (refreshError) {
-          console.error('Failed to refresh images:', refreshError);
-        }
-
-        setErrorMessage('Failed to copy images. Please try again.');
-      } finally {
-        setIsCopyingImages(false);
+      } catch (refreshError) {
+        console.error('Failed to refresh images:', refreshError);
       }
-    },
-    [
-      user,
-      activeProjectId,
-      activeSpaceId,
-      imageTypeToCopy,
-      selectedOriginalImageIds,
-      selectedUpdatedImageIds,
-      originalImages,
-      updatedImages,
-      dispatch,
-      setErrorMessage,
-    ]
-  );
+
+      setErrorMessage('Failed to copy images. Please try again.');
+    } finally {
+      setIsCopyingImages(false);
+    }
+  }, [
+    user,
+    activeProjectId,
+    activeSpaceId,
+    imageTypeToCopy,
+    selectedOriginalImageIds,
+    selectedUpdatedImageIds,
+    originalImages,
+    updatedImages,
+    dispatch,
+    setErrorMessage,
+  ]);
 
   const handleReorderOriginalImages = useCallback(
     (newOrderedImageIds: string[]) => {

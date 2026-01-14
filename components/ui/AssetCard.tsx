@@ -125,7 +125,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         position: 'relative',
         borderWidth: '2px',
         borderStyle: 'solid',
-        borderColor: isSelected ? '#6366f1' : '#d1d5db',
+        borderColor: isSelected ? '#bd6dff' : '#d1d5db',
         borderRadius: '6px',
         cursor: 'pointer',
         display: 'flex',
@@ -134,7 +134,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         transition: 'all 0.3s ease',
         overflow: 'hidden',
         boxShadow: isSelected
-          ? '0 8px 24px rgba(99, 102, 241, 0.25)'
+          ? '0 8px 24px rgba(99, 102, 241, 0.5)'
           : '0 2px 8px rgba(0, 0, 0, 0.08)',
       }}
     >

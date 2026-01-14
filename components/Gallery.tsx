@@ -205,8 +205,6 @@ const Gallery: React.FC<GalleryProps> = ({
       const rect = galleryRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      console.log('Starting drag selection');
-
       // Clear selection when starting a drag selection (like file managers)
       onClearSelection?.();
 
@@ -283,6 +281,18 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const hasSelection = selectedImageIds.size > 0;
 
+  // Common button style for toolbar icons
+  const toolbarButtonStyle = {
+    minWidth: '28px',
+    width: '28px',
+    height: '28px',
+    paddingTop: '3px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+  };
+
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
@@ -294,14 +304,15 @@ const Gallery: React.FC<GalleryProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '4px 8px',
-            backgroundColor: '#f0f0f0',
+            padding: '4px 8px 4px 16px',
+            backgroundColor: '#bd6dff',
             borderRadius: '8px',
             height: '32px',
+            color: '#ffffff',
           }}
         >
           {/* Selection count */}
-          <span style={{ fontSize: '13px', color: '#333', fontWeight: 500 }}>
+          <span style={{ fontSize: '13px', fontWeight: 500 }}>
             {selectedImageIds.size} selected
           </span>
 
@@ -314,14 +325,9 @@ const Gallery: React.FC<GalleryProps> = ({
                 icon={<CloseOutlined />}
                 onClick={onClearSelection}
                 style={{
-                  minWidth: '28px',
-                  width: '28px',
-                  height: '28px',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  ...toolbarButtonStyle,
                   fontSize: '12px',
+                  paddingTop: '2px',
                 }}
               />
             </Tooltip>
@@ -345,15 +351,7 @@ const Gallery: React.FC<GalleryProps> = ({
                 size="small"
                 icon={<DownloadOutlined />}
                 onClick={onBulkDownload}
-                style={{
-                  minWidth: '28px',
-                  width: '28px',
-                  height: '28px',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                style={toolbarButtonStyle}
               />
             </Tooltip>
           )}
@@ -365,15 +363,7 @@ const Gallery: React.FC<GalleryProps> = ({
                 size="small"
                 icon={<CopyOutlined />}
                 onClick={onBulkCopy}
-                style={{
-                  minWidth: '28px',
-                  width: '28px',
-                  height: '28px',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                style={toolbarButtonStyle}
               />
             </Tooltip>
           )}
@@ -385,16 +375,7 @@ const Gallery: React.FC<GalleryProps> = ({
                 size="small"
                 icon={<DeleteOutlined />}
                 onClick={onBulkDelete}
-                style={{
-                  minWidth: '28px',
-                  width: '28px',
-                  height: '28px',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#000',
-                }}
+                style={toolbarButtonStyle}
               />
             </Tooltip>
           )}
@@ -424,6 +405,7 @@ const Gallery: React.FC<GalleryProps> = ({
             gap: '16px',
             position: 'relative',
             userSelect: 'none',
+            padding: '24px',
           }}
         >
           {showUploadCard && onUploadImage && onUploadError && (
@@ -509,7 +491,7 @@ const Gallery: React.FC<GalleryProps> = ({
   );
 
   return (
-    <Card title={cardTitle}>
+    <Card title={cardTitle} bodyStyle={{ padding: 0 }}>
       {enableReordering && onReorder ? (
         <DndContext
           sensors={sensors}
