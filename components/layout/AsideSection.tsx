@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Alert, Typography } from 'antd';
+import { Alert, Typography, Button } from 'antd';
 import TaskSelect from '@/components/select/TaskSelect';
 import SelectedAssets from '@/components/SelectedAssets';
-import ToolkitPanel from './ToolkitPanel';
 import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
 import {
   selectSelectedOriginalImageIds,
@@ -124,11 +123,11 @@ const AsideSection: React.FC = () => {
 
       {/* Selected Image Display */}
       <div className="px-6">
-        <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
+        <Typography.Title level={5} className="m-0 mb-2">
           Target Image
         </Typography.Title>
         {selectionMessage ? (
-          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-300 text-gray-500 text-sm">
+          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
             {selectionMessage}
           </div>
         ) : selectedImage ? (
@@ -136,7 +135,7 @@ const AsideSection: React.FC = () => {
             <img
               src={cachedImageSrc || selectedImage.imageDownloadUrl}
               alt={selectedImage.name}
-              className="w-full h-[120px] rounded border border-gray-300 object-cover"
+              className="w-full h-[120px] rounded border border-gray-200 object-cover"
             />
           </div>
         ) : null}
@@ -149,28 +148,24 @@ const AsideSection: React.FC = () => {
         </div>
       )}
 
-      {/* Generate Button */}
-      <div className="px-6">
-        <button
+      {/* Generate Button - stick to bottom */}
+      <div className="px-6 mt-auto pb-6">
+        {isDisabled && disableReason && selectedImage && (
+          <div className="mb-2">
+            <Alert title={disableReason} type="warning" />
+          </div>
+        )}
+        <Button
+          block
+          size="large"
+          htmlType="button"
           disabled={isDisabled || !selectedImage}
           onClick={handleGenerate}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full cursor-pointer h-11 text-base font-semibold ${
-            isDisabled || !selectedImage
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500'
-          }`}
+          className={`btn-generate h-11 text-base font-semibold rounded-md shadow-sm ${isDisabled || !selectedImage ? 'btn-disabled' : ''}`}
         >
-          <AutoAwesomeIcon sx={{ fontSize: 20, marginRight: 1, color: 'inherit' }} />
+          <AutoAwesomeIcon className="text-lg mr-2 align-middle" />
           Generate
-        </button>
-        {isDisabled && disableReason && selectedImage && (
-          <Alert title={disableReason} type="warning" className="mt-2" />
-        )}
-      </div>
-
-      {/* Toolkit Panel at the bottom */}
-      <div className="mt-auto border-t border-gray-200">
-        <ToolkitPanel />
+        </Button>
       </div>
     </aside>
   );

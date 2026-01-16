@@ -106,7 +106,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
               ${
                 selectedTaskNames.includes(task.value as GeminiTaskName)
                   ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg'
-                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                  : 'border-gray-200 bg-white hover:border-gray-200 hover:shadow-md'
               }
             `}
             onClick={() =>

@@ -203,7 +203,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
           </div>
 
           {/* Image Name Footer */}
-          <div className="border-t border-gray-300 pt-1 text-center">
+          <div className="border-t border-gray-200 pt-1 text-center">
             <p className="text-sm font-medium text-gray-700 truncate">{image.name}</p>
           </div>
 

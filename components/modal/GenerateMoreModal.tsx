@@ -612,8 +612,17 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
             >
               <Typography.Title level={5}>Target Image</Typography.Title>
 
+              {/* Source Image Preview */}
+              <div className="min-h-[400px] rounded flex items-center justify-center overflow-hidden border border-gray-200">
+                <img
+                  src={cachedImageSrc || sourceImage.imageDownloadUrl}
+                  alt={sourceImage.name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+
               {/* Image Info */}
-              <div style={{ marginBottom: 16 }}>
+              <div className="mt-4">
                 <Tooltip title={sourceImage.name}>
                   <div
                     style={{
@@ -633,137 +642,46 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                     : new Date(sourceImage.createdAt).toLocaleString()}
                 </div>
               </div>
-
-              {/* Last Operation Info */}
-              {/* {lastOperation && (
-                <div style={{ marginBottom: 16 }}>
-                  <Typography.Title level={5} style={{ marginBottom: 8 }}>
-                    Last Generation
-                  </Typography.Title>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ marginBottom: 4 }}>
-                        <strong>Task:</strong> {formatTaskName(lastOperation.taskName)}
-                      </div>
-                      <div style={{ marginBottom: 4 }}>
-                        <strong>Color:</strong> {lastOperation.options.colorSnapshot?.name || 'N/A'}
-                      </div>
-                      <div>
-                        <strong>Custom Prompt:</strong> {lastOperation.customPrompt || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )} */}
-
-              {/* Source Image Preview */}
-              <div
-                style={{
-                  minHeight: 400,
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                <img
-                  src={cachedImageSrc || sourceImage.imageDownloadUrl}
-                  alt={sourceImage.name}
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    objectFit: 'contain',
-                  }}
-                />
-              </div>
             </div>
 
             {/* Right Column: Color Selector & Custom Prompt */}
-            <div
-              style={{
-                flex: '1 1 400px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-                minWidth: 0,
-              }}
-            >
+            <div className="flex flex-col flex-1 basis-[400px] gap-4 min-w-0">
               {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && <SelectedAssets />}
 
               {/* Custom Prompt & Historical Prompts */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 0,
-                  flex: 1,
-                  minHeight: 0,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                }}
-              >
+              <div className="flex gap-0 flex-1 min-h-0 border border-gray-200 rounded-md overflow-hidden">
                 {/* Left: Historical Custom Prompts List */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <div className="flex-1 flex flex-col min-w-0">
                   <Typography.Title
                     level={5}
-                    style={{
-                      margin: 0,
-                      marginBottom: '4px',
-                      padding: '12px 12px 0 12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
+                    className="m-0 mb-1 px-3 pt-3 flex items-center gap-1.5"
                   >
                     Saved Prompts
                     <InfoIconWithTooltip title="Historical custom prompts of all saved images" />
                   </Typography.Title>
 
                   {/* Search Input */}
-                  <Input
-                    placeholder="Filter prompts..."
-                    value={searchPrompts}
-                    onChange={(e) => setSearchPrompts(e.target.value)}
-                    allowClear
-                    style={{
-                      borderRadius: 0,
-                      borderLeft: 'none',
-                      borderRight: 'none',
-                      borderTop: 'none',
-                      margin: '8px 12px 0 12px',
-                      width: 'calc(100% - 24px)',
-                    }}
-                  />
+                  <div className="mt-2 px-3">
+                    <Input
+                      placeholder="Filter prompts..."
+                      value={searchPrompts}
+                      onChange={(e) => setSearchPrompts(e.target.value)}
+                      allowClear
+                      className="w-full rounded-none border-l-0 border-r-0 border-t-0"
+                    />
+                  </div>
 
                   {/* Prompts List */}
-                  <div
-                    style={{
-                      flex: 1,
-                      overflow: 'auto',
-                      borderBottom: 'none',
-                      maxHeight: '300px',
-                    }}
-                  >
+                  <div className="flex-1 overflow-auto">
                     {isLoadingPrompts ? (
-                      <div style={{ padding: 8 }}>
+                      <div className="p-2">
                         <Skeleton active paragraph={{ rows: 2 }} />
-                        <Skeleton active paragraph={{ rows: 2 }} style={{ marginTop: 8 }} />
-                        <Skeleton active paragraph={{ rows: 2 }} style={{ marginTop: 8 }} />
+                        <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
+                        <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
                       </div>
                     ) : filteredPrompts.length === 0 ? (
-                      <div
-                        style={{
-                          padding: 16,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '100%',
-                        }}
-                      >
-                        <MyEmpty description="No historical prompts" />
+                      <div className="p-4 flex items-center justify-center h-full">
+                        <MyEmpty description="No historical prompts found." />
                       </div>
                     ) : (
                       <List
@@ -817,42 +735,18 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                 </div>
 
                 {/* Right: Custom Prompt Textarea */}
-                <div
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minWidth: 0,
-                    borderLeft: '1px solid #e5e7eb',
-                    paddingBottom: '16px',
-                  }}
-                >
-                  <Typography.Title
-                    level={5}
-                    style={{ margin: 0, marginBottom: '4px', padding: '12px 12px 0 12px' }}
-                  >
+                <div className="flex-1 flex flex-col min-w-0 border-l border-gray-200 pb-4">
+                  <Typography.Title level={5} className="m-0 mb-1 px-3 pt-3">
                     Custom Prompt
                     <span
-                      style={{
-                        color: isCustomPromptRequired ? '#ff4d4f' : '#999',
-                        fontSize: '0.85em',
-                        marginLeft: '4px',
-                      }}
+                      className={`${isCustomPromptRequired ? 'text-red-500' : 'text-gray-500'} text-[0.85em] ml-1`}
                     >
                       ({isCustomPromptRequired ? 'Required' : 'Optional'})
                     </span>
                   </Typography.Title>
 
                   {/* Custom Prompt Input */}
-                  <div
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      padding: '8px 12px',
-                      minHeight: 0,
-                    }}
-                  >
+                  <div className="flex-1 flex flex-col p-2 px-3 min-h-0">
                     <Input.TextArea
                       rows={10}
                       placeholder={getPromptPlaceholder()}
@@ -862,7 +756,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                       maxLength={500}
                       showCount
                       allowClear
-                      style={{ flex: 1, resize: 'none' }}
+                      className="flex-1 resize-none"
                     />
                   </div>
                 </div>
@@ -870,24 +764,12 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
 
               {/* Prompt Writing Guide */}
               {activeTaskName && (
-                <div
-                  style={{
-                    padding: 12,
-                    backgroundColor: '#e6f7ff',
-                    borderRadius: 6,
-                    border: '1px solid #91d5ff',
-                  }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
+                  <div className="flex flex-col gap-0.5">
                     {getPromptWritingGuide().tips.map((tip, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          fontSize: '0.85rem',
-                        }}
-                      >
+                      <div key={index} className="text-[0.85rem]">
                         <h6>
-                          <BulbOutlined className="mr-2" style={{ color: '#1890ff' }} />
+                          <BulbOutlined className="mr-2 text-[#1890ff]" />
                           {tip.text}.
                           <span>
                             {' '}
@@ -895,11 +777,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                             <Button
                               type="link"
                               onClick={() => setIsDefaultPromptExpanded(true)}
-                              style={{
-                                padding: '0',
-                                margin: '0 4px',
-                                height: 'auto',
-                              }}
+                              className="p-0 h-auto"
                             >
                               default prompt
                               <InfoCircleOutlined />
@@ -917,7 +795,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                   title={getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE)}
                   type="warning"
                   showIcon
-                  style={{ margin: 0 }}
+                  className="m-0"
                 />
               )}
             </div>
@@ -949,21 +827,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
         size="default"
         closeIcon={<CloseOutlined />}
       >
-        <div
-          style={{
-            backgroundColor: '#f3f4f6',
-            borderRadius: 4,
-            padding: 16,
-            fontFamily: 'monospace',
-            fontSize: '0.8rem',
-            lineHeight: 1.5,
-            color: '#666',
-            border: '1px solid #e5e7eb',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            overflow: 'auto',
-          }}
-        >
+        <div className="bg-[#f3f4f6] rounded p-4 font-mono text-[0.8rem] leading-[1.5] text-[#666666] border border-gray-200 whitespace-pre-wrap break-words overflow-auto">
           {defaultPrompt}
         </div>
       </Drawer>

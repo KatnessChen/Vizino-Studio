@@ -35,11 +35,11 @@ export const useGenerateButtonState = ({
   } else if (!activeTaskName) {
     disableReason = 'Please select a goal.';
   } else if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
-    disableReason = 'Please select a color to remix.';
+    disableReason = 'Please select a color to generate image.';
   } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
-    disableReason = 'Please select a texture to remix.';
+    disableReason = 'Please select a texture to generate image.';
   } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
-    disableReason = 'Please select an object to remix.';
+    disableReason = 'Please select an object to generate image.';
   } else if (isCustomPromptRequired && !customPrompt.trim()) {
     disableReason = 'Please enter a custom prompt.';
   }

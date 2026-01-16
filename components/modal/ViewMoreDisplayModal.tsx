@@ -135,7 +135,7 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                               imageSources[operation.imageDownloadUrl] || operation.imageDownloadUrl
                             }
                             alt="Target image"
-                            className="w-full object-contain rounded-md border border-gray-300 bg-white"
+                            className="w-full object-contain rounded-md border border-gray-200 bg-white"
                           />
                         </div>
                       </div>
@@ -168,7 +168,7 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                                 <span className="text-xs text-gray-600">New Color:</span>
                                 <div className="flex items-center gap-2">
                                   <div
-                                    className="w-6 h-6 rounded border-2 border-gray-300 shadow-sm flex-shrink-0"
+                                    className="w-6 h-6 rounded border-2 border-gray-200 shadow-sm flex-shrink-0"
                                     style={{
                                       backgroundColor: operation.options.colorSnapshot.hex,
                                     }}
@@ -227,7 +227,7 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                   <img
                     src={imageSources[image.imageDownloadUrl] || image.imageDownloadUrl}
                     alt={image.name}
-                    className="w-full object-contain rounded-md border border-gray-300 bg-white"
+                    className="w-full object-contain rounded-md border border-gray-200 bg-white"
                   />
                 </div>
               </div>

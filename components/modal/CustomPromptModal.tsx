@@ -83,7 +83,7 @@ const CustomPromptModal: React.FC<CustomPromptModalProps> = ({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Enter your custom prompt here..."
-            className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm"
+            className="w-full h-32 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm"
           />
           {/* TODO: Add task-specific tips */}
           {/* <p className="text-xs text-gray-500 mt-2">
@@ -146,7 +146,7 @@ const CustomPromptModal: React.FC<CustomPromptModalProps> = ({
 
           <button
             onClick={handleCancel}
-            className="flex-1 px-6 py-3 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="flex-1 px-6 py-3 border border-gray-200 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           >
             Cancel
           </button>

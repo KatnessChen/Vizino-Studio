@@ -553,7 +553,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
           <input
             value={modalInput}
             type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
             placeholder={modalMode === ModalMode.ADD_PROJECT ? 'Project Name' : 'Space Name'}
             onChange={(e) => setModalInput(e.target.value)}
             autoFocus

@@ -85,45 +85,29 @@ const SelectedAssets: React.FC = () => {
     return selectedTaskNames[0];
   }, [selectedTaskNames]);
 
-  // Don't render if no task is selected
-  if (!activeTask) {
-    return null;
-  }
-
   // Determine what to display based on active task
-  const renderContent = () => {
+  const renderContent = useMemo(() => {
+    if (!activeTask) {
+      return null;
+    }
+
     if (activeTask === GEMINI_TASKS.RECOLOR_WALL.task_name) {
       if (selectedColor) {
         return (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="flex flex-col gap-2">
             <div
-              style={{
-                width: '40px',
-                height: '40px',
-                backgroundColor: selectedColor.hex,
-                borderRadius: '4px',
-                border: '1px solid #d1d5db',
-              }}
+              className="w-full h-[120px] rounded border border-dashed border-gray-200"
+              style={{ backgroundColor: selectedColor?.hex || 'bg-gray-100' }}
             />
-            <div style={{ flex: 1, fontSize: '0.875rem' }}>
-              <div style={{ fontWeight: 500 }}>{selectedColor.name}</div>
-              <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>{selectedColor.hex}</div>
+            <div className="text-sm">
+              <div className="font-medium">{selectedColor?.name}</div>
+              <div className="text-gray-500 text-xs">{selectedColor?.hex || ''}</div>
             </div>
           </div>
         );
       } else {
         return (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '4px',
-              border: '1px dashed #d1d5db',
-              color: '#9ca3af',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-            }}
-          >
+          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
             No color selected
           </div>
         );
@@ -133,60 +117,29 @@ const SelectedAssets: React.FC = () => {
     if (activeTask === GEMINI_TASKS.ADD_TEXTURE.task_name) {
       if (selectedTexture) {
         return (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', overflow: 'hidden' }}>
+          <div className="flex flex-col gap-2">
             {textureBase64 ? (
               <img
                 src={`data:image/jpeg;base64,${textureBase64}`}
                 alt={selectedTexture.name}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  border: '1px solid #d1d5db',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                }}
+                className="w-full h-[120px] rounded border border-dashed border-gray-200 object-contain"
               />
             ) : (
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#f3f4f6',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>...</span>
+              <div className="w-full h-[120px] rounded border border-gray-200 bg-gray-100 flex items-center justify-center">
+                <span className="text-xs text-gray-400">...</span>
               </div>
             )}
-            <div style={{ flex: 1, fontSize: '0.875rem' }}>
-              <div style={{ fontWeight: 500 }}>{selectedTexture.name}</div>
+            <div className="text-sm">
+              <div className="font-medium">{selectedTexture.name}</div>
               {selectedTexture.description && (
-                <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  {selectedTexture.description}
-                </div>
+                <div className="text-gray-500 text-xs">{selectedTexture.description}</div>
               )}
             </div>
           </div>
         );
       } else {
         return (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '4px',
-              border: '1px dashed #d1d5db',
-              color: '#9ca3af',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-            }}
-          >
+          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
             No texture selected
           </div>
         );
@@ -196,60 +149,29 @@ const SelectedAssets: React.FC = () => {
     if (activeTask === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
       if (selectedItem) {
         return (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', overflow: 'hidden' }}>
+          <div className="flex flex-col gap-2">
             {itemBase64 ? (
               <img
                 src={`data:image/jpeg;base64,${itemBase64}`}
                 alt={selectedItem.name}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  border: '1px solid #d1d5db',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                }}
+                className="w-full h-[120px] rounded border border-gray-200 object-contain"
               />
             ) : (
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#f3f4f6',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>...</span>
+              <div className="w-full h-[120px] rounded border border-gray-200 bg-gray-100 flex items-center justify-center">
+                <span className="text-xs text-gray-400">...</span>
               </div>
             )}
-            <div style={{ flex: 1, fontSize: '0.875rem' }}>
-              <div style={{ fontWeight: 500 }}>{selectedItem.name}</div>
+            <div className="text-sm">
+              <div className="font-medium">{selectedItem.name}</div>
               {selectedItem.description && (
-                <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  {selectedItem.description}
-                </div>
+                <div className="text-gray-500 text-xs">{selectedItem.description}</div>
               )}
             </div>
           </div>
         );
       } else {
         return (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '4px',
-              border: '1px dashed #d1d5db',
-              color: '#9ca3af',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-            }}
-          >
+          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
             No item selected
           </div>
         );
@@ -257,14 +179,14 @@ const SelectedAssets: React.FC = () => {
     }
 
     return null;
-  };
+  }, [activeTask, itemBase64, selectedColor, selectedItem, selectedTexture, textureBase64]);
 
   return (
     <div>
       <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
         Design Material
       </Typography.Title>
-      {renderContent()}
+      {renderContent}
     </div>
   );
 };

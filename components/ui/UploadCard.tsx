@@ -84,8 +84,8 @@ const UploadCard: React.FC<UploadCardProps> = ({
       <div
         className={`w-full h-full flex flex-col items-center justify-center border-2 border-dashed rounded-lg transition-all duration-200 ${
           isLimitReached
-            ? 'bg-gray-100 border-gray-300 text-gray-500'
-            : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-300 hover:border-blue-400 hover:from-blue-50 hover:to-blue-100'
+            ? 'bg-gray-100 border-gray-200 text-gray-500'
+            : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 hover:border-blue-400 hover:from-blue-50 hover:to-blue-100'
         }`}
       >
         <UploadIcon

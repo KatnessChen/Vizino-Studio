@@ -113,6 +113,7 @@ Users can upload custom versions. These are stored in Firestore and pulled into 
 ## Styles & Formatting
 
 - **CSS**: Tailwind v4 (utility-first) in `main.css`, component-specific styles in `variables.css`
+- **Styling Priority**: Prioritize Tailwind CSS utility classes over inline styles for consistency and maintainability
 - **Component Props**: Use TypeScript interfaces; avoid `any` type
 - **Imports**: Alias `@` resolves to workspace root (set in `vite.config.ts`)
 
