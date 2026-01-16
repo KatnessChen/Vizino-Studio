@@ -16,7 +16,7 @@ import SortableAssetCard from './ui/SortableAssetCard';
 import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
-import { Card, Button, Tooltip } from 'antd';
+import { Card, Button, Tooltip, Skeleton } from 'antd';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
   DriveFileMoveOutline as DriveFileMoveOutline,
@@ -54,7 +54,6 @@ interface GalleryProps {
   enableReordering?: boolean;
   isLoading?: boolean;
   onSingleRename?: (imageId: string) => void;
-  onSingleDuplicate?: (imageId: string) => void;
   onSingleCopy?: (imageId: string) => void;
 }
 
@@ -62,22 +61,21 @@ const Gallery: React.FC<GalleryProps> = ({
   title,
   images,
   selectedImageIds = new Set(),
-  onSelectMultiple,
   emptyMessage,
-  onUploadImage,
   showUploadCard = false,
+  isImageLimitReached = false,
+  enableReordering = false,
+  isLoading = false,
+  onClearSelection,
+  onUploadImage,
   onUploadError,
   onBulkDelete,
   onBulkDownload,
   onBulkCopy,
   onBulkMove,
-  onClearSelection,
-  isImageLimitReached = false,
   onReorder,
-  enableReordering = false,
-  isLoading = false,
+  onSelectMultiple,
   onSingleRename,
-  onSingleDuplicate,
   onSingleCopy,
 }) => {
   // State for ImageDisplayModal
@@ -408,12 +406,25 @@ const Gallery: React.FC<GalleryProps> = ({
   const galleryContent = (
     <>
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-gray-600">Loading images...</span>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '16px',
+            padding: '24px',
+          }}
+        >
+          {/* Display 8 skeleton cards */}
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={`skeleton-${index}`}>
+              <Skeleton.Image active style={{ width: '100%' }} />
+            </div>
+          ))}
         </div>
       ) : images.length === 0 && !showUploadCard ? (
-        <MyEmpty description={emptyMessage} />
+        <div className="p-8">
+          <MyEmpty description={emptyMessage} />
+        </div>
       ) : (
         <div
           ref={galleryRef}
