@@ -387,6 +387,7 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
             storageFilePath: '',
             isDeleted: false,
             deletedAt: null,
+            order: null,
           }}
           onClose={() => {
             setShowImageModal(false);

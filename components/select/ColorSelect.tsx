@@ -129,16 +129,7 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
               }}
               onClick={() => setIsAddColorModalOpen(true)}
             >
-              <Button
-                type="primary"
-                size="large"
-                icon={<PlusOutlined />}
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: '#6366f1',
-                  color: '#6366f1',
-                }}
-              >
+              <Button type="text" icon={<PlusOutlined />}>
                 Custom Color
               </Button>
             </div>

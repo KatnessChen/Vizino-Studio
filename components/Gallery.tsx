@@ -18,7 +18,13 @@ import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
 import { Card, Button, Tooltip } from 'antd';
 import MyEmpty from '@/components/ui/MyEmpty';
-import { DeleteOutlined, DownloadOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
+import {
+  DriveFileMoveOutline as DriveFileMoveOutline,
+  Downloading as DownloadIcon,
+  DeleteOutlined as DeleteIcon,
+  Close as CloseIcon,
+  ContentCopy as CopyIcon,
+} from '@mui/icons-material';
 
 interface GalleryProps {
   title: string;
@@ -38,6 +44,7 @@ interface GalleryProps {
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
   onBulkCopy?: () => void;
+  onBulkMove?: () => void;
   onClearSelection?: () => void;
   onSelectAll?: () => void;
   onGenerateMoreSuccess?: () => void;
@@ -63,6 +70,7 @@ const Gallery: React.FC<GalleryProps> = ({
   onBulkDelete,
   onBulkDownload,
   onBulkCopy,
+  onBulkMove,
   onClearSelection,
   isImageLimitReached = false,
   onReorder,
@@ -283,18 +291,21 @@ const Gallery: React.FC<GalleryProps> = ({
 
   // Common button style for toolbar icons
   const toolbarButtonStyle = {
-    minWidth: '28px',
-    width: '28px',
-    height: '28px',
-    paddingTop: '3px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     color: '#ffffff',
+    margin: '3px 6px 0px 6px',
+  };
+
+  const iconStyle = {
+    fontSize: '18px',
   };
 
   const cardTitle = (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div
+      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20 }}
+    >
       <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
 
       {/* Selection toolbar - only show when images are selected */}
@@ -322,13 +333,9 @@ const Gallery: React.FC<GalleryProps> = ({
               <Button
                 type="text"
                 size="small"
-                icon={<CloseOutlined />}
+                icon={<CloseIcon style={iconStyle} />}
                 onClick={onClearSelection}
-                style={{
-                  ...toolbarButtonStyle,
-                  fontSize: '12px',
-                  paddingTop: '2px',
-                }}
+                style={toolbarButtonStyle}
               />
             </Tooltip>
           )}
@@ -343,13 +350,13 @@ const Gallery: React.FC<GalleryProps> = ({
             }}
           />
 
-          {/* Action buttons - icon only */}
+          {/* Action icon buttons */}
           {onBulkDownload && (
             <Tooltip title="Download">
               <Button
                 type="text"
                 size="small"
-                icon={<DownloadOutlined />}
+                icon={<DownloadIcon style={iconStyle} />}
                 onClick={onBulkDownload}
                 style={toolbarButtonStyle}
               />
@@ -361,8 +368,20 @@ const Gallery: React.FC<GalleryProps> = ({
               <Button
                 type="text"
                 size="small"
-                icon={<CopyOutlined />}
+                icon={<CopyIcon style={iconStyle} />}
                 onClick={onBulkCopy}
+                style={toolbarButtonStyle}
+              />
+            </Tooltip>
+          )}
+
+          {onBulkMove && (
+            <Tooltip title="Move">
+              <Button
+                type="text"
+                size="small"
+                icon={<DriveFileMoveOutline style={iconStyle} />}
+                onClick={onBulkMove}
                 style={toolbarButtonStyle}
               />
             </Tooltip>
@@ -373,7 +392,7 @@ const Gallery: React.FC<GalleryProps> = ({
               <Button
                 type="text"
                 size="small"
-                icon={<DeleteOutlined />}
+                icon={<DeleteIcon style={iconStyle} />}
                 onClick={onBulkDelete}
                 style={toolbarButtonStyle}
               />
@@ -424,19 +443,16 @@ const Gallery: React.FC<GalleryProps> = ({
                   ref={(el) => {
                     if (el) {
                       cardRefs.current.set(image.id, el);
-                    } else {
-                      cardRefs.current.delete(image.id);
                     }
                   }}
                 >
                   <SortableAssetCard
                     asset={image}
                     isSelected={selectedImageIds.has(image.id)}
-                    onSelect={(e: React.MouseEvent) => handleCardClick(image.id, e)}
+                    onSelect={(e?: React.MouseEvent) => handleCardClick(image.id, e)}
                     onViewExpand={() => handleExpandPhotoImage(image)}
                     onViewDetails={() => onViewMoreButtonClick(image)}
                     onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
-                    onDuplicate={onSingleDuplicate ? () => onSingleDuplicate(image.id) : undefined}
                     onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
                   />
                 </div>
@@ -462,7 +478,6 @@ const Gallery: React.FC<GalleryProps> = ({
                   onViewExpand={() => handleExpandPhotoImage(image)}
                   onViewDetails={() => onViewMoreButtonClick(image)}
                   onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
-                  onDuplicate={onSingleDuplicate ? () => onSingleDuplicate(image.id) : undefined}
                   onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
                 />
               </div>
@@ -491,7 +506,7 @@ const Gallery: React.FC<GalleryProps> = ({
   );
 
   return (
-    <Card title={cardTitle} bodyStyle={{ padding: 0 }}>
+    <Card title={cardTitle} styles={{ body: { padding: 0 } }}>
       {enableReordering && onReorder ? (
         <DndContext
           sensors={sensors}

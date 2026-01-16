@@ -850,6 +850,116 @@ export async function duplicateImage(
   }
 }
 
+/**
+ * Moves an image to a different space (or same space) without preserving generation history.
+ * This creates a new copy of the image with evolutionChain and parentImageId cleared.
+ *
+ * @param userId The ID of the user.
+ * @param sourceProjectId The ID of the source project.
+ * @param sourceSpaceId The ID of the source space.
+ * @param sourceImageId The ID of the source image.
+ * @param targetProjectId The ID of the target project.
+ * @param targetSpaceId The ID of the target space.
+ * @returns The newly created ImageData in the target space.
+ */
+export async function moveImageToSpace(
+  userId: string,
+  sourceProjectId: string,
+  sourceSpaceId: string,
+  sourceImageId: string,
+  targetProjectId: string,
+  targetSpaceId: string
+): Promise<ImageData> {
+  if (
+    !userId ||
+    !sourceProjectId ||
+    !sourceSpaceId ||
+    !sourceImageId ||
+    !targetProjectId ||
+    !targetSpaceId
+  ) {
+    throw new Error('All parameters are required for moving an image.');
+  }
+
+  try {
+    // Fetch the source image
+    const sourceDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      sourceProjectId,
+      'spaces',
+      sourceSpaceId,
+      'images',
+      sourceImageId
+    );
+
+    const sourceImageDoc = await getDoc(sourceDocRef);
+    if (!sourceImageDoc.exists()) {
+      throw new Error(`Source image not found: ${sourceImageId}`);
+    }
+
+    const sourceImageData = sourceImageDoc.data() as ImageData;
+
+    // Generate new image ID
+    const newImageId = crypto.randomUUID();
+    const now = Timestamp.fromDate(new Date());
+
+    // Get the maximum order for the target space
+    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Create the new image document WITHOUT generation history
+    const newImageData: ImageData = {
+      id: newImageId,
+      name: sourceImageData.name, // Keep original name (no " Copy" suffix)
+      spaceId: targetSpaceId,
+      evolutionChain: [], // Clear evolution chain
+      parentImageId: null, // Clear parent reference
+      imageDownloadUrl: sourceImageData.imageDownloadUrl,
+      storageFilePath: sourceImageData.storageFilePath,
+      mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Write to Firestore in target space
+    const newDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      targetProjectId,
+      'spaces',
+      targetSpaceId,
+      'images',
+      newImageId
+    );
+
+    const batch = writeBatch(db);
+    const { parentImageId, ...firestoreData } = newImageData;
+    batch.set(newDocRef, {
+      ...firestoreData,
+      parentImageId,
+    });
+
+    await batch.commit();
+    console.log(`Image moved successfully to space ${targetSpaceId}: ${newImageId}`);
+
+    return newImageData;
+  } catch (error) {
+    console.error('Failed to move image:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to move image: ${error.message}`);
+    }
+    throw new Error('Failed to move image in Firebase.');
+  }
+}
+
 // ============================================================================
 // Custom Colors Management
 // ============================================================================

@@ -17,7 +17,6 @@ interface AssetCardProps {
   onViewDetails?: () => void;
   onSelect?: (event?: React.MouseEvent) => void;
   onRename?: () => void;
-  onDuplicate?: () => void;
   onCopy?: () => void;
 }
 
@@ -29,7 +28,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
   onViewDetails,
   onSelect,
   onRename,
-  onDuplicate,
   onCopy,
 }) => {
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
@@ -83,14 +81,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onRename();
       },
     },
-    onDuplicate && {
-      key: 'duplicate',
-      label: 'Duplicate',
-      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
-        domEvent.stopPropagation();
-        onDuplicate();
-      },
-    },
     onCopy && {
       key: 'copy',
       label: 'Copy',
@@ -110,8 +100,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   ].filter(Boolean) as Exclude<MenuProps['items'], undefined>;
 
   // Show gear icon if any operation is available
-  const hasOperations = onRename || onDuplicate || onCopy;
-
+  const hasOperations = onRename || onCopy;
   return (
     <div
       onClick={(e) => onSelect?.(e)}

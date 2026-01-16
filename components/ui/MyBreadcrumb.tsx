@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Breadcrumb, Dropdown, Space, Tooltip, Button, Modal, Alert, MenuProps } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons';
+import { Breadcrumb, Dropdown, Button, Modal, Alert } from 'antd';
+import { PlusOutlined, DownOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
 import GenericConfirmModal from '../modal/GenericConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProjectSpaceMenuItems } from '@/hooks/useProjectSpaceMenuItems';
 import {
   checkProjectLimit,
   checkSpaceLimit,
-  formatLimitMessage,
   getLimitExceededMessage,
 } from '@/utils/limitationUtils';
 import { AppDispatch } from '@/stores/store';
@@ -384,165 +384,29 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
     }
   }, [modalMode]);
 
-  const projectLimitCheck = useMemo(
-    () => checkProjectLimit(projects, adminSettings.mock_limit_reached),
-    [projects, adminSettings.mock_limit_reached]
-  );
-  const spaceLimitCheck = useMemo(
-    () => checkSpaceLimit(activeProject, adminSettings.mock_limit_reached),
-    [activeProject, adminSettings.mock_limit_reached]
-  );
-
-  const projectMenuItems: MenuProps['items'] = useMemo(() => {
-    const projectItems = projects.map((project) => ({
-      key: project.id,
-      label: (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            minWidth: 200,
-          }}
-        >
-          <span>{project.name}</span>
-          <Space size={4}>
-            <Tooltip title="Edit Project Name">
-              <EditOutlined
-                style={{ fontSize: 14, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingEntityIds({ projectId: project.id, spaceId: null });
-                  setModalMode(ModalMode.EDIT_PROJECT);
-                  setModalInput(project.name);
-                }}
-              />
-            </Tooltip>
-            <Tooltip
-              title={
-                project.spaces.length > 0 ? 'Cannot delete project with spaces.' : 'Delete Project'
-              }
-            >
-              <DeleteOutlined
-                style={{
-                  fontSize: 14,
-                  cursor: project.spaces.length > 0 ? 'not-allowed' : 'pointer',
-                  opacity: project.spaces.length > 0 ? 0.4 : 1,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (project.spaces.length === 0) {
-                    handleDeleteProject(project.id, project.name);
-                  }
-                }}
-              />
-            </Tooltip>
-          </Space>
-        </div>
-      ),
-      onClick: () => handleSelectProject(project.id),
-    }));
-
-    const addProjectItem = {
-      key: 'add-project',
-      label: (
-        <Tooltip title={projectLimitCheck.canAdd ? '' : getLimitExceededMessage('projects', 10)}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              opacity: projectLimitCheck.canAdd ? 1 : 0.5,
-            }}
-          >
-            <PlusOutlined style={{ fontSize: 16 }} />
-            <span>Add New Project</span>
-            <span style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>
-              {formatLimitMessage('Projects', projects.length, 10)}
-            </span>
-          </div>
-        </Tooltip>
-      ),
-      onClick: () => setModalMode(ModalMode.ADD_PROJECT),
-      disabled: !projectLimitCheck.canAdd,
-    };
-
-    return projectItems.length > 0
-      ? [...projectItems, { type: 'divider' }, addProjectItem]
-      : [addProjectItem];
-  }, [projects, handleSelectProject, handleDeleteProject, projectLimitCheck]);
-
-  const spaceMenuItems: MenuProps['items'] = useMemo(() => {
-    if (!activeProject) return [];
-    const spaceItems = activeProject.spaces.map((space) => ({
-      key: space.id,
-      label: (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            minWidth: 200,
-          }}
-        >
-          <span>{space.name}</span>
-          <Space size={4}>
-            <Tooltip title="Edit Space Name">
-              <EditOutlined
-                style={{ fontSize: 14, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!activeProject) return;
-                  setEditingEntityIds({ projectId: activeProject.id, spaceId: space.id });
-                  setModalMode(ModalMode.EDIT_SPACE);
-                  setModalInput(space.name);
-                }}
-              />
-            </Tooltip>
-            <Tooltip title="Delete Space">
-              <DeleteOutlined
-                style={{ fontSize: 14, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!activeProject) return;
-                  handleDeleteSpace(activeProject.id, space.id, space.name);
-                }}
-              />
-            </Tooltip>
-          </Space>
-        </div>
-      ),
-      onClick: () => handleSelectSpace(space.id),
-    }));
-
-    const addSpaceItem = {
-      key: 'add-space',
-      label: (
-        <Tooltip title={spaceLimitCheck.canAdd ? '' : getLimitExceededMessage('spaces', 10)}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              opacity: spaceLimitCheck.canAdd ? 1 : 0.5,
-            }}
-          >
-            <PlusOutlined style={{ fontSize: 16 }} />
-            <span>Add New Space</span>
-            <span style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>
-              {activeProject ? formatLimitMessage('Spaces', activeProject.spaces.length, 10) : ''}
-            </span>
-          </div>
-        </Tooltip>
-      ),
-      onClick: () => setModalMode(ModalMode.ADD_SPACE),
-      disabled: !activeProjectId || !spaceLimitCheck.canAdd,
-    };
-
-    return spaceItems.length > 0
-      ? [...spaceItems, { type: 'divider' }, addSpaceItem]
-      : [addSpaceItem];
-  }, [activeProject, handleSelectSpace, handleDeleteSpace, activeProjectId, spaceLimitCheck]);
+  const { projectMenuItems, spaceMenuItems } = useProjectSpaceMenuItems({
+    projects,
+    activeProject: activeProject || null,
+    activeProjectId,
+    adminSettings,
+    isMenuItemEditable: true,
+    onSelectProject: handleSelectProject,
+    onSelectSpace: handleSelectSpace,
+    onDeleteProject: handleDeleteProject,
+    onDeleteSpace: handleDeleteSpace,
+    onEditProject: (projectId: string, projectName: string) => {
+      setEditingEntityIds({ projectId, spaceId: null });
+      setModalMode(ModalMode.EDIT_PROJECT);
+      setModalInput(projectName);
+    },
+    onEditSpace: (projectId: string, spaceId: string, spaceName: string) => {
+      setEditingEntityIds({ projectId, spaceId });
+      setModalMode(ModalMode.EDIT_SPACE);
+      setModalInput(spaceName);
+    },
+    onAddProject: () => setModalMode(ModalMode.ADD_PROJECT),
+    onAddSpace: () => setModalMode(ModalMode.ADD_SPACE),
+  });
 
   const breadcrumbItems = useMemo(() => {
     if (projects.length === 0) {

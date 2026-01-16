@@ -38,21 +38,11 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
       ]}
       width={500}
     >
-      <div
-        style={{
-          marginBottom: 24,
-          padding: 16,
-          backgroundColor: '#eff6ff',
-          borderRadius: 6,
-          border: '1px solid #bfdbfe',
-        }}
-      >
-        <p style={{ fontSize: '14px', color: '#374151' }}>
-          {numberOfImages > 1
-            ? `${numberOfImages} images will be copied.`
-            : `The selected image will be copied.`}
-        </p>
-      </div>
+      <p>
+        {numberOfImages > 1
+          ? `${numberOfImages} images will be copied.`
+          : `The selected image will be copied.`}
+      </p>
     </Modal>
   );
 };
