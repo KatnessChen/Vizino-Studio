@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
-import { Modal, Button, Input, Checkbox, Typography } from 'antd';
-import { GeminiTaskName, GEMINI_TASKS } from '@/services/gemini/geminiTasks';
+import { Modal, Button, Typography } from 'antd';
+import { GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { getFileExtension } from '@/utils/downloadUtils';
 import { removeExtension, generateTimestamp } from '@/utils/fileNameUtils';
+import CustomizeImageNameForm from '@/components/form/CustomizeImageNameForm';
 
 const MAX_IMAGE_NAME_LENGTH = 50;
 
@@ -223,104 +224,30 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           </div>
         </div>
       </div>
-
       {/* Image Naming Section */}
       <div style={{ borderTop: '1px solid #e8e8e8', paddingTop: 16 }}>
-        <Typography.Title level={5} style={{ marginBottom: 12 }}>
-          Customize Image Name
-        </Typography.Title>
-
-        {/* Base Name Input */}
-        <div style={{ marginBottom: 16 }}>
-          <Typography.Text strong style={{ display: 'block', marginBottom: 4 }}>
-            Base Name
-          </Typography.Text>
-          <Input
-            value={baseName}
-            onChange={(e) => setBaseName(e.target.value)}
-            maxLength={MAX_IMAGE_NAME_LENGTH}
-            placeholder="Enter image name"
-            status={nameError ? 'error' : ''}
-          />
-          {nameError && (
-            <Typography.Text type="danger" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-              {nameError}
-            </Typography.Text>
-          )}
-        </div>
-
-        {/* Checkbox Options */}
-        <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Checkbox
-            checked={prefixTimestamp}
-            onChange={(e) => setPrefixTimestamp(e.target.checked)}
-          >
-            Prefix with timestamp
-          </Checkbox>
-          <Checkbox
-            checked={suffixTimestamp}
-            onChange={(e) => setSuffixTimestamp(e.target.checked)}
-          >
-            Suffix with timestamp
-          </Checkbox>
-          <Checkbox checked={suffixMimeType} onChange={(e) => setSuffixMimeType(e.target.checked)}>
-            Suffix with file extension
-          </Checkbox>
-          {taskName === GEMINI_TASKS.RECOLOR_WALL.task_name && colorName && (
-            <Checkbox
-              checked={suffixColorName}
-              onChange={(e) => setSuffixColorName(e.target.checked)}
-            >
-              Suffix with color name
-            </Checkbox>
-          )}
-          {taskName === GEMINI_TASKS.ADD_TEXTURE.task_name && textureName && (
-            <Checkbox
-              checked={suffixTextureName}
-              onChange={(e) => setSuffixTextureName(e.target.checked)}
-            >
-              Suffix with texture name
-            </Checkbox>
-          )}
-          {taskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && itemName && (
-            <Checkbox
-              checked={suffixItemName}
-              onChange={(e) => setSuffixItemName(e.target.checked)}
-            >
-              Suffix with texture name
-            </Checkbox>
-          )}
-        </div>
-
-        {/* Final Name Preview */}
-        <div
-          style={{
-            backgroundColor: '#fafafa',
-            borderRadius: 4,
-            padding: 12,
-            border: '1px solid #e8e8e8',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Typography.Text strong>Final Name Preview:</Typography.Text>
-            <Typography.Text
-              type={finalName.length > MAX_IMAGE_NAME_LENGTH ? 'danger' : 'secondary'}
-              style={{ fontSize: 12 }}
-            >
-              {finalName.length} / {MAX_IMAGE_NAME_LENGTH} characters
-            </Typography.Text>
-          </div>
-          <Typography.Text
-            code
-            style={{
-              display: 'block',
-              wordBreak: 'break-all',
-              color: nameError ? '#ff4d4f' : undefined,
-            }}
-          >
-            {finalName || '(empty)'}
-          </Typography.Text>
-        </div>
+        <CustomizeImageNameForm
+          baseName={baseName}
+          onBaseNameChange={setBaseName}
+          prefixTimestamp={prefixTimestamp}
+          onPrefixTimestampChange={setPrefixTimestamp}
+          suffixTimestamp={suffixTimestamp}
+          onSuffixTimestampChange={setSuffixTimestamp}
+          suffixMimeType={suffixMimeType}
+          onSuffixMimeTypeChange={setSuffixMimeType}
+          finalName={finalName}
+          nameError={nameError}
+          taskName={taskName}
+          colorName={colorName}
+          textureName={textureName}
+          itemName={itemName}
+          suffixColorName={suffixColorName}
+          onSuffixColorNameChange={setSuffixColorName}
+          suffixTextureName={suffixTextureName}
+          onSuffixTextureNameChange={setSuffixTextureName}
+          suffixItemName={suffixItemName}
+          onSuffixItemNameChange={setSuffixItemName}
+        />
       </div>
     </Modal>
   );
