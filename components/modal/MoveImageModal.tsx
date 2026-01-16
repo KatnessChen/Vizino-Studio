@@ -33,7 +33,6 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
   const [newSpaceName, setNewSpaceName] = useState('');
   const [nameError, setNameError] = useState<string>('');
 
-  // Use the hook to get consistent space data and limit checks
   const { spaceMenuItems } = useProjectSpaceMenuItems({
     projects,
     activeProject: activeProject || null,
