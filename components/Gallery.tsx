@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import {
   DndContext,
   DragEndEvent,
@@ -11,11 +12,18 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { ImageData } from '@/types';
+import {
+  selectSelectedOriginalImageIds,
+  selectSelectedUpdatedImageIds,
+  selectAllImages,
+} from '@/stores/imageStore';
+import { RootState } from '@/stores/store';
 import AssetCard from './ui/AssetCard';
 import SortableAssetCard from './ui/SortableAssetCard';
 import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
+import ImagesComparingButton from './button/ImagesComparingButton';
 import { Card, Button, Tooltip, Skeleton } from 'antd';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
@@ -208,6 +216,11 @@ const Gallery: React.FC<GalleryProps> = ({
   // Drag selection handlers
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      // Only start drag selection if clicking on the gallery background (not on a card)
+      if ((e.target as HTMLElement).closest('[data-card-id]')) {
+        return;
+      }
+
       const rect = galleryRef.current?.getBoundingClientRect();
       if (!rect) return;
 
@@ -287,6 +300,43 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const hasSelection = selectedImageIds.size > 0;
 
+  // Get global selection state from Redux (both original and generated)
+  const selectedOriginalImageIds = useSelector((state: RootState) =>
+    selectSelectedOriginalImageIds(state)
+  );
+  const selectedUpdatedImageIds = useSelector((state: RootState) =>
+    selectSelectedUpdatedImageIds(state)
+  );
+  const allImages = useSelector((state: RootState) => selectAllImages(state));
+
+  // Calculate total selected images across both original and generated
+  const totalSelectedImages = useMemo(() => {
+    return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
+  }, [selectedOriginalImageIds, selectedUpdatedImageIds]);
+
+  // Get all selected image objects (both original and generated) for comparison modal
+  const allSelectedImagesForComparison = useMemo(() => {
+    const allSelectedImages: ImageData[] = [];
+
+    // Add selected original image IDs by finding them in all images
+    selectedOriginalImageIds.forEach((id) => {
+      const img = allImages.find((i) => i.id === id);
+      if (img) {
+        allSelectedImages.push(img);
+      }
+    });
+
+    // Add selected generated image IDs by finding them in all images
+    selectedUpdatedImageIds.forEach((id) => {
+      const img = allImages.find((i) => i.id === id);
+      if (img) {
+        allSelectedImages.push(img);
+      }
+    });
+
+    return allSelectedImages;
+  }, [selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
+
   // Common button style for toolbar icons
   const toolbarButtonStyle = {
     display: 'flex',
@@ -346,6 +396,13 @@ const Gallery: React.FC<GalleryProps> = ({
               backgroundColor: '#d0d0d0',
               margin: '0 2px',
             }}
+          />
+
+          {/* Compare button */}
+          <ImagesComparingButton
+            totalSelectedPhotos={totalSelectedImages}
+            selectedPhotos={allSelectedImagesForComparison}
+            isToolbarMode={true}
           />
 
           {/* Action icon buttons */}
@@ -505,7 +562,8 @@ const Gallery: React.FC<GalleryProps> = ({
                 width: selectionBox.width,
                 height: selectionBox.height,
                 border: '2px dashed #cccccc',
-                backgroundColor: 'rgba(204, 204, 204, 0.1)',
+                backgroundColor: 'indigo',
+                opacity: 0.1,
                 pointerEvents: 'none',
                 zIndex: 1000,
               }}
