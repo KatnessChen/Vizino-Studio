@@ -43,7 +43,7 @@ const AuthPanel: React.FC = () => {
         // Login View
         <Box>
           <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3 }}>
-            Welcome to Vizion Studio
+            Welcome to Vizino Studio
           </Typography>
 
           {error && (

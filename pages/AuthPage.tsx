@@ -84,7 +84,7 @@ const AuthPage: React.FC = () => {
               }}
               className="cursor-default"
             >
-              Vizion
+              Vizino
             </Typography>
             <Typography
               variant="subtitle1"
@@ -104,7 +104,7 @@ const AuthPage: React.FC = () => {
           {/* Description */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body1" paragraph>
-              Welcome to Vizion Studio – your personal AI interior design assistant. Visualize your
+              Welcome to Vizino Studio – your personal AI interior design assistant. Visualize your
               spaces in any color or texture before you renovate.
             </Typography>
             <Stack spacing={1}>
