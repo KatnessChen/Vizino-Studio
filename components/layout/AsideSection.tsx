@@ -128,17 +128,7 @@ const AsideSection: React.FC = () => {
           Target Image
         </Typography.Title>
         {selectionMessage ? (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '4px',
-              border: '1px dashed #d1d5db',
-              color: '#9ca3af',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-            }}
-          >
+          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-300 text-gray-500 text-sm">
             {selectionMessage}
           </div>
         ) : selectedImage ? (
@@ -146,13 +136,7 @@ const AsideSection: React.FC = () => {
             <img
               src={cachedImageSrc || selectedImage.imageDownloadUrl}
               alt={selectedImage.name}
-              style={{
-                width: '100%',
-                height: 'auto',
-                borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                marginBottom: '8px',
-              }}
+              className="w-full h-[120px] rounded border border-gray-300 object-cover"
             />
           </div>
         ) : null}
@@ -170,22 +154,17 @@ const AsideSection: React.FC = () => {
         <button
           disabled={isDisabled || !selectedImage}
           onClick={handleGenerate}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full cursor-pointer ${
+          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full cursor-pointer h-11 text-base font-semibold ${
             isDisabled || !selectedImage
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : 'text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500'
           }`}
-          style={{
-            height: '44px',
-            fontSize: '1rem',
-            fontWeight: 600,
-          }}
         >
           <AutoAwesomeIcon sx={{ fontSize: 20, marginRight: 1, color: 'inherit' }} />
           Generate
         </button>
         {isDisabled && disableReason && selectedImage && (
-          <Alert title={disableReason} type="warning" style={{ marginTop: '8px' }} />
+          <Alert title={disableReason} type="warning" className="mt-2" />
         )}
       </div>
 
