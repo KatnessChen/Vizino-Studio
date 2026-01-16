@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState';
 import GenericConfirmModal from '@/components/modal/GenericConfirmModal';
 import CopyImageModal from '@/components/modal/CopyImageModal';
 import MoveImageModal from '@/components/modal/MoveImageModal';
+import RenameImageModal from '@/components/modal/RenameImageModal';
 import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
 import Footer from '@/components/layout/Footer';
 import AsideSection from '@/components/layout/AsideSection';
@@ -44,11 +45,13 @@ import {
   selectActiveSpaceId,
   selectIsAppInitiated,
   selectInitError,
+  selectIsFetchingSpaceImages,
   addImageOptimistic,
   removeImageOptimistic,
   removeImagesOptimistic,
   updateImageOptimistic,
   addSpace,
+  setIsFetchingSpaceImages,
 } from '@/stores/projectStore';
 import { reorderImagesWithDebounce } from '@/stores/imageOrderThunks';
 import {
@@ -67,6 +70,7 @@ const LandingPage: React.FC = () => {
 
   const isAppInitiated = useSelector(selectIsAppInitiated);
   const initError = useSelector(selectInitError);
+  const isFetchingSpaceImages = useSelector(selectIsFetchingSpaceImages);
 
   // Get active space from store
   const projects = useSelector(selectProjects);
@@ -127,6 +131,10 @@ const LandingPage: React.FC = () => {
   const [imageTypeToMove, setImageTypeToMove] = useState<'original' | 'updated' | null>(null);
   const [imagesToMove, setImagesToMove] = useState<ImageData[]>([]);
   const [isMovingImage, setIsMovingImage] = useState<boolean>(false);
+
+  // State for rename modal
+  const [showRenameModal, setShowRenameModal] = useState<boolean>(false);
+  const [imageToRename, setImageToRename] = useState<ImageData | null>(null);
 
   // Initialize app on mount
   useAppInit();
@@ -245,7 +253,15 @@ const LandingPage: React.FC = () => {
         );
       }
     },
-    [user, activeProjectId, activeSpaceId, dispatch, setErrorMessage, imageLimitCheck]
+    [
+      user,
+      activeProjectId,
+      activeSpaceId,
+      dispatch,
+      setErrorMessage,
+      imageLimitCheck,
+      originalImages,
+    ]
   );
 
   const handleRenameImage = useCallback(
@@ -283,6 +299,7 @@ const LandingPage: React.FC = () => {
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
+        message.success('Image renamed successfully');
         setErrorMessage(null);
       } catch (error) {
         console.error('Failed to rename image:', error);
@@ -295,6 +312,40 @@ const LandingPage: React.FC = () => {
       }
     },
     [user, activeProjectId, activeSpaceId, dispatch, setErrorMessage]
+  );
+
+  const handleOpenRenameModal = useCallback(
+    (imageId: string) => {
+      if (!activeProjectId || !activeSpaceId) {
+        setErrorMessage('No project and space selected.');
+        return;
+      }
+
+      const project = projects.find((p) => p.id === activeProjectId);
+      if (!project) return;
+
+      const space = project.spaces.find((s) => s.id === activeSpaceId);
+      if (!space) return;
+
+      // Find the image from both original and updated images
+      const allImages = [...originalImages, ...updatedImages];
+      const image = allImages.find((img) => img.id === imageId);
+
+      if (image) {
+        setImageToRename(image);
+        setShowRenameModal(true);
+      }
+    },
+    [activeProjectId, activeSpaceId, projects, originalImages, updatedImages]
+  );
+
+  const handleConfirmRename = useCallback(
+    (imageId: string, newName: string) => {
+      setShowRenameModal(false);
+      setImageToRename(null);
+      handleRenameImage(imageId, newName);
+    },
+    [handleRenameImage]
   );
 
   const handleImageSatisfied = useCallback(
@@ -386,8 +437,13 @@ const LandingPage: React.FC = () => {
         );
 
         // Fetch updated space images to get real Firebase Storage URL
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
-        dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+        dispatch(setIsFetchingSpaceImages(true));
+        try {
+          const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+          dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+        } finally {
+          dispatch(setIsFetchingSpaceImages(false));
+        }
       } catch (error) {
         console.error('Failed to save processed image:', error);
 
@@ -427,12 +483,15 @@ const LandingPage: React.FC = () => {
     if (!user || !activeProjectId || !activeSpaceId) return;
 
     try {
+      dispatch(setIsFetchingSpaceImages(true));
       // Fetch updated space images from Firestore
       const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
       dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
     } catch (error) {
       console.error('Failed to refresh images:', error);
       setErrorMessage('Failed to refresh images. Please reload the page.');
+    } finally {
+      dispatch(setIsFetchingSpaceImages(false));
     }
   }, [user, activeProjectId, activeSpaceId, dispatch, setErrorMessage]);
 
@@ -744,18 +803,12 @@ const LandingPage: React.FC = () => {
   // Single image operations
   const handleSingleRename = useCallback(
     (imageId: string) => {
-      const image = [...originalImages, ...updatedImages].find((img) => img.id === imageId);
-      if (!image) return;
-
-      const newName = prompt('Enter new name for the image:', image.name);
-      if (newName && newName.trim()) {
-        handleRenameImage(imageId, newName.trim());
-      }
+      handleOpenRenameModal(imageId);
     },
-    [originalImages, updatedImages, handleRenameImage]
+    [handleOpenRenameModal]
   );
 
-  const handleSingleDuplicate = useCallback(
+  const handleSingleCopy = useCallback(
     (imageId: string) => {
       const image = [...originalImages, ...updatedImages].find((img) => img.id === imageId);
       if (!image) return;
@@ -776,14 +829,6 @@ const LandingPage: React.FC = () => {
       setShowCopyModal(true);
     },
     [originalImages, updatedImages, dispatch]
-  );
-
-  const handleSingleCopy = useCallback(
-    (imageId: string) => {
-      // Same as duplicate for now - can be customized later
-      handleSingleDuplicate(imageId);
-    },
-    [handleSingleDuplicate]
   );
 
   const handleBulkMove = useCallback(
@@ -850,18 +895,13 @@ const LandingPage: React.FC = () => {
         await Promise.all(movePromises);
 
         // Update Redux state - remove images from current space
-        if (imageTypeToMove === 'original') {
-          dispatch(
-            removeImagesOptimistic({
-              projectId: activeProjectId,
-              spaceId: activeSpaceId,
-              imageIds: imagesToMove.map((img) => img.id),
-            })
-          );
-        } else {
-          // For updated images, we need to handle differently since they're in a different slice
-          // For now, just show success message
-        }
+        dispatch(
+          removeImagesOptimistic({
+            projectId: activeProjectId,
+            spaceId: activeSpaceId,
+            imageIds: imagesToMove.map((img) => img.id),
+          })
+        );
 
         // Clear selection
         if (imageTypeToMove === 'original') {
@@ -979,8 +1019,8 @@ const LandingPage: React.FC = () => {
                       enableReordering={true}
                       onReorder={handleReorderOriginalImages}
                       onSingleRename={handleSingleRename}
-                      onSingleDuplicate={handleSingleDuplicate} // TODO: consolidate onSingleDuplicate & onSingleCopy
-                      onSingleCopy={handleSingleCopy} // TODO: consolidate onSingleDuplicate & onSingleCopy
+                      onSingleCopy={handleSingleCopy}
+                      isLoading={isFetchingSpaceImages}
                     />
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
@@ -1012,8 +1052,8 @@ const LandingPage: React.FC = () => {
                       enableReordering={true}
                       onReorder={handleReorderGeneratedImages}
                       onSingleRename={handleSingleRename}
-                      onSingleDuplicate={handleSingleDuplicate}
                       onSingleCopy={handleSingleCopy}
+                      isLoading={isFetchingSpaceImages}
                     />
                   </div>
                 )}
@@ -1099,6 +1139,19 @@ const LandingPage: React.FC = () => {
             handleGenerateMoreSuccess();
           }}
           onCancel={handleGenerateMoreCancel}
+        />
+      )}
+
+      {/* Rename Image Modal */}
+      {imageToRename && (
+        <RenameImageModal
+          isOpen={showRenameModal}
+          image={imageToRename}
+          onConfirm={handleConfirmRename}
+          onCancel={() => {
+            setShowRenameModal(false);
+            setImageToRename(null);
+          }}
         />
       )}
     </div>

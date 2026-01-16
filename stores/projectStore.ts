@@ -8,6 +8,7 @@ interface ProjectState {
   activeSpaceId: string | null;
   isAppInitiated: boolean;
   initError: string | null;
+  isFetchingSpaceImages: boolean;
 }
 
 const initialState: ProjectState = {
@@ -16,6 +17,7 @@ const initialState: ProjectState = {
   activeSpaceId: null,
   isAppInitiated: false,
   initError: null,
+  isFetchingSpaceImages: false,
 };
 
 export const projectStore = createSlice({
@@ -96,6 +98,11 @@ export const projectStore = createSlice({
     },
     setInitError: (state, action: PayloadAction<string | null>) => {
       state.initError = action.payload;
+    },
+
+    // Fetching space images state
+    setIsFetchingSpaceImages: (state, action: PayloadAction<boolean>) => {
+      state.isFetchingSpaceImages = action.payload;
     },
 
     // Optimistic updates for images
@@ -225,6 +232,7 @@ export const projectStore = createSlice({
     selectActiveSpaceId: (state) => state.activeSpaceId,
     selectIsAppInitiated: (state) => state.isAppInitiated,
     selectInitError: (state) => state.initError,
+    selectIsFetchingSpaceImages: (state) => state.isFetchingSpaceImages,
     selectActiveProject: (state) =>
       state.activeProjectId
         ? state.projects.find((p) => p.id === state.activeProjectId)
@@ -253,6 +261,7 @@ export const {
   setActiveSpaceId,
   setIsAppInitiated,
   setInitError,
+  setIsFetchingSpaceImages,
   addImageOptimistic,
   removeImageOptimistic,
   removeImagesOptimistic,
@@ -267,6 +276,7 @@ export const {
   selectActiveSpaceId,
   selectIsAppInitiated,
   selectInitError,
+  selectIsFetchingSpaceImages,
   selectActiveProject,
   selectActiveSpace,
 } = projectStore.selectors;
