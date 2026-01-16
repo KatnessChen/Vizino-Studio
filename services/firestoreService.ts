@@ -851,8 +851,8 @@ export async function duplicateImage(
 }
 
 /**
- * Moves an image to a different space (or same space) without preserving generation history.
- * This creates a new copy of the image with evolutionChain and parentImageId cleared.
+ * Moves an image to a different space while preserving generation history.
+ * This creates a new copy of the image with evolutionChain and parentImageId intact.
  *
  * @param userId The ID of the user.
  * @param sourceProjectId The ID of the source project.
@@ -910,13 +910,13 @@ export async function moveImageToSpace(
     const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
-    // Create the new image document WITHOUT generation history
+    // Create the new image document WITH generation history preserved
     const newImageData: ImageData = {
       id: newImageId,
-      name: sourceImageData.name, // Keep original name (no " Copy" suffix)
+      name: sourceImageData.name,
       spaceId: targetSpaceId,
-      evolutionChain: [], // Clear evolution chain
-      parentImageId: null, // Clear parent reference
+      evolutionChain: sourceImageData.evolutionChain || [], // Keep evolution chain
+      parentImageId: sourceImageData.parentImageId, // Keep parent reference
       imageDownloadUrl: sourceImageData.imageDownloadUrl,
       storageFilePath: sourceImageData.storageFilePath,
       mimeType: sourceImageData.mimeType,
@@ -949,6 +949,9 @@ export async function moveImageToSpace(
 
     await batch.commit();
     console.log(`Image moved successfully to space ${targetSpaceId}: ${newImageId}`);
+
+    // Soft delete the original image in the source space
+    await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
 
     return newImageData;
   } catch (error) {
