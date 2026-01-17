@@ -1005,7 +1005,6 @@ const LandingPage: React.FC = () => {
                       showRemoveButtons={selectedOriginalImageIds.size === 0}
                       emptyMessage="No images uploaded yet."
                       onUploadImage={handleImageUpload}
-                      showUploadCard={true}
                       onBulkDownload={() => handleBulkDownload('original')}
                       onUploadError={setErrorMessage}
                       onBulkDelete={() => handleBulkDelete('original')}
