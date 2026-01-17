@@ -24,7 +24,8 @@ import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
-import { Card, Button, Tooltip, Skeleton } from 'antd';
+import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
+import { BarsOutlined, AppstoreOutlined } from '@ant-design/icons';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
   DriveFileMoveOutline as DriveFileMoveOutline,
@@ -107,6 +108,9 @@ const Gallery: React.FC<GalleryProps> = ({
     width: number;
     height: number;
   } | null>(null);
+
+  // Layout mode: 'Kanban' (grid) or 'List' (vertical list)
+  const [layoutMode, setLayoutMode] = useState<'Kanban' | 'List'>('Kanban');
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -356,105 +360,116 @@ const Gallery: React.FC<GalleryProps> = ({
     >
       <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
 
-      {/* Selection toolbar - only show when images are selected */}
-      {hasSelection && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 8px 4px 16px',
-            backgroundColor: '#bd6dff',
-            borderRadius: '8px',
-            height: '32px',
-            color: '#ffffff',
-          }}
-        >
-          {/* Selection count */}
-          <span style={{ fontSize: '13px', fontWeight: 500 }}>
-            {selectedImageIds.size} selected
-          </span>
-
-          {/* Close/Deselect button */}
-          {onClearSelection && (
-            <Tooltip title="Deselect all">
-              <Button
-                type="text"
-                size="small"
-                icon={<CloseIcon style={iconStyle} />}
-                onClick={onClearSelection}
-                style={toolbarButtonStyle}
-              />
-            </Tooltip>
-          )}
-
-          {/* Divider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {hasSelection && (
           <div
             style={{
-              width: '1px',
-              height: '18px',
-              backgroundColor: '#d0d0d0',
-              margin: '0 2px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 8px 4px 16px',
+              backgroundColor: '#bd6dff',
+              borderRadius: '8px',
+              height: '32px',
+              color: '#ffffff',
             }}
-          />
+          >
+            {/* Selection count */}
+            <span style={{ fontSize: '13px', fontWeight: 500 }}>
+              {selectedImageIds.size} selected
+            </span>
 
-          {/* Compare button */}
-          <ImagesComparingButton
-            totalSelectedPhotos={totalSelectedImages}
-            selectedPhotos={allSelectedImagesForComparison}
-            isToolbarMode={true}
-          />
+            {/* Close/Deselect button */}
+            {onClearSelection && (
+              <Tooltip title="Deselect all">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseIcon style={iconStyle} />}
+                  onClick={onClearSelection}
+                  style={toolbarButtonStyle}
+                />
+              </Tooltip>
+            )}
 
-          {/* Action icon buttons */}
-          {onBulkDownload && (
-            <Tooltip title="Download">
-              <Button
-                type="text"
-                size="small"
-                icon={<DownloadIcon style={iconStyle} />}
-                onClick={onBulkDownload}
-                style={toolbarButtonStyle}
-              />
-            </Tooltip>
-          )}
+            {/* Divider */}
+            <div
+              style={{
+                width: '1px',
+                height: '18px',
+                backgroundColor: '#d0d0d0',
+                margin: '0 2px',
+              }}
+            />
 
-          {onBulkCopy && (
-            <Tooltip title="Copy">
-              <Button
-                type="text"
-                size="small"
-                icon={<CopyIcon style={iconStyle} />}
-                onClick={onBulkCopy}
-                style={toolbarButtonStyle}
-              />
-            </Tooltip>
-          )}
+            {/* Compare button */}
+            <ImagesComparingButton
+              totalSelectedPhotos={totalSelectedImages}
+              selectedPhotos={allSelectedImagesForComparison}
+              isToolbarMode={true}
+            />
 
-          {onBulkMove && (
-            <Tooltip title="Move">
-              <Button
-                type="text"
-                size="small"
-                icon={<DriveFileMoveOutline style={iconStyle} />}
-                onClick={onBulkMove}
-                style={toolbarButtonStyle}
-              />
-            </Tooltip>
-          )}
+            {/* Action icon buttons */}
+            {onBulkDownload && (
+              <Tooltip title="Download">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DownloadIcon style={iconStyle} />}
+                  onClick={onBulkDownload}
+                  style={toolbarButtonStyle}
+                />
+              </Tooltip>
+            )}
 
-          {onBulkDelete && (
-            <Tooltip title="Delete">
-              <Button
-                type="text"
-                size="small"
-                icon={<DeleteIcon style={iconStyle} />}
-                onClick={onBulkDelete}
-                style={toolbarButtonStyle}
-              />
-            </Tooltip>
-          )}
-        </div>
-      )}
+            {onBulkCopy && (
+              <Tooltip title="Copy">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyIcon style={iconStyle} />}
+                  onClick={onBulkCopy}
+                  style={toolbarButtonStyle}
+                />
+              </Tooltip>
+            )}
+            {onBulkMove && (
+              <Tooltip title="Move">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DriveFileMoveOutline style={iconStyle} />}
+                  onClick={onBulkMove}
+                  style={toolbarButtonStyle}
+                />
+              </Tooltip>
+            )}
+
+            {onBulkDelete && (
+              <Tooltip title="Delete">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteIcon style={iconStyle} />}
+                  onClick={onBulkDelete}
+                  style={toolbarButtonStyle}
+                />
+              </Tooltip>
+            )}
+          </div>
+        )}
+
+        {/* Layout toggle (separate from toolbar) */}
+        <Segmented
+          orientation="vertical"
+          value={layoutMode}
+          onChange={(val) => setLayoutMode(val as 'Kanban' | 'List')}
+          options={[
+            { value: 'List', icon: <BarsOutlined /> },
+            { value: 'Kanban', icon: <AppstoreOutlined /> },
+          ]}
+        />
+      </div>
     </div>
   );
 
@@ -464,16 +479,15 @@ const Gallery: React.FC<GalleryProps> = ({
     <>
       {isLoading ? (
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '16px',
-            padding: '24px',
-          }}
+          className={
+            layoutMode === 'Kanban'
+              ? 'grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 p-6'
+              : 'flex flex-col gap-4 p-6'
+          }
         >
           {/* Display 8 skeleton cards */}
           {Array.from({ length: 8 }).map((_, index) => (
-            <div key={`skeleton-${index}`}>
+            <div key={`skeleton-${index}`} className={layoutMode === 'List' ? 'w-full' : ''}>
               <Skeleton.Image active style={{ width: '100%' }} />
             </div>
           ))}
@@ -486,14 +500,11 @@ const Gallery: React.FC<GalleryProps> = ({
         <div
           ref={galleryRef}
           onMouseDown={handleMouseDown}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '16px',
-            position: 'relative',
-            userSelect: 'none',
-            padding: '24px',
-          }}
+          className={
+            layoutMode === 'Kanban'
+              ? 'grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 p-6 relative select-none'
+              : 'flex flex-col gap-4 p-6 relative select-none'
+          }
         >
           {showUploadCard && onUploadImage && onUploadError && (
             <UploadCard
