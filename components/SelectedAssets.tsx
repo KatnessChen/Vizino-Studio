@@ -11,6 +11,7 @@ import {
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { imageCache } from '@/utils/imageCache';
 import { imageDownloadUrlToBase64 } from '@/utils';
+import { cardHeight } from '@/components/layout/AsideSection';
 
 const SelectedAssets: React.FC = () => {
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
@@ -96,7 +97,7 @@ const SelectedAssets: React.FC = () => {
         return (
           <div className="flex flex-col gap-2">
             <div
-              className="w-full h-[120px] rounded border border-dashed border-gray-200"
+              className={`w-full h-[${cardHeight}] rounded border border-dashed border-gray-200`}
               style={{ backgroundColor: selectedColor?.hex || 'bg-gray-100' }}
             />
             <div className="text-sm">
@@ -107,7 +108,9 @@ const SelectedAssets: React.FC = () => {
         );
       } else {
         return (
-          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
+          <div
+            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+          >
             No color selected
           </div>
         );
@@ -122,10 +125,12 @@ const SelectedAssets: React.FC = () => {
               <img
                 src={`data:image/jpeg;base64,${textureBase64}`}
                 alt={selectedTexture.name}
-                className="w-full h-[120px] rounded border border-dashed border-gray-200 object-contain"
+                className={`w-full h-[${cardHeight}] rounded border border-dashed border-gray-200 object-contain`}
               />
             ) : (
-              <div className="w-full h-[120px] rounded border border-gray-200 bg-gray-100 flex items-center justify-center">
+              <div
+                className={`w-full h-[${cardHeight}] rounded border border-gray-200 bg-gray-100 flex items-center justify-center`}
+              >
                 <span className="text-xs text-gray-400">...</span>
               </div>
             )}
@@ -139,7 +144,9 @@ const SelectedAssets: React.FC = () => {
         );
       } else {
         return (
-          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
+          <div
+            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+          >
             No texture selected
           </div>
         );
@@ -154,10 +161,12 @@ const SelectedAssets: React.FC = () => {
               <img
                 src={`data:image/jpeg;base64,${itemBase64}`}
                 alt={selectedItem.name}
-                className="w-full h-[120px] rounded border border-gray-200 object-contain"
+                className={`w-full h-[${cardHeight}] rounded border border-gray-200 object-contain`}
               />
             ) : (
-              <div className="w-full h-[120px] rounded border border-gray-200 bg-gray-100 flex items-center justify-center">
+              <div
+                className={`w-full h-[${cardHeight}] rounded border border-gray-200 bg-gray-100 flex items-center justify-center`}
+              >
                 <span className="text-xs text-gray-400">...</span>
               </div>
             )}
@@ -171,7 +180,9 @@ const SelectedAssets: React.FC = () => {
         );
       } else {
         return (
-          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
+          <div
+            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+          >
             No item selected
           </div>
         );

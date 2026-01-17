@@ -71,7 +71,7 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
   };
 
   return (
-    <Card title={<span>{title}</span>}>
+    <Card title={title}>
       {error && (
         <AntAlert
           title="Error"

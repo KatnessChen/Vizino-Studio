@@ -24,6 +24,8 @@ import { imageCache } from '@/utils/imageCache';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useAuth } from '@/contexts/AuthContext';
 
+export const cardHeight = '120px';
+
 const AsideSection: React.FC = () => {
   const dispatch = useDispatch();
   const { user, adminSettings } = useAuth();
@@ -127,7 +129,9 @@ const AsideSection: React.FC = () => {
           Target Image
         </Typography.Title>
         {selectionMessage ? (
-          <div className="flex justify-center items-center h-[120px] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm">
+          <div
+            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+          >
             {selectionMessage}
           </div>
         ) : selectedImage ? (
@@ -135,7 +139,7 @@ const AsideSection: React.FC = () => {
             <img
               src={cachedImageSrc || selectedImage.imageDownloadUrl}
               alt={selectedImage.name}
-              className="w-full h-[120px] rounded border border-gray-200 object-cover"
+              className={`w-full h-[${cardHeight}] rounded border border-gray-200 object-cover`}
             />
           </div>
         ) : null}
