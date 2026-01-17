@@ -109,15 +109,23 @@ const AssetCard: React.FC<AssetCardProps> = ({
       onClick={(e) => onSelect?.(e)}
       onMouseEnter={() => setShowButtons(true)}
       onMouseLeave={() => setShowButtons(false)}
-      className={`w-full h-full min-w-[160px] ${isList ? 'min-h-[120px]' : 'min-h-[200px]'} relative border-2 ${isSelected ? 'border-[#bd6dff]' : 'border-[#d1d5db]'} rounded-md cursor-pointer ${isList ? 'flex-row' : 'flex-col'} flex bg-[#f9fafb] transition-all duration-300 overflow-hidden ${isSelected ? 'shadow-[0_8px_24px_rgba(99,102,241,0.5)]' : 'shadow-[0_2px_8px_rgba(0,0,0,0.08)]'}`}>
-
+      className={`w-full min-w-[160px] ${isList ? 'min-h-[120px]' : 'min-h-[200px]'} relative border-2 ${isSelected ? 'border-[#bd6dff]' : 'border-[#d1d5db]'} rounded-md cursor-pointer ${isList ? 'flex-row' : 'flex-col'} flex bg-[#f9fafb] overflow-hidden ${isSelected ? 'shadow-[0_8px_24px_rgba(99,102,241,0.5)]' : 'shadow-[0_2px_8px_rgba(0,0,0,0.08)]'}`}
+    >
       {/* Image container */}
       <div
-        className={isList ? 'relative overflow-hidden w-[140px] h-full flex-none' : 'flex-1 relative overflow-hidden min-h-[140px]'}
+        className={
+          isList
+            ? 'relative overflow-hidden w-[140px] min-h-[120px] flex-none'
+            : 'flex-1 relative overflow-hidden min-h-[140px]'
+        }
       >
         {/* Asset preview */}
         {imageSrc ? (
-          <img src={imageSrc} alt={asset.name} className="absolute inset-0 w-full h-full object-cover" />
+          <img
+            src={imageSrc}
+            alt={asset.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
         ) : (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-[#e5e7eb]">
             <span className="text-[0.75rem] text-[#6b7280]">{isLoadingCache && 'Loading...'}</span>
@@ -150,7 +158,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="gear-button w-8 h-8 rounded-md bg-white opacity-90 flex items-center justify-center cursor-pointer shadow-sm transition-all"
+                className="gear-button w-8 h-8 rounded-md bg-white opacity-90 flex items-center justify-center cursor-pointer shadow-sm"
               >
                 <SettingOutlined className="text-[16px] text-slate-700" />
               </div>
@@ -162,14 +170,16 @@ const AssetCard: React.FC<AssetCardProps> = ({
       {/* Right column for list layout */}
       {isList ? (
         <div className="p-3 flex flex-col justify-center flex-1 min-w-0 gap-1.5">
-          <div className="text-sm font-semibold text-slate-900 truncate">
-            {asset.name}
+          <div className="text-sm font-semibold text-slate-900 truncate">{asset.name}</div>
+          <div className="text-xs text-slate-500">
+            {isImageData ? (asset as ImageData).mimeType : ''}
           </div>
-          <div className="text-xs text-slate-500">{isImageData ? (asset as ImageData).mimeType : ''}</div>
         </div>
       ) : (
         /* Asset name - below image */
-        <div className="p-2.5 bg-white border-t border-gray-200 text-sm font-medium text-slate-700 text-left truncate">{asset.name}</div>
+        <div className="p-2.5 bg-white border-t border-gray-200 text-sm font-medium text-slate-700 text-left truncate">
+          {asset.name}
+        </div>
       )}
     </div>
   );
