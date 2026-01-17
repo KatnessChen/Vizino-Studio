@@ -109,75 +109,18 @@ const AssetCard: React.FC<AssetCardProps> = ({
       onClick={(e) => onSelect?.(e)}
       onMouseEnter={() => setShowButtons(true)}
       onMouseLeave={() => setShowButtons(false)}
-      style={{
-        width: '100%',
-        height: '100%',
-        minWidth: '160px',
-        minHeight: isList ? '120px' : '200px',
-        position: 'relative',
-        borderWidth: '2px',
-        borderStyle: 'solid',
-        borderColor: isSelected ? '#bd6dff' : '#d1d5db',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: isList ? 'row' : 'column',
-        backgroundColor: '#f9fafb',
-        transition: 'all 0.3s ease',
-        overflow: 'hidden',
-        boxShadow: isSelected
-          ? '0 8px 24px rgba(99, 102, 241, 0.5)'
-          : '0 2px 8px rgba(0, 0, 0, 0.08)',
-      }}
-    >
+      className={`w-full h-full min-w-[160px] ${isList ? 'min-h-[120px]' : 'min-h-[200px]'} relative border-2 ${isSelected ? 'border-[#bd6dff]' : 'border-[#d1d5db]'} rounded-md cursor-pointer ${isList ? 'flex-row' : 'flex-col'} flex bg-[#f9fafb] transition-all duration-300 overflow-hidden ${isSelected ? 'shadow-[0_8px_24px_rgba(99,102,241,0.5)]' : 'shadow-[0_2px_8px_rgba(0,0,0,0.08)]'}`}>
+
       {/* Image container */}
       <div
-        style={
-          isList
-            ? {
-                width: '140px',
-                height: '100%',
-                position: 'relative',
-                overflow: 'hidden',
-                flex: '0 0 140px',
-              }
-            : {
-                flex: 1,
-                position: 'relative',
-                overflow: 'hidden',
-                minHeight: '140px',
-              }
-        }
+        className={isList ? 'relative overflow-hidden w-[140px] h-full flex-none' : 'flex-1 relative overflow-hidden min-h-[140px]'}
       >
         {/* Asset preview */}
         {imageSrc ? (
-          <img
-            src={imageSrc}
-            alt={asset.name}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              position: 'absolute',
-              inset: 0,
-            }}
-          />
+          <img src={imageSrc} alt={asset.name} className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#e5e7eb',
-              position: 'absolute',
-              inset: 0,
-            }}
-          >
-            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-              {isLoadingCache && 'Loading...'}
-            </span>
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-[#e5e7eb]">
+            <span className="text-[0.75rem] text-[#6b7280]">{isLoadingCache && 'Loading...'}</span>
           </div>
         )}
       </div>
@@ -185,23 +128,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
       {/* Toolbar - top-right of the card (keeps same buttons) */}
       {(onViewExpand || onViewDetails || hasOperations) && (
         <div
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            zIndex: 10,
-            opacity: showButtons ? 1 : 0,
-            visibility: showButtons ? 'visible' : 'hidden',
-            transition: 'opacity 0.3s ease, visibility 0.3s ease',
-            pointerEvents: showButtons ? 'auto' : 'none',
-            display: 'flex',
-            gap: '6px',
-            alignItems: 'center',
-            padding: '4px 6px',
-            borderRadius: '6px',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(4px)',
-          }}
+          className={`absolute top-2 right-2 z-10 flex gap-1.5 items-center p-1 rounded-md bg-[rgba(255,255,255,0.05)] backdrop-blur-sm transition-opacity duration-300 ${showButtons ? 'opacity-100 visible pointer-events-auto' : 'opacity-0 invisible pointer-events-none'}`}
         >
           {onViewExpand && (
             <MyButton
@@ -209,42 +136,23 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 e.stopPropagation();
                 onViewExpand();
               }}
-              icon={<EyeFilled style={{ fontSize: '16px' }} />}
+              icon={<EyeFilled className="text-[16px]" />}
             >
               View
             </MyButton>
           )}
 
           {onViewExpand && (onViewDetails || hasOperations) && (
-            <div
-              style={{
-                width: '1px',
-                height: '24px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                margin: '0 2px',
-              }}
-            />
+            <div className="w-px h-6 bg-white/20 mx-0.5" />
           )}
 
           {(onViewDetails || hasOperations) && (
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="gear-button"
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.2s ease',
-                }}
+                className="gear-button w-8 h-8 rounded-md bg-white opacity-90 flex items-center justify-center cursor-pointer shadow-sm transition-all"
               >
-                <SettingOutlined style={{ fontSize: '16px', color: '#374151' }} />
+                <SettingOutlined className="text-[16px] text-slate-700" />
               </div>
             </Dropdown>
           )}
@@ -253,42 +161,15 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
       {/* Right column for list layout */}
       {isList ? (
-        <div
-          style={{
-            padding: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            flex: 1,
-            minWidth: 0,
-            gap: 6,
-          }}
-        >
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div className="p-3 flex flex-col justify-center flex-1 min-w-0 gap-1.5">
+          <div className="text-sm font-semibold text-slate-900 truncate">
             {asset.name}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-            {isImageData ? (asset as ImageData).mimeType : ''}
-          </div>
+          <div className="text-xs text-slate-500">{isImageData ? (asset as ImageData).mimeType : ''}</div>
         </div>
       ) : (
         /* Asset name - below image */
-        <div
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#ffffff',
-            borderTop: '1px solid #e5e7eb',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            color: '#374151',
-            textAlign: 'left',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {asset.name}
-        </div>
+        <div className="p-2.5 bg-white border-t border-gray-200 text-sm font-medium text-slate-700 text-left truncate">{asset.name}</div>
       )}
     </div>
   );
