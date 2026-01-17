@@ -7,6 +7,7 @@ import { ImageData } from '@/types';
 interface SortableAssetCardProps {
   asset: ImageData;
   isSelected: boolean;
+  layout?: 'grid' | 'list';
   onSelect: (event?: React.MouseEvent) => void;
   onViewExpand: () => void;
   onViewDetails: () => void;
@@ -17,6 +18,7 @@ interface SortableAssetCardProps {
 const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
   asset,
   isSelected,
+  layout = 'grid',
   onSelect,
   onViewExpand,
   onViewDetails,
@@ -39,6 +41,7 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
       <AssetCard
         asset={asset}
         isSelected={isSelected}
+        layout={layout}
         onSelect={onSelect}
         onViewExpand={onViewExpand}
         onViewDetails={onViewDetails}

@@ -1016,7 +1016,6 @@ const LandingPage: React.FC = () => {
                       onGenerateMoreSuccess={handleGenerateMoreSuccess}
                       userId={user?.uid}
                       isImageLimitReached={!imageLimitCheck.canAdd}
-                      enableReordering={true}
                       onReorder={handleReorderOriginalImages}
                       onSingleRename={handleSingleRename}
                       onSingleCopy={handleSingleCopy}
@@ -1049,7 +1048,6 @@ const LandingPage: React.FC = () => {
                       onGenerateMoreSuccess={handleGenerateMoreSuccess}
                       userId={user?.uid}
                       isImageLimitReached={!imageLimitCheck.canAdd}
-                      enableReordering={true}
                       onReorder={handleReorderGeneratedImages}
                       onSingleRename={handleSingleRename}
                       onSingleCopy={handleSingleCopy}

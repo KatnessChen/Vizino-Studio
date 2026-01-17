@@ -60,7 +60,6 @@ interface GalleryProps {
   userId?: string | undefined;
   isImageLimitReached?: boolean;
   onReorder?: (newOrderedImageIds: string[]) => void;
-  enableReordering?: boolean;
   isLoading?: boolean;
   onSingleRename?: (imageId: string) => void;
   onSingleCopy?: (imageId: string) => void;
@@ -73,7 +72,6 @@ const Gallery: React.FC<GalleryProps> = ({
   emptyMessage,
   showUploadCard = false,
   isImageLimitReached = false,
-  enableReordering = false,
   isLoading = false,
   onClearSelection,
   onUploadImage,
@@ -461,7 +459,6 @@ const Gallery: React.FC<GalleryProps> = ({
 
         {/* Layout toggle (separate from toolbar) */}
         <Segmented
-          orientation="vertical"
           value={layoutMode}
           onChange={(val) => setLayoutMode(val as 'Kanban' | 'List')}
           options={[
@@ -513,32 +510,8 @@ const Gallery: React.FC<GalleryProps> = ({
               isLimitReached={isImageLimitReached}
             />
           )}
-          {enableReordering ? (
-            <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
-              {images.map((image) => (
-                <div
-                  key={image.id}
-                  data-card-id={image.id}
-                  ref={(el) => {
-                    if (el) {
-                      cardRefs.current.set(image.id, el);
-                    }
-                  }}
-                >
-                  <SortableAssetCard
-                    asset={image}
-                    isSelected={selectedImageIds.has(image.id)}
-                    onSelect={(e?: React.MouseEvent) => handleCardClick(image.id, e)}
-                    onViewExpand={() => handleExpandPhotoImage(image)}
-                    onViewDetails={() => onViewMoreButtonClick(image)}
-                    onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
-                    onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
-                  />
-                </div>
-              ))}
-            </SortableContext>
-          ) : (
-            images.map((image) => (
+          <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+            {images.map((image) => (
               <div
                 key={image.id}
                 data-card-id={image.id}
@@ -550,18 +523,19 @@ const Gallery: React.FC<GalleryProps> = ({
                   }
                 }}
               >
-                <AssetCard
+                <SortableAssetCard
                   asset={image}
                   isSelected={selectedImageIds.has(image.id)}
-                  onSelect={(e) => handleCardClick(image.id, e)}
+                  layout={layoutMode === 'List' ? 'list' : 'grid'}
+                  onSelect={(e?: React.MouseEvent) => handleCardClick(image.id, e)}
                   onViewExpand={() => handleExpandPhotoImage(image)}
                   onViewDetails={() => onViewMoreButtonClick(image)}
                   onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
                   onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
                 />
               </div>
-            ))
-          )}
+            ))}
+          </SortableContext>
 
           {/* Selection box overlay */}
           {selectionBox && (
@@ -587,32 +561,29 @@ const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <Card title={cardTitle} styles={{ body: { padding: 0 } }}>
-      {enableReordering && onReorder ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-        >
-          {galleryContent}
-          <DragOverlay>
-            {activeImage ? (
-              <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
-                <AssetCard
-                  asset={activeImage}
-                  isSelected={selectedImageIds.has(activeImage.id)}
-                  onSelect={() => {}}
-                  onViewExpand={() => {}}
-                  onViewDetails={() => {}}
-                />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        galleryContent
-      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {galleryContent}
+        <DragOverlay>
+          {activeImage ? (
+            <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
+              <AssetCard
+                asset={activeImage}
+                isSelected={selectedImageIds.has(activeImage.id)}
+                onSelect={() => {}}
+                onViewExpand={() => {}}
+                onViewDetails={() => {}}
+                layout={layoutMode === 'List' ? 'list' : 'grid'}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Image Display Modal */}
       {imageToDisplayInModal && (

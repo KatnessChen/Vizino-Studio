@@ -13,6 +13,7 @@ interface AssetCardProps {
   asset: Asset;
   isSelected: boolean;
   base64?: string | undefined;
+  layout?: 'grid' | 'list';
   onViewExpand?: () => void;
   onViewDetails?: () => void;
   onSelect?: (event?: React.MouseEvent) => void;
@@ -24,6 +25,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   asset,
   isSelected,
   base64,
+  layout = 'grid',
   onViewExpand,
   onViewDetails,
   onSelect,
@@ -70,6 +72,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   const imageSrc = getImageSrc();
 
   const [showButtons, setShowButtons] = useState(false);
+  const isList = layout === 'list';
 
   // Menu items for gear dropdown
   const menuItems = [
@@ -110,7 +113,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         width: '100%',
         height: '100%',
         minWidth: '160px',
-        minHeight: '200px',
+        minHeight: isList ? '120px' : '200px',
         position: 'relative',
         borderWidth: '2px',
         borderStyle: 'solid',
@@ -118,7 +121,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         borderRadius: '6px',
         cursor: 'pointer',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: isList ? 'row' : 'column',
         backgroundColor: '#f9fafb',
         transition: 'all 0.3s ease',
         overflow: 'hidden',
@@ -129,12 +132,22 @@ const AssetCard: React.FC<AssetCardProps> = ({
     >
       {/* Image container */}
       <div
-        style={{
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: '140px',
-        }}
+        style={
+          isList
+            ? {
+                width: '140px',
+                height: '100%',
+                position: 'relative',
+                overflow: 'hidden',
+                flex: '0 0 140px',
+              }
+            : {
+                flex: 1,
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: '140px',
+              }
+        }
       >
         {/* Asset preview */}
         {imageSrc ? (
@@ -167,97 +180,116 @@ const AssetCard: React.FC<AssetCardProps> = ({
             </span>
           </div>
         )}
+      </div>
 
-        {/* Action buttons toolbar - top right corner (View + Gear) */}
-        {(onViewExpand || onViewDetails || hasOperations) && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '8px',
-              right: '8px',
-              zIndex: 10,
-              opacity: showButtons ? 1 : 0,
-              visibility: showButtons ? 'visible' : 'hidden',
-              transition: 'opacity 0.3s ease, visibility 0.3s ease',
-              pointerEvents: showButtons ? 'auto' : 'none',
-              display: 'flex',
-              gap: '6px',
-              alignItems: 'center',
-              padding: '4px 6px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(4px)',
-            }}
-          >
-            {/* View button */}
-            {onViewExpand && (
-              <MyButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewExpand();
-                }}
-                icon={<EyeFilled style={{ fontSize: '16px' }} />}
-              >
-                View
-              </MyButton>
-            )}
+      {/* Toolbar - top-right of the card (keeps same buttons) */}
+      {(onViewExpand || onViewDetails || hasOperations) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            zIndex: 10,
+            opacity: showButtons ? 1 : 0,
+            visibility: showButtons ? 'visible' : 'hidden',
+            transition: 'opacity 0.3s ease, visibility 0.3s ease',
+            pointerEvents: showButtons ? 'auto' : 'none',
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center',
+            padding: '4px 6px',
+            borderRadius: '6px',
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          {onViewExpand && (
+            <MyButton
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewExpand();
+              }}
+              icon={<EyeFilled style={{ fontSize: '16px' }} />}
+            >
+              View
+            </MyButton>
+          )}
 
-            {/* Divider */}
-            {onViewExpand && (onViewDetails || hasOperations) && (
+          {onViewExpand && (onViewDetails || hasOperations) && (
+            <div
+              style={{
+                width: '1px',
+                height: '24px',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                margin: '0 2px',
+              }}
+            />
+          )}
+
+          {(onViewDetails || hasOperations) && (
+            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <div
+                onClick={(e) => e.stopPropagation()}
+                className="gear-button"
                 style={{
-                  width: '1px',
-                  height: '24px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  margin: '0 2px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.2s ease',
                 }}
-              />
-            )}
+              >
+                <SettingOutlined style={{ fontSize: '16px', color: '#374151' }} />
+              </div>
+            </Dropdown>
+          )}
+        </div>
+      )}
 
-            {/* Gear icon dropdown */}
-            {(onViewDetails || hasOperations) && (
-              <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="gear-button"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <SettingOutlined style={{ fontSize: '16px', color: '#374151' }} />
-                </div>
-              </Dropdown>
-            )}
+      {/* Right column for list layout */}
+      {isList ? (
+        <div
+          style={{
+            padding: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            flex: 1,
+            minWidth: 0,
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {asset.name}
           </div>
-        )}
-      </div>
-
-      {/* Asset name - below image */}
-      <div
-        style={{
-          padding: '8px 12px',
-          backgroundColor: '#ffffff',
-          borderTop: '1px solid #e5e7eb',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-          color: '#374151',
-          textAlign: 'left',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {asset.name}
-      </div>
+          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+            {isImageData ? (asset as ImageData).mimeType : ''}
+          </div>
+        </div>
+      ) : (
+        /* Asset name - below image */
+        <div
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#ffffff',
+            borderTop: '1px solid #e5e7eb',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            color: '#374151',
+            textAlign: 'left',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {asset.name}
+        </div>
+      )}
     </div>
   );
 };
