@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Radio, Modal, Input, Card } from 'antd';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Radio, Modal, Input, Card, Button } from 'antd';
 import { Alert } from '@mui/material';
 import { Snackbar } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { Texture, Item } from '@/types';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelector, useDispatch } from 'react-redux';
@@ -18,9 +19,10 @@ import {
 import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
+  MAX_FILE_SIZE_MB,
 } from '@/constants/constants';
-import UploadCard from '../ui/UploadCard';
 import ImageDisplayModal from '../modal/ImageDisplayModal';
+import BatchUploadModal from '../modal/BatchUploadModal';
 import AssetCard from '@/components/ui/AssetCard';
 
 type AssetType = 'texture' | 'item';
@@ -69,6 +71,7 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   const [base64Map, setBase64Map] = useState<Map<string, string>>(new Map());
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedAssetForView, setSelectedAssetForView] = useState<Asset | null>(null);
+  const [showBatchUploadModal, setShowBatchUploadModal] = useState(false);
 
   // Load asset previews from cache
   useEffect(() => {
@@ -145,6 +148,21 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
     [dispatch, addAsset, onError, isTexture]
   );
 
+  // Handle batch asset upload
+  const handleBatchAssetUpload = async (
+    filesWithMetadata: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
+  ) => {
+    for (const { file, name, description } of filesWithMetadata) {
+      if (!name) continue; // Skip if no name
+      try {
+        await handleAssetUpload(file, name, description || '');
+      } catch (error) {
+        console.error('Failed to upload asset:', name, error);
+        throw error; // Stop on first error
+      }
+    }
+  };
+
   const existingNames = new Set(customAssets.map((a) => a.name.toLowerCase()));
 
   const validateAssetName = (name: string): string | null => {
@@ -158,24 +176,6 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
       return `This ${isTexture ? 'texture' : 'item'} name already exists`;
     }
     return null;
-  };
-
-  const handleFileSelect = (file: File) => {
-    setUploadError(null);
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError(`${isTexture ? 'Texture' : 'Item'} file must be smaller than 5MB`);
-      return false;
-    }
-
-    // Set default name from file name
-    const defaultName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-    setAssetName(defaultName.substring(0, MAX_CUSTOM_ASSET_NAME_LENGTH));
-    setPendingFile(file);
-    setShowNameModal(true);
-
-    return false; // Prevent default upload
   };
 
   const handleConfirmUpload = async () => {
@@ -221,11 +221,6 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
     : 'Add description about this object (e.g., Gray fabric sectional sofa)';
   const previewAlt = isTexture ? 'Texture preview' : 'Object preview';
 
-  const handleUploadError = (message: string) => {
-    setUploadError(message);
-    onError?.(message);
-  };
-
   // Calculate current asset index for navigation
   const currentAssetIndex = selectedAssetForView
     ? customAssets.findIndex((asset) => asset.id === selectedAssetForView.id)
@@ -243,8 +238,22 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
     }
   }, [currentAssetIndex, customAssets]);
 
+  const cardTitle = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span>{title || defaultTitle}</span>
+      <Button
+        type="dashed"
+        icon={<AddIcon style={{ fontSize: '18px' }} />}
+        onClick={() => setShowBatchUploadModal(true)}
+      >
+        {title || defaultTitle}
+      </Button>
+    </div>
+  );
+
   return (
-    <Card title={<span>{title || defaultTitle}</span>}>
+    <Card title={cardTitle}>
+
       {(uploadError || loadAssetsError) && (
         <Alert
           title="Error"
@@ -284,7 +293,6 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
               gap: '16px',
             }}
           >
-            <UploadCard onImageUpload={handleFileSelect} onError={handleUploadError} />
             <Radio.Group
               value={selectedAsset?.id || undefined}
               onChange={(e) => {
@@ -489,6 +497,18 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
           </div>
         )}
       </Modal>
+
+      {/* Batch Upload Modal */}
+      <BatchUploadModal
+        isOpen={showBatchUploadModal}
+        onClose={() => setShowBatchUploadModal(false)}
+        onUpload={handleBatchAssetUpload}
+        mode="asset"
+        assetType={type}
+        existingNames={existingNames}
+        title={`Upload ${isTexture ? 'Textures' : 'Items'}`}
+        currentCount={0}
+      />
     </Card>
   );
 };

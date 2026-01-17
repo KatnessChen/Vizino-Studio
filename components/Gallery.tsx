@@ -20,9 +20,9 @@ import {
 import { RootState } from '@/stores/store';
 import AssetCard from './ui/AssetCard';
 import SortableAssetCard from './ui/SortableAssetCard';
-import UploadCard from './ui/UploadCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
 import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
+import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
 import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
 import { BarsOutlined, AppstoreOutlined } from '@ant-design/icons';
@@ -33,6 +33,7 @@ import {
   DeleteOutlined as DeleteIcon,
   Close as CloseIcon,
   ContentCopy as CopyIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 
 interface GalleryProps {
@@ -48,7 +49,6 @@ interface GalleryProps {
   showRemoveButtons?: boolean;
   emptyMessage: string;
   onUploadImage?: (file: File) => void;
-  showUploadCard?: boolean;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -70,7 +70,6 @@ const Gallery: React.FC<GalleryProps> = ({
   images,
   selectedImageIds = new Set(),
   emptyMessage,
-  showUploadCard = false,
   isImageLimitReached = false,
   isLoading = false,
   onClearSelection,
@@ -92,6 +91,9 @@ const Gallery: React.FC<GalleryProps> = ({
   // State for ViewMoreDisplayModal
   const [showViewMoreModal, setShowViewMoreModal] = useState<boolean>(false);
   const [imageForViewMore, setImageForViewMore] = useState<ImageData | null>(null);
+
+  // State for BatchUploadModal
+  const [showBatchUploadModal, setShowBatchUploadModal] = useState<boolean>(false);
 
   // Drag and drop state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -339,6 +341,11 @@ const Gallery: React.FC<GalleryProps> = ({
     return allSelectedImages;
   }, [selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
 
+  // Calculate total image count (original + generated) for upload limit
+  const totalImageCount = useMemo(() => {
+    return allImages.length;
+  }, [allImages]);
+
   // Common button style for toolbar icons
   const toolbarButtonStyle = {
     display: 'flex',
@@ -350,6 +357,25 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const iconStyle = {
     fontSize: '18px',
+  };
+
+  // Handle batch file upload
+  const handleBatchUpload = async (
+    filesWithMetadata: Array<{ file: File; width: number; height: number }>
+  ) => {
+    if (!onUploadImage) return;
+
+    // Upload files sequentially
+    // Note: width and height will be stored in Firestore by the upload handler
+    for (const { file } of filesWithMetadata) {
+      try {
+        await onUploadImage(file);
+      } catch (error) {
+        console.error('Failed to upload file:', file.name, error);
+        onUploadError?.(`Failed to upload ${file.name}`);
+        throw error; // Stop on first error
+      }
+    }
   };
 
   const cardTitle = (
@@ -457,15 +483,27 @@ const Gallery: React.FC<GalleryProps> = ({
           </div>
         )}
 
+        {/* Upload button (only show if upload is enabled) */}
+        {onUploadImage && onUploadError && (
+          <Button
+            type="dashed"
+            icon={<AddIcon style={{ fontSize: '16px' }} />}
+            onClick={() => setShowBatchUploadModal(true)}
+            disabled={isImageLimitReached}
+          >
+            Images
+          </Button>
+        )}
+
         {/* Layout toggle (separate from toolbar) */}
-        <Segmented
+        {images.length > 0 && <Segmented
           value={layoutMode}
           onChange={(val) => setLayoutMode(val as 'Kanban' | 'List')}
           options={[
             { value: 'List', icon: <BarsOutlined /> },
             { value: 'Kanban', icon: <AppstoreOutlined /> },
           ]}
-        />
+        />}
       </div>
     </div>
   );
@@ -489,7 +527,7 @@ const Gallery: React.FC<GalleryProps> = ({
             </div>
           ))}
         </div>
-      ) : images.length === 0 && !showUploadCard ? (
+      ) : images.length === 0 ? (
         <div className="p-8">
           <MyEmpty description={emptyMessage} />
         </div>
@@ -503,13 +541,6 @@ const Gallery: React.FC<GalleryProps> = ({
               : 'flex flex-col gap-4 p-6 relative select-none'
           }
         >
-          {showUploadCard && onUploadImage && onUploadError && (
-            <UploadCard
-              onImageUpload={onUploadImage}
-              onError={onUploadError}
-              isLimitReached={isImageLimitReached}
-            />
-          )}
           <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
             {images.map((image) => (
               <div
@@ -604,6 +635,17 @@ const Gallery: React.FC<GalleryProps> = ({
           isOpen={showViewMoreModal}
           image={imageForViewMore}
           onClose={handleCloseViewMoreModal}
+        />
+      )}
+
+      {/* Batch Upload Modal */}
+      {onUploadImage && onUploadError && (
+        <BatchUploadModal
+          isOpen={showBatchUploadModal}
+          onClose={() => setShowBatchUploadModal(false)}
+          onUpload={handleBatchUpload}
+          currentCount={totalImageCount}
+          title="Upload Images"
         />
       )}
     </Card>
