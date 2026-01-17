@@ -10,7 +10,7 @@ const Footer: React.FC = () => {
         <div className="flex items-center justify-between text-sm text-gray-600">
           <p>© {currentYear} Vizino Studio. All rights reserved.</p>
           <p className="font-semibold">
-            <Tag>v.0.6.0</Tag>
+            <Tag>v.0.7.0</Tag>
           </p>
         </div>
       </div>
