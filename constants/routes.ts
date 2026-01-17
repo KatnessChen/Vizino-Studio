@@ -7,7 +7,7 @@ export const ROUTES = {
   HOME: '/',
   AUTH: '/auth',
   ADMIN_SETTING: '/admin-setting',
-  PROJECT: '/project/:slugId',
+  PROJECT: '/project/:projectSlugId',
   SPACE: '/project/:projectSlugId/space/:spaceSlugId',
 } as const;
 

@@ -28,8 +28,8 @@ import { extractShortId } from '@/utils/stringUtils';
 export const useAppInit = () => {
   const { user } = useAuth();
   const dispatch = useDispatch<AppDispatch>();
-  const { slugId: projectSlugId, spaceSlugId } = useParams<{
-    slugId?: string;
+  const { projectSlugId, spaceSlugId } = useParams<{
+    projectSlugId?: string;
     spaceSlugId?: string;
   }>();
   const navigate = useNavigate();
@@ -138,5 +138,5 @@ export const useAppInit = () => {
 
     initializeApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [user?.uid, projectSlugId, spaceSlugId]);
 };
