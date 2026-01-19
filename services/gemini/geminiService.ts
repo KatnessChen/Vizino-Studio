@@ -11,7 +11,8 @@ export { GEMINI_TASKS };
 export type { GeminiTask };
 
 // TODO: explore more model solutions and make this selectable to users
-const defaultModel = 'gemini-3-pro-image-preview';
+// https://ai.google.dev/gemini-api/docs/models
+const defaultModel = 'gemini-2.5-flash';
 
 const getBase64FromImageData = async (userId: string | undefined, imageData: ImageData) => {
   // Fetch the image from Firebase Storage using SDK
