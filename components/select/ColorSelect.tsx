@@ -70,8 +70,20 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
     }
   };
 
+  const cardTitle = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span>{title}</span>
+      <Button
+        icon={<PlusOutlined />}
+        onClick={() => setIsAddColorModalOpen(true)}
+      >
+        Color
+      </Button>
+    </div>
+  );
+
   return (
-    <Card title={title}>
+    <Card title={cardTitle}>
       {error && (
         <AntAlert
           title="Error"
@@ -105,35 +117,6 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
               gap: '16px',
             }}
           >
-            {/* Add Color Card */}
-            <div
-              style={{
-                minHeight: '160px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px dashed #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: '#f9fafb',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#6366f1';
-                (e.currentTarget as HTMLElement).style.backgroundColor = '#eef2ff';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#d1d5db';
-                (e.currentTarget as HTMLElement).style.backgroundColor = '#f9fafb';
-              }}
-              onClick={() => setIsAddColorModalOpen(true)}
-            >
-              <Button type="text" icon={<PlusOutlined />}>
-                Custom Color
-              </Button>
-            </div>
-
             <Radio.Group
               value={selectedColor?.id || undefined}
               onChange={(e) => {

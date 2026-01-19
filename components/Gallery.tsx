@@ -33,8 +33,8 @@ import {
   DeleteOutlined as DeleteIcon,
   Close as CloseIcon,
   ContentCopy as CopyIcon,
-  Add as AddIcon,
 } from '@mui/icons-material';
+import { PlusOutlined } from '@ant-design/icons';
 
 interface GalleryProps {
   title: string;
@@ -486,8 +486,7 @@ const Gallery: React.FC<GalleryProps> = ({
         {/* Upload button (only show if upload is enabled) */}
         {onUploadImage && onUploadError && (
           <Button
-            type="dashed"
-            icon={<AddIcon style={{ fontSize: '16px' }} />}
+            icon={<PlusOutlined />}
             onClick={() => setShowBatchUploadModal(true)}
             disabled={isImageLimitReached}
           >

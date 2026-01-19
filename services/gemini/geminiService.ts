@@ -40,7 +40,8 @@ export const generateRecoloredImage = async (
   imageData: ImageData,
   colorName: string,
   colorHex: string,
-  customPrompt?: string
+  customPrompt?: string,
+  signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(userId, imageData),
@@ -52,6 +53,7 @@ export const generateRecoloredImage = async (
     colorHex,
     customPrompt,
     userId,
+    signal,
   });
 };
 
@@ -61,7 +63,8 @@ export const generateRetexturedImage = async (
   textureImageDownloadUrl: string,
   textureMimeType: string,
   textureName: string,
-  customPrompt?: string
+  customPrompt?: string,
+  signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(userId, imageData),
@@ -69,7 +72,7 @@ export const generateRetexturedImage = async (
   };
 
   // Fetch texture image from URL
-  const textureBase64 = await fetchImageAsBase64(textureImageDownloadUrl);
+  const textureBase64 = await fetchImageAsBase64(textureImageDownloadUrl, signal);
 
   const textureImage = {
     base64String: textureBase64,
@@ -81,6 +84,7 @@ export const generateRetexturedImage = async (
     customPrompt,
     userId,
     textureImage,
+    signal,
   });
 };
 
@@ -90,7 +94,8 @@ export const generateItemPlacedImage = async (
   itemImageDownloadUrl: string,
   itemMimeType: string,
   itemName: string,
-  customPrompt?: string
+  customPrompt?: string,
+  signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(userId, imageData),
@@ -98,7 +103,7 @@ export const generateItemPlacedImage = async (
   };
 
   // Fetch item image from URL
-  const itemBase64 = await fetchImageAsBase64(itemImageDownloadUrl);
+  const itemBase64 = await fetchImageAsBase64(itemImageDownloadUrl, signal);
 
   const itemImage = {
     base64String: itemBase64,
@@ -110,13 +115,15 @@ export const generateItemPlacedImage = async (
     customPrompt,
     userId,
     itemImage,
+    signal,
   });
 };
 
 export const generateCustomPromptImage = async (
   userId: string,
   imageData: ImageData,
-  customPrompt: string
+  customPrompt: string,
+  signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(userId, imageData),
@@ -126,14 +133,15 @@ export const generateCustomPromptImage = async (
   return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, {
     customPrompt,
     userId,
+    signal,
   });
 };
 
 /**
  * Fetch image from URL and convert to base64
  */
-async function fetchImageAsBase64(url: string): Promise<string> {
-  const response = await fetch(url);
+async function fetchImageAsBase64(url: string, signal?: AbortSignal): Promise<string> {
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(GEMINI_ERRORS.FAILED_TO_FETCH_FROM_URL(response.statusText));
   }
@@ -170,6 +178,7 @@ export const processImageWithTask = async (
       base64String: string;
       mimeType: string;
     };
+    signal?: AbortSignal;
   } = {}
 ): Promise<{ base64: string; mimeType: string }> => {
   if (!process.env.API_KEY) {
@@ -214,9 +223,19 @@ export const processImageWithTask = async (
     });
 
     // Add the prompt text
-    parts.push({ text: prompt });
+    parts.push({ text: prompt + '\n' + prompt }); // Improve the ai response by repeating the prompt
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    // If the caller provided an AbortSignal and it's already aborted, throw early
+    if (options.signal && options.signal.aborted) {
+      const abortErr: any = new Error('Request aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
+
+    // Pass AbortSignal to the underlying request if supported by the SDK. Also race with the signal
+    // to ensure we respond quickly to aborts even if the SDK doesn't forward the signal.
+    // Build request params; avoid passing unknown properties directly to typed SDK call
+    const generateParams: any = {
       model,
       contents: {
         parts,
@@ -224,7 +243,49 @@ export const processImageWithTask = async (
       config: {
         responseModalities: [Modality.IMAGE],
       },
-    });
+    };
+
+    // Attach signal at runtime (SDK may respect it if implemented)
+    if (options.signal) generateParams.signal = options.signal;
+
+    const generatePromise = ai.models.generateContent(generateParams);
+
+    let response: GenerateContentResponse;
+    let abortHandler: (() => void) | null = null;
+
+    if (options.signal) {
+      // Race the generate promise with a promise that rejects when signal aborts
+      const abortPromise = new Promise<never>((_, reject) => {
+        abortHandler = () => {
+          const abortErr: any = new Error('Request aborted');
+          abortErr.name = 'AbortError';
+          reject(abortErr);
+        };
+        options.signal!.addEventListener('abort', abortHandler!);
+      });
+
+      try {
+        response = await Promise.race([generatePromise, abortPromise]);
+      } finally {
+        // Clean up event listener to avoid leaks
+        if (abortHandler) {
+          try {
+            options.signal!.removeEventListener('abort', abortHandler);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    } else {
+      response = await generatePromise;
+    }
+
+    // If signal was aborted after response arrived, treat as aborted and ignore result
+    if (options.signal && options.signal.aborted) {
+      const abortErr: any = new Error('Request aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
 
     // Check if request was blocked by safety filters or other reasons
     // Reference: https://ai.google.dev/docs/safety_ratings
@@ -251,7 +312,22 @@ export const processImageWithTask = async (
       base64: newImageBase64,
       mimeType: newImageMimeType,
     };
-  } catch (error) {
+  } catch (error: any) {
+    // Propagate aborts so callers can distinguish cancellation
+    if (error && error.name === 'AbortError') {
+      console.warn('Gemini request aborted by signal');
+      const abortErr: any = new Error('Request aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
+
+    if (options.signal && options.signal.aborted) {
+      console.warn('Gemini request aborted by provided signal');
+      const abortErr: any = new Error('Request aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
+
     console.error('Error processing image with Gemini API:', error);
     throw new Error(
       GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))

@@ -13,7 +13,11 @@ import { imageCache } from '@/utils/imageCache';
 import { imageDownloadUrlToBase64 } from '@/utils';
 import { cardHeight } from '@/components/layout/AsideSection';
 
-const SelectedAssets: React.FC = () => {
+interface SelectedAssetsProps {
+  customCardHeight?: number;
+}
+
+const SelectedAssets: React.FC<SelectedAssetsProps> = ({ customCardHeight }) => {
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
   const selectedColor = useSelector((state: RootState) => selectSelectedColor(state));
   const selectedTexture = useSelector((state: RootState) => selectSelectedTexture(state));
@@ -21,6 +25,8 @@ const SelectedAssets: React.FC = () => {
 
   const [textureBase64, setTextureBase64] = useState<string | null>(null);
   const [itemBase64, setItemBase64] = useState<string | null>(null);
+
+  const height = customCardHeight ? `${customCardHeight}px` : cardHeight;
 
   // Load texture preview from cache
   useEffect(() => {
@@ -95,21 +101,22 @@ const SelectedAssets: React.FC = () => {
     if (activeTask === GEMINI_TASKS.RECOLOR_WALL.task_name) {
       if (selectedColor) {
         return (
-          <div className="flex flex-col gap-2">
+          <div className="relative">
             <div
-              className={`w-full h-[${cardHeight}] rounded border border-dashed border-gray-200`}
-              style={{ backgroundColor: selectedColor?.hex || 'bg-gray-100' }}
+              className="w-full rounded border border-dashed border-gray-200"
+              style={{ backgroundColor: selectedColor?.hex || 'bg-gray-100', height }}
             />
-            <div className="text-sm">
-              <div className="font-medium">{selectedColor?.name}</div>
-              <div className="text-gray-500 text-xs">{selectedColor?.hex || ''}</div>
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b">
+              <div className="text-sm font-medium">{selectedColor?.name}</div>
+              <div className="text-xs opacity-90">{selectedColor?.hex || ''}</div>
             </div>
           </div>
         );
       } else {
         return (
           <div
-            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+            className="flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm"
+            style={{ height }}
           >
             No color selected
           </div>
@@ -120,24 +127,26 @@ const SelectedAssets: React.FC = () => {
     if (activeTask === GEMINI_TASKS.ADD_TEXTURE.task_name) {
       if (selectedTexture) {
         return (
-          <div className="flex flex-col gap-2">
+          <div className="relative">
             {textureBase64 ? (
               <img
                 src={`data:image/jpeg;base64,${textureBase64}`}
                 alt={selectedTexture.name}
-                className={`w-full h-[${cardHeight}] rounded border border-dashed border-gray-200 object-contain`}
+                className="w-full rounded border border-dashed border-gray-200 object-cover"
+                style={{ height }}
               />
             ) : (
               <div
-                className={`w-full h-[${cardHeight}] rounded border border-gray-200 bg-gray-100 flex items-center justify-center`}
+                className="w-full rounded border border-gray-200 bg-gray-100 flex items-center justify-center"
+                style={{ height }}
               >
                 <span className="text-xs text-gray-400">...</span>
               </div>
             )}
-            <div className="text-sm">
-              <div className="font-medium">{selectedTexture.name}</div>
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b">
+              <div className="text-sm font-medium truncate">{selectedTexture.name}</div>
               {selectedTexture.description && (
-                <div className="text-gray-500 text-xs">{selectedTexture.description}</div>
+                <div className="text-xs opacity-90 truncate">{selectedTexture.description}</div>
               )}
             </div>
           </div>
@@ -145,7 +154,8 @@ const SelectedAssets: React.FC = () => {
       } else {
         return (
           <div
-            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+            className="flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm"
+            style={{ height }}
           >
             No texture selected
           </div>
@@ -156,24 +166,26 @@ const SelectedAssets: React.FC = () => {
     if (activeTask === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
       if (selectedItem) {
         return (
-          <div className="flex flex-col gap-2">
+          <div className="relative">
             {itemBase64 ? (
               <img
                 src={`data:image/jpeg;base64,${itemBase64}`}
                 alt={selectedItem.name}
-                className={`w-full h-[${cardHeight}] rounded border border-gray-200 object-contain`}
+                className="w-full rounded border border-gray-200 object-cover"
+                style={{ height }}
               />
             ) : (
               <div
-                className={`w-full h-[${cardHeight}] rounded border border-gray-200 bg-gray-100 flex items-center justify-center`}
+                className="w-full rounded border border-gray-200 bg-gray-100 flex items-center justify-center"
+                style={{ height }}
               >
                 <span className="text-xs text-gray-400">...</span>
               </div>
             )}
-            <div className="text-sm">
-              <div className="font-medium">{selectedItem.name}</div>
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b">
+              <div className="text-sm font-medium truncate">{selectedItem.name}</div>
               {selectedItem.description && (
-                <div className="text-gray-500 text-xs">{selectedItem.description}</div>
+                <div className="text-xs opacity-90 truncate">{selectedItem.description}</div>
               )}
             </div>
           </div>
@@ -181,7 +193,8 @@ const SelectedAssets: React.FC = () => {
       } else {
         return (
           <div
-            className={`flex justify-center items-center h-[${cardHeight}] p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+            className="flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm"
+            style={{ height }}
           >
             No item selected
           </div>

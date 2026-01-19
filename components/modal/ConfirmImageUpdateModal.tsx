@@ -146,7 +146,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
       title={
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
-            Transformation complete. Save this result?
+            Generation complete.
           </Typography.Title>
         </div>
       }
