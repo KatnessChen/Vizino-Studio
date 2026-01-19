@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ImageData, Color } from '@/types';
 import {
   generateRecoloredImage,
@@ -40,20 +40,34 @@ export const useImageProcessing = ({
   selectedTaskName,
   options: { selectedColor, selectedTexture, selectedItem },
 }: UseImageProcessingProps) => {
-  const [processingImage, setProcessingImage] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelProcessing = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsProcessingImage(false);
+      setErrorMessage(null);
+    }
+  }, []);
 
   const processImage = useCallback(
     async (
       imageData: ImageData,
       customPrompt: string | undefined
     ): Promise<{ base64: string; mimeType: string } | null> => {
-      setProcessingImage(true);
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
+      setIsProcessingImage(true);
       setErrorMessage(null);
 
       if (!userId) {
         setErrorMessage('User ID is required to process images.');
-        setProcessingImage(false);
+        setIsProcessingImage(false);
         return null;
       }
 
@@ -63,7 +77,7 @@ export const useImageProcessing = ({
         if (selectedTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
           if (!selectedColor) {
             setErrorMessage('Please select a color first.');
-            setProcessingImage(false);
+            setIsProcessingImage(false);
             return null;
           }
 
@@ -72,12 +86,13 @@ export const useImageProcessing = ({
             imageData,
             selectedColor.name,
             selectedColor.hex,
-            customPrompt
+            customPrompt,
+            signal
           );
         } else if (selectedTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name) {
           if (!selectedTexture) {
             setErrorMessage('Please select a texture first.');
-            setProcessingImage(false);
+            setIsProcessingImage(false);
             return null;
           }
           result = await generateRetexturedImage(
@@ -86,12 +101,13 @@ export const useImageProcessing = ({
             selectedTexture.textureImageDownloadUrl,
             selectedTexture.mimeType || 'image/jpeg',
             selectedTexture.name,
-            customPrompt
+            customPrompt,
+            signal
           );
         } else if (selectedTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
           if (!selectedItem) {
             setErrorMessage('Please select a home item first.');
-            setProcessingImage(false);
+            setIsProcessingImage(false);
             return null;
           }
           result = await generateItemPlacedImage(
@@ -100,15 +116,16 @@ export const useImageProcessing = ({
             selectedItem.itemImageDownloadUrl,
             selectedItem.mimeType || 'image/jpeg',
             selectedItem.name,
-            customPrompt
+            customPrompt,
+            signal
           );
         } else if (selectedTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
           if (!customPrompt || customPrompt.trim() === '') {
             setErrorMessage('Please enter a custom prompt first.');
-            setProcessingImage(false);
+            setIsProcessingImage(false);
             return null;
           }
-          result = await generateCustomPromptImage(userId, imageData, customPrompt);
+          result = await generateCustomPromptImage(userId, imageData, customPrompt, signal);
         } else {
           throw new Error('Unknown task type');
         }
@@ -123,9 +140,18 @@ export const useImageProcessing = ({
           }
         }
 
-        setProcessingImage(false);
+        setIsProcessingImage(false);
+        abortControllerRef.current = null;
         return result;
       } catch (error: any) {
+        // Check if error is due to abort
+        if (error.name === 'AbortError' || signal.aborted) {
+          console.log('Request was cancelled by user');
+          setIsProcessingImage(false);
+          abortControllerRef.current = null;
+          return null;
+        }
+
         console.error('Processing failed:', error);
         const msg = error instanceof Error ? error.message : String(error);
         let displayMessage = `Processing failed: ${msg}.`;
@@ -153,7 +179,8 @@ export const useImageProcessing = ({
         }
 
         setErrorMessage(displayMessage);
-        setProcessingImage(false);
+        setIsProcessingImage(false);
+        abortControllerRef.current = null;
         return null;
       }
     },
@@ -162,8 +189,9 @@ export const useImageProcessing = ({
 
   return {
     processImage,
-    processingImage,
+    isProcessingImage,
     errorMessage,
     setErrorMessage,
+    cancelProcessing,
   };
 };

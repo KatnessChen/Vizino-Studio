@@ -1,17 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  Modal,
-  Button,
-  Input,
-  Spin,
-  Alert,
-  Tooltip,
-  Drawer,
-  Typography,
-  message,
-  Skeleton,
-} from 'antd';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, message, Skeleton } from 'antd';
 import { BulbOutlined, CloseOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
@@ -88,11 +77,56 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     null
   );
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [savingImage, setSavingImage] = useState(false);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [isDefaultPromptExpanded, setIsDefaultPromptExpanded] = useState(false);
   const [searchPrompts, setSearchPrompts] = useState<string>('');
 
   const { Text } = Typography;
+
+  // Generate shimmer layer configurations dynamically
+  const shimmerLayers = useMemo(() => {
+    const layers = [];
+    const totalLayers = 24;
+
+    for (let i = 0; i < totalLayers; i++) {
+      // Vary speed between 6-9 seconds (30-50% slower than before)
+      const speed = 6 + (i % 4) * 0.8;
+      // Stagger delays - start with negative delays so they begin from left side
+      const delay = -speed + i * 0.3;
+      // Vary opacity between 0.12 and 0.22
+      const opacity = 0.12 + (i % 10) * 0.01;
+      // Alternate between indigo and violet
+      const color1 = i % 2 === 0 ? 'rgba(99, 102, 241,' : 'rgba(139, 92, 246,';
+      const color2 = i % 2 === 0 ? 'rgba(139, 92, 246,' : 'rgba(99, 102, 241,';
+      // Vary gradient positions
+      const start = 20 + (i % 12);
+      const mid1 = 38 + (i % 8);
+      const mid2 = 52 + (i % 8);
+      const end = 78 - (i % 12);
+
+      layers.push({
+        id: i + 1,
+        speed,
+        delay,
+        gradient: `linear-gradient(75deg, transparent 0%, transparent ${start}%, ${color1} ${opacity}) ${mid1}%, ${color2} ${opacity}) ${mid2}%, transparent ${end}%, transparent 100%)`,
+      });
+    }
+
+    return layers;
+  }, []);
+
+  // Generate keyframes for all shimmer animations
+  const shimmerKeyframes = useMemo(() => {
+    let keyframes = '';
+    for (let i = 1; i <= 24; i++) {
+      keyframes += `
+    @keyframes shimmer${i} {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }`;
+    }
+    return keyframes;
+  }, []);
 
   // Use custom prompts hook
   const {
@@ -145,21 +179,22 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
   const isCustomPromptRequired = getCustomPromptRequired(activeTaskName);
 
   // Use image processing hook
-  const { processImage, processingImage, errorMessage, setErrorMessage } = useImageProcessing({
-    userId,
-    selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
-    options: {
-      selectedColor,
-      selectedTexture,
-      selectedItem,
-    },
-  });
+  const { processImage, isProcessingImage, errorMessage, setErrorMessage, cancelProcessing } =
+    useImageProcessing({
+      userId,
+      selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
+      options: {
+        selectedColor,
+        selectedTexture,
+        selectedItem,
+      },
+    });
 
   // Get generate button state
   const { isDisabled: isGenerateDisabled, disableReason } = useGenerateButtonState({
     activeTaskName,
-    processingImage,
-    savingImage,
+    isProcessingImage,
+    isSavingImage,
     canAddOperation: operationLimitCheck.canAdd,
     selectedColor,
     selectedTexture,
@@ -235,17 +270,11 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     }
 
     // Validate based on task type
-    if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
-      setValidationError(disableReason);
-      return;
-    }
-
-    if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
-      setValidationError(disableReason);
-      return;
-    }
-
-    if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
+    if (
+      (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) ||
+      (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) ||
+      (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem)
+    ) {
       setValidationError(disableReason);
       return;
     }
@@ -303,7 +332,16 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
   );
 
   const handleClose = () => {
-    if (!savingImage) {
+    // If processing, cancel the request and keep modal open while preserving form state
+    if (isProcessingImage) {
+      cancelProcessing();
+      // Inform the user that processing was cancelled and return to the modal
+      message.info('Image generation cancelled');
+      return;
+    }
+
+    // Only allow closing when not saving (prevent accidental closure during save)
+    if (!isSavingImage) {
       setValidationError(null);
       setErrorMessage(null);
       setCustomPrompt('');
@@ -338,7 +376,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       return;
     }
 
-    setSavingImage(true);
+    setIsSavingImage(true);
     setShowConfirmationModal(false);
 
     let tempImageId = '';
@@ -351,7 +389,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       );
       if (!operationLimitCheck.canAdd) {
         setErrorMessage(getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE));
-        setSavingImage(false);
+        setIsSavingImage(false);
         setShowConfirmationModal(true);
         return;
       }
@@ -400,7 +438,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       setGeneratedImage(null);
       setErrorMessage(null);
       setValidationError(null);
-      setSavingImage(false);
+      setIsSavingImage(false);
 
       // Reset sourceImage in Redux
       dispatch(setSourceImage(null));
@@ -463,7 +501,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       );
 
       setErrorMessage(error instanceof Error ? error.message : 'Failed to save processed image.');
-      setSavingImage(false);
+      setIsSavingImage(false);
       setShowConfirmationModal(true); // Reopen confirmation modal on error
     }
   };
@@ -480,15 +518,15 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     if (!activeTaskName) return 'Generate Image';
 
     if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
-      return 'Generate Recolored Image';
+      return 'Generate recolored image';
     } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name) {
-      return 'Apply Texture to Specified Surfaces';
+      return 'Apply texture to specified surfaces';
     } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
-      return 'Add New Elements';
+      return 'Add new elements';
     } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-      return 'Transform Image with Custom Prompts';
+      return 'Transform image with custom prompts';
     }
-    return 'Generate More Images';
+    return 'Generate more images';
   };
 
   // Dynamic prompt placeholder based on task
@@ -561,26 +599,22 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
 
   return (
     <>
+      <style>{shimmerKeyframes}</style>
       <Modal
         title={
           <div className="mb-4">
-            <Typography.Title level={4} style={{ margin: 0 }}>
+            <Typography.Title level={4} className="m-0">
               {getModalTitle()}
             </Typography.Title>
           </div>
         }
         open={isOpen}
         onCancel={handleClose}
-        width={1200}
-        maskClosable={!savingImage}
-        keyboard={!savingImage}
+        width="1152px"
+        maskClosable={!isSavingImage && !isProcessingImage}
+        keyboard={!isSavingImage && !isProcessingImage}
         footer={[
-          <Button
-            key="cancel"
-            onClick={handleClose}
-            disabled={processingImage || savingImage}
-            size="large"
-          >
+          <Button key="cancel" onClick={handleClose} disabled={isSavingImage} size="large">
             Cancel
           </Button>,
           <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
@@ -596,60 +630,42 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
           </Tooltip>,
         ]}
       >
-        <Spin spinning={processingImage} tip="Generating new image..." size="large">
-          {/* Error Messages */}
-          {errorMessage && (
-            <Alert title={errorMessage} type="error" showIcon style={{ marginBottom: 16 }} />
-          )}
-          {validationError && (
-            <Alert title={validationError} type="warning" showIcon style={{ marginBottom: 16 }} />
-          )}
+        {/* Error Messages */}
+        {errorMessage && <Alert title={errorMessage} type="error" showIcon className="mb-4" />}
+        {validationError && (
+          <Alert title={validationError} type="warning" showIcon className="mb-4" />
+        )}
 
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-            {/* Left Column: Source Image */}
-            <div
-              style={{ minWidth: 0, flex: '1 1 400px', display: 'flex', flexDirection: 'column' }}
-            >
+        <div className="flex gap-8 flex-wrap relative">
+          {/* Left Column: Target Image + Design Material */}
+          <div className="min-w-0 flex-1 basis-[200px] flex flex-col gap-4 relative">
+            {/* Target Image */}
+            <div className="relative">
               <Typography.Title level={5}>Target Image</Typography.Title>
 
               {/* Source Image Preview */}
-              <div className="min-h-[400px] rounded flex items-center justify-center overflow-hidden border border-gray-200">
-                <img
-                  src={cachedImageSrc || sourceImage.imageDownloadUrl}
-                  alt={sourceImage.name}
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-
-              {/* Image Info */}
-              <div className="mt-4">
-                <Tooltip title={sourceImage.name}>
-                  <div
-                    style={{
-                      marginBottom: 4,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <strong>Filename:</strong> {sourceImage.name}
-                  </div>
-                </Tooltip>
-                <div>
-                  <strong>Created:</strong>{' '}
-                  {sourceImage.createdAt instanceof Object && 'toDate' in sourceImage.createdAt
-                    ? sourceImage.createdAt.toDate().toLocaleString()
-                    : new Date(sourceImage.createdAt).toLocaleString()}
-                </div>
-              </div>
+              <div
+                className="h-[240px] rounded overflow-hidden border border-gray-200 bg-cover bg-center bg-no-repeat relative"
+                style={{
+                  backgroundImage: `url(${cachedImageSrc || sourceImage.imageDownloadUrl})`,
+                }}
+              />
             </div>
 
-            {/* Right Column: Color Selector & Custom Prompt */}
-            <div className="flex flex-col flex-1 basis-[400px] gap-4 min-w-0">
-              {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && <SelectedAssets />}
+            {/* Design Material */}
+            {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
+              <SelectedAssets customCardHeight={240} />
+            )}
+          </div>
 
+          {/* Right Column: Custom Prompt */}
+          <div className="flex flex-col flex-1 basis-[400px] gap-4 min-w-0 relative">
+            <div>
               {/* Custom Prompt & Historical Prompts */}
-              <div className="flex gap-0 flex-1 min-h-0 border border-gray-200 rounded-md overflow-hidden">
+              <Typography.Title level={5} className="mb-2">
+                Custom Prompt
+              </Typography.Title>
+              <div className="flex gap-0 flex-1 min-h-0 border border-gray-200 rounded-md overflow-hidden h-[420px] relative">
                 {/* Left: Historical Custom Prompts List */}
                 <div className="flex-1 flex flex-col min-w-0">
                   <Typography.Title
@@ -661,7 +677,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                   </Typography.Title>
 
                   {/* Search Input */}
-                  <div className="mt-2 px-3">
+                  <div className="mt-2 mb-2 px-3">
                     <Input
                       placeholder="Filter prompts..."
                       value={searchPrompts}
@@ -672,7 +688,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                   </div>
 
                   {/* Prompts List */}
-                  <div className="flex-1 overflow-auto">
+                  <div className="overflow-auto flex-1">
                     {isLoadingPrompts ? (
                       <div className="p-2">
                         <Skeleton active paragraph={{ rows: 2 }} />
@@ -688,7 +704,8 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                         sx={{
                           width: '100%',
                           bgcolor: 'background.paper',
-                          overflow: 'auto',
+                          paddingBottom: 0,
+                          height: '334px', // hardcoded height to make both columns same height
                         }}
                       >
                         {filteredPrompts.map((prompt: CustomPrompt, index) => (
@@ -735,9 +752,9 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                 </div>
 
                 {/* Right: Custom Prompt Textarea */}
-                <div className="flex-1 flex flex-col min-w-0 border-l border-gray-200 pb-4">
+                <div className="flex-1 flex flex-col min-w-0 border-l border-gray-200">
                   <Typography.Title level={5} className="m-0 mb-1 px-3 pt-3">
-                    Custom Prompt
+                    Input
                     <span
                       className={`${isCustomPromptRequired ? 'text-red-500' : 'text-gray-500'} text-[0.85em] ml-1`}
                     >
@@ -746,13 +763,12 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                   </Typography.Title>
 
                   {/* Custom Prompt Input */}
-                  <div className="flex-1 flex flex-col p-2 px-3 min-h-0">
+                  <div className="flex-1 flex flex-col px-3 pb-3 pt-2 min-h-0">
                     <Input.TextArea
-                      rows={10}
                       placeholder={getPromptPlaceholder()}
                       value={customPrompt}
                       onChange={(e) => setCustomPrompt(e.target.value)}
-                      disabled={processingImage}
+                      disabled={isProcessingImage}
                       maxLength={500}
                       showCount
                       allowClear
@@ -761,47 +777,93 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Prompt Writing Guide */}
-              {activeTaskName && (
-                <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
-                  <div className="flex flex-col gap-0.5">
-                    {getPromptWritingGuide().tips.map((tip, index) => (
-                      <div key={index} className="text-[0.85rem]">
-                        <h6>
-                          <BulbOutlined className="mr-2 text-[#1890ff]" />
-                          {tip.text}.
-                          <span>
-                            {' '}
-                            See{' '}
-                            <Button
-                              type="link"
-                              onClick={() => setIsDefaultPromptExpanded(true)}
-                              className="p-0 h-auto"
-                            >
-                              default prompt
-                              <InfoCircleOutlined />
-                            </Button>{' '}
-                          </span>{' '}
-                          to understand what’s behind.
-                        </h6>
-                      </div>
-                    ))}
-                  </div>
+            {/* Prompt Writing Guide */}
+            {activeTaskName && (
+              <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
+                <div className="flex flex-col gap-0.5">
+                  {getPromptWritingGuide().tips.map((tip, index) => (
+                    <div key={index} className="text-[0.85rem]">
+                      <h6>
+                        <BulbOutlined className="mr-2 text-[#1890ff]" />
+                        {tip.text}.
+                        <span>
+                          {' '}
+                          See
+                          <Button
+                            type="link"
+                            onClick={() => setIsDefaultPromptExpanded(true)}
+                            className="p-0 h-auto px-1"
+                          >
+                            default prompt
+                            <InfoCircleOutlined />
+                          </Button>
+                        </span>{' '}
+                        to understand what's behind.
+                      </h6>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {hasReachedOperationLimit && (
-                <Alert
-                  title={getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE)}
-                  type="warning"
-                  showIcon
-                  className="m-0"
-                />
-              )}
+              </div>
+            )}
+            {hasReachedOperationLimit && (
+              <Alert
+                title={getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE)}
+                type="warning"
+                showIcon
+                className="m-0"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Full Modal Loading Overlay */}
+        {isProcessingImage && (
+          <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center backdrop-blur-xl bg-white/85 pointer-events-auto rounded-md overflow-hidden">
+            {/* Dynamically generated shimmer layers - 24 total */}
+            {shimmerLayers.map((layer) => (
+              <div
+                key={layer.id}
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: layer.gradient,
+                  animation: `shimmer${layer.id} ${layer.speed}s infinite ${layer.delay}s`,
+                }}
+              />
+            ))}
+
+            {/* Spinner and text */}
+            <div className="flex flex-col items-center gap-6 z-10">
+              {/* Large Spinner */}
+              <div
+                className="w-16 h-16 border-4 border-gray-200 border-t-indigo-500 rounded-full"
+                style={{
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+
+              {/* Processing text */}
+              <Typography.Title level={3} className="text-xl font-medium text-gray-800">
+                Image processing...
+              </Typography.Title>
+
+              {/* Cancel button */}
+              <Button type="text" onClick={handleClose} size="small" className="mt-4">
+                Cancel
+              </Button>
             </div>
           </div>
-        </Spin>
+        )}
       </Modal>
+
+      {/* Spinner animation */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
 
       {/* Confirmation Modal for Generated Image */}
       {sourceImage && generatedImage && activeTaskName && (

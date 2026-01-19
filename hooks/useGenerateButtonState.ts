@@ -3,8 +3,8 @@ import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 
 interface UseGenerateButtonStateProps {
   activeTaskName: string | null;
-  processingImage: boolean;
-  savingImage: boolean;
+  isProcessingImage: boolean;
+  isSavingImage: boolean;
   canAddOperation: boolean;
   selectedColor: Color | null;
   selectedTexture: Texture | null;
@@ -15,8 +15,8 @@ interface UseGenerateButtonStateProps {
 
 export const useGenerateButtonState = ({
   activeTaskName,
-  processingImage,
-  savingImage,
+  isProcessingImage,
+  isSavingImage,
   canAddOperation,
   selectedColor,
   selectedTexture,
@@ -26,9 +26,9 @@ export const useGenerateButtonState = ({
 }: UseGenerateButtonStateProps) => {
   let disableReason = '';
 
-  if (processingImage) {
+  if (isProcessingImage) {
     disableReason = 'Processing image...';
-  } else if (savingImage) {
+  } else if (isSavingImage) {
     disableReason = 'Saving image...';
   } else if (!canAddOperation) {
     disableReason = 'Generation limit reached for this image.';

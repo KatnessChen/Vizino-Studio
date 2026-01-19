@@ -41,7 +41,7 @@ const AsideSection: React.FC = () => {
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
 
   // Use image processing hook to get sourceImage state
-  const { processingImage } = useImageProcessing({
+  const { isProcessingImage } = useImageProcessing({
     userId: user?.uid,
     selectedTaskName: selectedTaskNames[0] || null,
     options: {
@@ -92,8 +92,8 @@ const AsideSection: React.FC = () => {
     : null;
   const { isDisabled, disableReason } = useGenerateButtonState({
     activeTaskName: selectedTaskNames[0] || null,
-    processingImage,
-    savingImage: false, // AsideSection doesn't track saving state, only processing
+    isProcessingImage,
+    isSavingImage: false, // AsideSection doesn't track saving state, only processing
     canAddOperation: operationLimitCheck?.canAdd ?? false,
     selectedColor,
     selectedTexture,
