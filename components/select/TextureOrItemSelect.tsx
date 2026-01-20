@@ -112,9 +112,16 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
 
   // Handle asset upload to Firestore
   const handleAssetUpload = useCallback(
-    async (file: File, name: string, description: string) => {
+    async (file: File, name: string, description: string, dimensions?: { width: number; height: number; aspect_ratio: number }) => {
       try {
-        const newAsset = await addAsset({ name, file, description });
+        const newAsset = await addAsset({ 
+          name, 
+          file, 
+          description,
+          width: dimensions?.width,
+          height: dimensions?.height,
+          aspect_ratio: dimensions?.aspect_ratio
+        });
 
         setUploadError(null);
         setToast({
@@ -152,10 +159,16 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   const handleBatchAssetUpload = async (
     filesWithMetadata: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
   ) => {
-    for (const { file, name, description } of filesWithMetadata) {
+    for (const { file, name, description, width, height } of filesWithMetadata) {
       if (!name) continue; // Skip if no name
       try {
-        await handleAssetUpload(file, name, description || '');
+        const aspect_ratio = width && height ? width / height : undefined;
+        await handleAssetUpload(
+          file, 
+          name, 
+          description || '', 
+          aspect_ratio && width && height ? { width, height, aspect_ratio } : undefined
+        );
       } catch (error) {
         console.error('Failed to upload asset:', name, error);
         throw error; // Stop on first error
@@ -191,6 +204,9 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
     setIsUploading(true);
 
     try {
+      // For single upload, we might not have dimensions immediately unless we read the file
+      // Since this is a minor case compared to batch upload, we can skip calculating dimensions here
+      // or implement a quick image load if critical. For now, proceeding without dimensions for single upload.
       await handleAssetUpload(pendingFile, assetName.trim(), assetDescription.trim());
 
       // Reset state

@@ -485,7 +485,8 @@ export async function createImage(
   projectId: string,
   spaceId: string,
   imageFile: Blob | File | null,
-  imageMetadata: Pick<ImageData, 'id' | 'name' | 'mimeType'>,
+  imageMetadata: Pick<ImageData, 'id' | 'name' | 'mimeType' | 'description'> &
+    Partial<Pick<ImageData, 'width' | 'height' | 'aspect_ratio'>>,
   processingInfo?: {
     parentImage?: ImageData | null;
     operation?: ImageOperation | null;
@@ -564,6 +565,11 @@ export async function createImage(
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
+      description: imageMetadata.description || '',
+      // Persist dimensions if provided
+      width: imageMetadata.width ?? undefined,
+      height: imageMetadata.height ?? undefined,
+      aspect_ratio: imageMetadata.aspect_ratio ?? undefined,
     };
 
     console.log({ newImageData });
@@ -815,6 +821,10 @@ export async function duplicateImage(
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? undefined,
+      height: sourceImageData.height ?? undefined,
+      aspect_ratio: sourceImageData.aspect_ratio ?? undefined,
     };
 
     // Write to Firestore
@@ -925,6 +935,10 @@ export async function moveImageToSpace(
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? undefined,
+      height: sourceImageData.height ?? undefined,
+      aspect_ratio: sourceImageData.aspect_ratio ?? undefined,
     };
 
     // Write to Firestore in target space
@@ -1142,7 +1156,14 @@ export async function deleteColor(
 export async function addTexture(
   userId: string,
   projectId: string,
-  textureData: { name: string; file: File; description?: string }
+  textureData: {
+    name: string;
+    file: File;
+    description?: string;
+    width?: number;
+    height?: number;
+    aspect_ratio?: number;
+  }
 ): Promise<Texture> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1173,6 +1194,9 @@ export async function addTexture(
       name: textureData.name.trim(),
       textureImageDownloadUrl,
       description: textureData.description?.trim() || '',
+      width: textureData.width,
+      height: textureData.height,
+      aspect_ratio: textureData.aspect_ratio,
       createdAt: now,
       updatedAt: now,
     };
@@ -1188,6 +1212,9 @@ export async function addTexture(
       name: textureDoc.name,
       textureImageDownloadUrl: textureDoc.textureImageDownloadUrl,
       description: textureDoc.description,
+      width: textureDoc.width,
+      height: textureDoc.height,
+      aspect_ratio: textureDoc.aspect_ratio,
     };
   } catch (error) {
     console.error('Failed to add texture:', error);
@@ -1223,6 +1250,9 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
         name: data.name,
         textureImageDownloadUrl: data.textureImageDownloadUrl,
         description: data.description,
+        width: data.width,
+        height: data.height,
+        aspect_ratio: data.aspect_ratio,
       };
     });
 
@@ -1380,7 +1410,14 @@ async function cacheTextureImages(textures: Texture[]): Promise<void> {
 export async function addItem(
   userId: string,
   projectId: string,
-  itemData: { name: string; file: File; description?: string }
+  itemData: {
+    name: string;
+    file: File;
+    description?: string;
+    width?: number;
+    height?: number;
+    aspect_ratio?: number;
+  }
 ): Promise<Item> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1409,6 +1446,9 @@ export async function addItem(
       name: itemData.name.trim(),
       itemImageDownloadUrl,
       description: itemData.description?.trim() || '',
+      width: itemData.width,
+      height: itemData.height,
+      aspect_ratio: itemData.aspect_ratio,
       createdAt: now,
       updatedAt: now,
     };
@@ -1424,6 +1464,9 @@ export async function addItem(
       name: itemDoc.name,
       itemImageDownloadUrl: itemDoc.itemImageDownloadUrl,
       description: itemDoc.description,
+      width: itemDoc.width,
+      height: itemDoc.height,
+      aspect_ratio: itemDoc.aspect_ratio,
     };
   } catch (error) {
     console.error('Failed to add item:', error);
@@ -1459,6 +1502,9 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
         name: data.name,
         itemImageDownloadUrl: data.itemImageDownloadUrl,
         description: data.description,
+        width: data.width,
+        height: data.height,
+        aspect_ratio: data.aspect_ratio,
       };
     });
 

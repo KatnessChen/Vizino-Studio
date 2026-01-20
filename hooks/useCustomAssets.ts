@@ -104,7 +104,7 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, projectId, dispatch, assetType]);
 
-  const addAsset = async (assetData: { name: string; file: File; description?: string }) => {
+  const addAsset = async (assetData: { name: string; file: File; description?: string; width?: number; height?: number; aspect_ratio?: number }) => {
     if (!user?.uid || !projectId) {
       throw new Error('User or project not available');
     }

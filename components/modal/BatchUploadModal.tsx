@@ -265,7 +265,8 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
         file: fp.file,
         width: fp.width,
         height: fp.height,
-        ...(isAssetMode && { name: fp.name?.trim(), description: fp.description?.trim() }),
+        name: fp.name?.trim(),
+        description: fp.description?.trim(),
       }));
 
       await onUpload(filesWithMetadata);
@@ -399,6 +400,12 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
               animation: hoverModalFadeIn 0.25s ease-out;
             }
           `}</style>
+          
+          {isLoadingPreviews && (
+            <div className="mb-2 text-sm text-blue-600 font-medium animate-pulse">
+               Processing images... please wait
+            </div>
+          )}
 
           <div className="preview-scroll max-h-96 overflow-y-auto space-y-3 pr-2">
             {isLoadingPreviews ? (

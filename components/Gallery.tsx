@@ -48,7 +48,7 @@ interface GalleryProps {
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
   emptyMessage: string;
-  onUploadImage?: (file: File) => void;
+  onUploadImage?: (file: File, metadata?: { width: number; height: number; aspect_ratio: number; name?: string; description?: string }) => void;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -361,15 +361,23 @@ const Gallery: React.FC<GalleryProps> = ({
 
   // Handle batch file upload
   const handleBatchUpload = async (
-    filesWithMetadata: Array<{ file: File; width: number; height: number }>
+    filesWithMetadata: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
   ) => {
     if (!onUploadImage) return;
 
     // Upload files sequentially
-    // Note: width and height will be stored in Firestore by the upload handler
-    for (const { file } of filesWithMetadata) {
+    for (const fileData of filesWithMetadata) {
+      const { file, width, height, name: customName, description = '' } = fileData;
+      const name = customName || file.name;
       try {
-        await onUploadImage(file);
+        const aspect_ratio = width && height ? width / height : undefined;
+        await onUploadImage(file, {
+          width, 
+          height, 
+          aspect_ratio: aspect_ratio || 1, 
+          name, 
+          description
+        });
       } catch (error) {
         console.error('Failed to upload file:', file.name, error);
         onUploadError?.(`Failed to upload ${file.name}`);

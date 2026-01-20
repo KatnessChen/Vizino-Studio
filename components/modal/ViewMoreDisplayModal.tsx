@@ -3,6 +3,8 @@ import { Modal, Button, Typography } from 'antd';
 import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
 import { ImageData } from '@/types';
 import { imageCache, formatTimestamp } from '@/utils';
+import { getMetadata, ref as storageRef } from 'firebase/storage';
+import { storage } from '@/services/firestoreService';
 
 interface ViewMoreDisplayModalProps {
   isOpen: boolean;
@@ -12,6 +14,7 @@ interface ViewMoreDisplayModalProps {
 
 const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, image, onClose }) => {
   const [imageSources, setImageSources] = useState<Record<string, string>>({});
+  const [fileSizeMB, setFileSizeMB] = useState<string | null>(null);
 
   const hasEvolutionChain = image.evolutionChain && image.evolutionChain.length > 0;
 
@@ -52,10 +55,53 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
       }
 
       setImageSources(sources);
+
+      // Determine file size (MB)
+      try {
+        // 1) If dimensions are present, estimate size using 3 bytes per pixel (RGB)
+        if (typeof image.width === 'number' && typeof image.height === 'number') {
+          const estimatedBytes = image.width * image.height * 3; // rough RGB estimate
+          setFileSizeMB(bytesToMBString(estimatedBytes));
+          return;
+        }
+
+        // 2) Prefer storageFilePath if available (actual size)
+        if (image.storageFilePath) {
+          const metadata = await getMetadata(storageRef(storage, image.storageFilePath));
+          if (metadata && typeof metadata.size === 'number') {
+            setFileSizeMB(bytesToMBString(metadata.size));
+            return;
+          }
+        }
+
+        // 3) Fallback: if imageDownloadUrl is data URI, compute from base64
+        if (image.imageDownloadUrl && image.imageDownloadUrl.startsWith('data:')) {
+          const parts = image.imageDownloadUrl.split('base64,');
+          if (parts.length === 2) {
+            const base64Str = parts[1];
+            const bytes = base64ToBytes(base64Str);
+            setFileSizeMB(bytesToMBString(bytes));
+            return;
+          }
+        }
+
+        // Unknown size
+        setFileSizeMB(null);
+      } catch (err) {
+        console.warn('[ViewMoreDisplayModal] Failed to determine file size:', err);
+        setFileSizeMB(null);
+      }
     };
 
     loadImages();
   }, [isOpen, image, hasEvolutionChain]);
+
+  // Helpers
+  const bytesToMBString = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  const base64ToBytes = (b64: string) => {
+    const padding = (b64.match(/=+$/) || [''])[0].length;
+    return Math.round((b64.length * 3) / 4 - padding);
+  };
 
   return (
     <Modal
@@ -79,18 +125,59 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
         {/* Section A: Basic Image Information */}
         <div className="space-y-3 mt-6">
           <div className="space-y-2">
+            {/* Image Name */}
             <div className="flex items-start">
               <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
                 Image Name:
               </span>
               <span className="text-sm text-gray-800">{image.name}</span>
             </div>
+
+            {/* File Type */}
             <div className="flex items-start">
               <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                Generation Time:
+                File Type:
+              </span>
+              <span className="text-sm text-gray-800">{image.mimeType || '-'}</span>
+            </div>
+
+            {/* Dimensions */}
+            <div className="flex items-start">
+              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
+                Dimensions:
+              </span>
+              <span className="text-sm text-gray-800">
+                {image.width && image.height ? `W${image.width} × H${image.height} pixels` : '-'}
+              </span>
+            </div>
+
+            {/* File Size */}
+            <div className="flex items-start">
+              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
+                File Size:
+              </span>
+              <span className="text-sm text-gray-800">{fileSizeMB ?? '-'}</span>
+            </div>
+
+            {/* Description */}
+            {image.description && (
+              <div className="flex items-start">
+                <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
+                  Description:
+                </span>
+                <span className="text-sm text-gray-800">{image.description}</span>
+              </div>
+            )}
+
+            {/* Created/Generation Time */}
+            <div className="flex items-start">
+              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
+                {hasEvolutionChain ? 'Generation Time:' : 'Created Time:'}
               </span>
               <span className="text-sm text-gray-800">{formatTimestamp(image.createdAt)}</span>
             </div>
+
+            {/* Update Time */}
             {image.updatedAt && image.updatedAt !== image.createdAt && (
               <div className="flex items-start">
                 <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">

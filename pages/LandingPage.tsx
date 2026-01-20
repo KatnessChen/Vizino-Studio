@@ -173,7 +173,16 @@ const LandingPage: React.FC = () => {
   );
 
   const handleImageUpload = useCallback(
-    async (file: File) => {
+    async (
+      file: File,
+      metadata?: {
+        width: number;
+        height: number;
+        aspect_ratio: number;
+        name?: string;
+        description?: string;
+      }
+    ) => {
       if (!user) {
         // TODO: redirect user to login steps instead of error
         setErrorMessage('Please log in to upload images.');
@@ -197,10 +206,13 @@ const LandingPage: React.FC = () => {
       const currentMaxOrder = Math.max(0, ...originalImages.map((img) => img.order ?? 0));
       const optimisticOrder = currentMaxOrder + 1;
 
+      // Use provided name or fall back to file name
+      const imageName = metadata?.name || file.name;
+
       // Optimistic update - add image immediately to UI
       const optimisticImage = {
         id: tempImageId,
-        name: file.name,
+        name: imageName,
         mimeType: file.type,
         spaceId: activeSpaceId,
         evolutionChain: [],
@@ -212,6 +224,11 @@ const LandingPage: React.FC = () => {
         deletedAt: null,
         createdAt: now,
         updatedAt: now,
+        description: metadata?.description,
+        // Add optimistic dimensions
+        width: metadata?.width,
+        height: metadata?.height,
+        aspect_ratio: metadata?.aspect_ratio,
       };
 
       dispatch(
@@ -227,8 +244,13 @@ const LandingPage: React.FC = () => {
         // and create the image document in Firestore
         await createImage(user.uid, activeProjectId, activeSpaceId, file, {
           id: tempImageId,
-          name: file.name,
+          name: imageName,
+          description: metadata?.description,
           mimeType: file.type,
+          // Include dimensions from client metadata when available
+          width: metadata?.width,
+          height: metadata?.height,
+          aspect_ratio: metadata?.aspect_ratio,
         });
 
         // Fetch updated space images
