@@ -10,6 +10,26 @@
 
 4. **For code and comments, Always use English**
 
+## Copilot UI/UX Guidelines (English)
+
+When generating UI designs, components, or front-end specifications, follow modern UI/UX principles that are implementable and accessible:
+
+- **User-centered**: Focus on the user's primary goals and reduce unnecessary options. Each screen should have one primary task. 💡
+- **Clear information hierarchy**: Use clear visual hierarchy (heading > subheading > content > actions) and consistent navigation and naming. 🔍
+- **Consistency & componentization**: Use design tokens (colors, spacing, typography, radii) and reusable components (buttons, inputs, cards). Provide component API examples (props/events). ♻️
+- **Accessibility (WCAG 2.1 AA)**: Ensure color contrast, keyboard operability, semantic HTML, ARIA attributes, and screen reader support. Include an accessibility checklist for interactive components. ♿
+- **Feedback & states**: Provide clear visual and textual feedback for success, error, loading, and empty states; use predictable microcopy. 📝
+- **Responsive & performance-conscious**: Provide layout variants for common breakpoints (mobile/tablet/desktop) and optimize initial render and image loading strategies. 📱💻
+- **Deliverables that are testable**: Output a components list, component API (props/events), visual specs (spacing/color/typography), responsive breakpoints, interaction flow diagrams, and acceptance criteria. ✅
+- **Design rationale**: For key decisions, provide a 1–2 sentence rationale linking the choice to user pain points. 🔧
+- **Internationalization & text flexibility**: Allow space for longer strings, support LTR/RTL, and localizability considerations. 🌍
+
+Output format example:
+
+1. Short design summary; 2) Components list (each component includes props, states, ARIA); 3) Visual tokens (colors/typography/spacing); 4) Responsive layouts and acceptance criteria; 5) Test checklist including accessibility checks.
+
+If requested, also provide React + TypeScript component templates and Tailwind/CSS tokens, and include unit test cases and accessibility verification steps. ✨
+
 ## Project Overview
 
 **Interior Painting Designer** is a React/TypeScript web app that allows users to upload room photos and visualize different paint colors, textures, and furnishings using Google's Gemini API. The app uses Firebase for authentication and storage, Redux for state management, and Tailwind CSS for styling.
