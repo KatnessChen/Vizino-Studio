@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
-import { Button, CircularProgress, Box } from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { Button } from 'antd';
+import { LogoutOutlined, LoadingOutlined } from '@ant-design/icons';
 import { signOutUser } from '@/services/authService';
 
 interface LogoutButtonProps {
   onSuccess?: () => void;
   onError?: (error: string) => void;
-  variant?: 'contained' | 'outlined' | 'text';
   disabled?: boolean;
 }
 
-const LogoutButton: React.FC<LogoutButtonProps> = ({
-  onSuccess,
-  onError,
-  variant = 'outlined',
-  disabled = false,
-}) => {
+const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disabled = false }) => {
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
@@ -38,21 +32,20 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({
   };
 
   return (
-    <Box position="relative">
-      <Button
-        variant={variant as any}
-        color="primary"
-        disabled={disabled || loading}
-        onClick={handleLogout}
-        startIcon={loading ? <CircularProgress size={20} /> : <LogoutIcon />}
-        sx={{
-          textTransform: 'none',
-          fontSize: '0.875rem',
-        }}
-      >
-        {loading ? 'Signing out...' : 'Sign out'}
-      </Button>
-    </Box>
+    <Button
+      type="default"
+      disabled={disabled || loading}
+      onClick={handleLogout}
+      icon={loading ? <LoadingOutlined spin /> : <LogoutOutlined />}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+      }}
+    >
+      {loading ? 'Signing out...' : 'Sign out'}
+    </Button>
   );
 };
 
