@@ -11,6 +11,7 @@ import CopyImageModal from '@/components/modal/CopyImageModal';
 import MoveImageModal from '@/components/modal/MoveImageModal';
 import RenameImageModal from '@/components/modal/RenameImageModal';
 import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
+import GreetingModal from '@/components/modal/GreetingModal';
 import Footer from '@/components/layout/Footer';
 import AsideSection from '@/components/layout/AsideSection';
 import ColorSelect from '@/components/select/ColorSelect';
@@ -27,6 +28,7 @@ import {
   createSpace,
 } from '@/services/firestoreService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
 import { formatImageOperationData, downloadFile, buildDownloadFilename } from '@/utils';
 import { checkImageLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
@@ -61,11 +63,25 @@ import {
   selectSelectedItem,
   selectSourceImage,
   setSourceImage,
+  setSelectedColor,
 } from '@/stores/taskStore';
+import GuestOnboardingTour, { GuestOnboardingTourRef } from '@/components/GuestOnboardingTour';
+import { getDemoImages, getDefaultGuestColor, getDefaultDemoImageId } from '@/constants/demoImages';
+import { 
+  selectGuestImages, 
+  selectHasSeenGreeting, 
+  setHasSeenGreeting,
+  setShowLoginRequiredModal
+} from '@/stores/guestStore';
 
-const LandingPage: React.FC = () => {
+interface LandingPageProps {
+  tourRef: React.RefObject<GuestOnboardingTourRef | null>;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // Get authenticated user
-  const { user, adminSettings } = useAuth();
+  const { user, adminSettings, isAuthenticated } = useAuth();
+  const { isGuestMode } = useGuest();
   const dispatch = useDispatch();
 
   const isAppInitiated = useSelector(selectIsAppInitiated);
@@ -78,8 +94,26 @@ const LandingPage: React.FC = () => {
   const activeSpaceId = useSelector(selectActiveSpaceId);
 
   // Get images from store (computed from rooms)
-  const originalImages = useSelector(selectOriginalImages);
-  const updatedImages = useSelector(selectUpdatedImages);
+  const storeOriginalImages = useSelector(selectOriginalImages);
+  const storeUpdatedImages = useSelector(selectUpdatedImages);
+  const guestImages = useSelector(selectGuestImages);
+
+  // For guests, show demo images if no images uploaded yet
+  const originalImages = useMemo(() => {
+    if (isGuestMode && storeOriginalImages.length === 0) {
+      return getDemoImages();
+    }
+    return storeOriginalImages;
+  }, [isGuestMode, storeOriginalImages]);
+
+  // For guests, show guest generated images; for users, show space updated images
+  const updatedImages = useMemo(() => {
+    if (isGuestMode) {
+      // Filter to only show images with parentImageId (generated images)
+      return guestImages.filter((img) => img.parentImageId);
+    }
+    return storeUpdatedImages;
+  }, [isGuestMode, guestImages, storeUpdatedImages]);
 
   // Get task-related state from taskStore
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
@@ -106,6 +140,40 @@ const LandingPage: React.FC = () => {
     selectedImage: null,
     customPrompt: undefined,
   });
+
+  const hasSeenGreeting = useSelector(selectHasSeenGreeting);
+  const [isGreetingModalOpen, setIsGreetingModalOpen] = useState(false);
+
+  // Show greeting modal for new guests
+  useEffect(() => {
+    if (isGuestMode && !hasSeenGreeting && isAppInitiated) {
+      // Delay slightly to ensure layout is ready
+      const timer = setTimeout(() => {
+        setIsGreetingModalOpen(true);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isGuestMode, hasSeenGreeting, isAppInitiated]);
+
+  const handleCloseGreetingModal = () => {
+    setIsGreetingModalOpen(false);
+    dispatch(setHasSeenGreeting());
+  };
+
+  const handleGreetingSignIn = () => {
+    setIsGreetingModalOpen(false);
+    dispatch(setHasSeenGreeting());
+    dispatch(setShowLoginRequiredModal(true));
+  };
+
+  const handleGreetingTakeTour = () => {
+    setIsGreetingModalOpen(false);
+    dispatch(setHasSeenGreeting());
+    // Start tour after a short delay
+    setTimeout(() => {
+      tourRef.current?.openTour();
+    }, 400);
+  };
 
   // Derive modal visibility from Redux state
   const showGenerateMoreModal = useCallback(() => {
@@ -148,6 +216,19 @@ const LandingPage: React.FC = () => {
       message.error(errorMessage);
     }
   }, [errorMessage]);
+
+  // Pre-select demo image and default color for guest mode
+  useEffect(() => {
+    if (isGuestMode && isAppInitiated) {
+      // Pre-select first demo image
+      const defaultImageId = getDefaultDemoImageId();
+      dispatch(setSelectedOriginalImageIds(new Set([defaultImageId])));
+
+      // Pre-select default color
+      const defaultColor = getDefaultGuestColor();
+      dispatch(setSelectedColor(defaultColor));
+    }
+  }, [isGuestMode, isAppInitiated, dispatch]);
 
   // Get current active space
   const activeSpace = useMemo(() => {
@@ -952,6 +1033,11 @@ const LandingPage: React.FC = () => {
   );
 
   const getEmptyStateComponent = useMemo(() => {
+    // Guest mode: don't show empty state, show main content
+    if (isGuestMode) {
+      return null;
+    }
+
     const hasNoProject = projects.length === 0 || !activeProjectId;
     const hasNoSpace = !activeSpaceId;
 
@@ -967,7 +1053,7 @@ const LandingPage: React.FC = () => {
     }
 
     return null;
-  }, [activeProjectId, activeSpaceId, projects.length]);
+  }, [activeProjectId, activeSpaceId, projects.length, isGuestMode]);
 
   const selectedOriginalImageId = Array.from(selectedOriginalImageIds)[0] || null;
   const selectedOriginalImage =
@@ -985,7 +1071,7 @@ const LandingPage: React.FC = () => {
           style={{ minHeight: 'calc(100vh - var(--header-height) - var(--footer-height))' }}
         >
           <div className="flex items-end justify-between pr-6">
-            <MyBreadcrumb />
+            <MyBreadcrumb onStartTour={() => tourRef.current?.openTour()} />
             {imageLimitInfo && (
               <Tag variant="outlined" color="purple">
                 {imageLimitInfo.current} / {imageLimitInfo.max} images in total
@@ -1015,36 +1101,40 @@ const LandingPage: React.FC = () => {
               <>
                 {getEmptyStateComponent}
 
-                {activeSpaceId && (
+                {(activeSpaceId || isGuestMode) && (
                   <div className="flex flex-col gap-6">
-                    <Gallery
-                      title="Original Images"
-                      images={originalImages}
-                      selectedImageIds={selectedOriginalImageIds}
-                      onSelectImage={handleSelectOriginalImage}
-                      onSelectMultiple={handleSelectMultipleOriginal}
-                      onRenameImage={handleRenameImage}
-                      showRemoveButtons={selectedOriginalImageIds.size === 0}
-                      emptyMessage="No images uploaded yet."
-                      onUploadImage={handleImageUpload}
-                      onBulkDownload={() => handleBulkDownload('original')}
-                      onUploadError={setErrorMessage}
-                      onBulkDelete={() => handleBulkDelete('original')}
-                      onBulkCopy={() => handleBulkCopy('original')}
-                      onBulkMove={() => handleBulkMove('original')}
-                      onClearSelection={handleClearOriginalSelection}
-                      onSelectAll={handleSelectAllOriginal}
-                      onGenerateMoreSuccess={handleGenerateMoreSuccess}
-                      userId={user?.uid}
-                      isImageLimitReached={!imageLimitCheck.canAdd}
-                      onReorder={handleReorderOriginalImages}
-                      onSingleRename={handleSingleRename}
-                      onSingleCopy={handleSingleCopy}
-                      isLoading={isFetchingSpaceImages}
-                    />
+                    <div data-tour="original-gallery">
+                      <Gallery
+                        title="Original Images"
+                        images={originalImages}
+                        selectedImageIds={selectedOriginalImageIds}
+                        onSelectImage={handleSelectOriginalImage}
+                        onSelectMultiple={handleSelectMultipleOriginal}
+                        onRenameImage={handleRenameImage}
+                        showRemoveButtons={selectedOriginalImageIds.size === 0}
+                        emptyMessage="No images uploaded yet."
+                        onUploadImage={handleImageUpload}
+                        onBulkDownload={() => handleBulkDownload('original')}
+                        onUploadError={setErrorMessage}
+                        onBulkDelete={() => handleBulkDelete('original')}
+                        onBulkCopy={() => handleBulkCopy('original')}
+                        onBulkMove={() => handleBulkMove('original')}
+                        onClearSelection={handleClearOriginalSelection}
+                        onSelectAll={handleSelectAllOriginal}
+                        onGenerateMoreSuccess={handleGenerateMoreSuccess}
+                        userId={user?.uid}
+                        isImageLimitReached={!imageLimitCheck.canAdd}
+                        onReorder={handleReorderOriginalImages}
+                        onSingleRename={handleSingleRename}
+                        onSingleCopy={handleSingleCopy}
+                        isLoading={isFetchingSpaceImages}
+                      />
+                    </div>
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
-                      <ColorSelect selectedColor={selectedColor} />
+                      <div data-tour="color-select">
+                        <ColorSelect selectedColor={selectedColor} />
+                      </div>
                     )}
                     {selectedTaskNames[0] === GEMINI_TASKS.ADD_TEXTURE.task_name && (
                       <TextureOrItemSelect type="texture" onError={setErrorMessage} />
@@ -1053,27 +1143,29 @@ const LandingPage: React.FC = () => {
                       <TextureOrItemSelect type="item" onError={setErrorMessage} />
                     )}
 
-                    <Gallery
-                      title="Generated Images"
-                      images={updatedImages}
-                      selectedImageIds={selectedUpdatedImageIds}
-                      onSelectMultiple={handleSelectUpdatedImage}
-                      onRenameImage={handleRenameImage}
-                      emptyMessage="No generated images yet."
-                      onBulkDelete={() => handleBulkDelete('updated')}
-                      onBulkCopy={() => handleBulkCopy('updated')}
-                      onBulkMove={() => handleBulkMove('updated')}
-                      onClearSelection={handleClearUpdatedSelection}
-                      onSelectAll={handleSelectAllUpdated}
-                      onBulkDownload={() => handleBulkDownload('updated')}
-                      onGenerateMoreSuccess={handleGenerateMoreSuccess}
-                      userId={user?.uid}
-                      isImageLimitReached={!imageLimitCheck.canAdd}
-                      onReorder={handleReorderGeneratedImages}
-                      onSingleRename={handleSingleRename}
-                      onSingleCopy={handleSingleCopy}
-                      isLoading={isFetchingSpaceImages}
-                    />
+                    <div data-tour="generated-gallery">
+                      <Gallery
+                        title="Generated Images"
+                        images={updatedImages}
+                        selectedImageIds={selectedUpdatedImageIds}
+                        onSelectMultiple={handleSelectUpdatedImage}
+                        onRenameImage={handleRenameImage}
+                        emptyMessage="No generated images yet."
+                        onBulkDelete={() => handleBulkDelete('updated')}
+                        onBulkCopy={() => handleBulkCopy('updated')}
+                        onBulkMove={() => handleBulkMove('updated')}
+                        onClearSelection={handleClearUpdatedSelection}
+                        onSelectAll={handleSelectAllUpdated}
+                        onBulkDownload={() => handleBulkDownload('updated')}
+                        onGenerateMoreSuccess={handleGenerateMoreSuccess}
+                        userId={user?.uid}
+                        isImageLimitReached={!imageLimitCheck.canAdd}
+                        onReorder={handleReorderGeneratedImages}
+                        onSingleRename={handleSingleRename}
+                        onSingleCopy={handleSingleCopy}
+                        isLoading={isFetchingSpaceImages}
+                      />
+                    </div>
                   </div>
                 )}
               </>
@@ -1173,6 +1265,17 @@ const LandingPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Guest Onboarding Tour */}
+      <GuestOnboardingTour ref={tourRef} />
+
+      {/* Initial Greeting Modal for Guests */}
+      <GreetingModal
+        open={isGreetingModalOpen}
+        onSignIn={handleGreetingSignIn}
+        onTakeTour={handleGreetingTakeTour}
+        onClose={handleCloseGreetingModal}
+      />
     </div>
   );
 };

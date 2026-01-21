@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Breadcrumb, Dropdown, Button, Modal, Alert } from 'antd';
-import { PlusOutlined, DownOutlined } from '@ant-design/icons';
+import { PlusOutlined, DownOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
 import GenericConfirmModal from '../modal/GenericConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuest } from '@/contexts/GuestContext';
 import { useProjectSpaceMenuItems } from '@/hooks/useProjectSpaceMenuItems';
 import {
   checkProjectLimit,
@@ -66,10 +67,16 @@ export type ModalMode = (typeof ModalMode)[keyof typeof ModalMode];
 interface BreadcrumbProps {
   onProjectSelected?: (projectId: string) => void;
   onSpaceSelected?: (projectId: string, spaceId: string) => void;
+  onStartTour?: () => void;
 }
 
-const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSelected }) => {
-  const { user, adminSettings } = useAuth();
+const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ 
+  onProjectSelected, 
+  onSpaceSelected,
+  onStartTour 
+}) => {
+  const { user, adminSettings, isAuthenticated } = useAuth();
+  const { isGuestMode } = useGuest();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const projects = useSelector(selectProjects);
@@ -409,6 +416,29 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
   });
 
   const breadcrumbItems = useMemo(() => {
+    // Guest mode: show default project and space (non-editable)
+    if (isGuestMode) {
+      return [
+        {
+          title: (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <HomeIcon />
+              Default Project
+            </span>
+          ),
+        },
+        {
+          title: (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CategoryIcon />
+              Default Space
+            </span>
+          ),
+        },
+      ];
+    }
+
+    // Authenticated user with no projects
     if (projects.length === 0) {
       return [
         {
@@ -487,6 +517,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
     return items;
   }, [
     user,
+    isGuestMode,
     activeProjectId,
     activeProject,
     activeSpaceId,
@@ -519,6 +550,38 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ onProjectSelected, onSpaceSel
         />
 
         <Box flexGrow={1} />
+
+        {/* Guest Mode Indicator and Tour - Moved from Header */}
+        {isGuestMode && (
+          <div className="flex items-center gap-3">
+            {/* Guest Mode Badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
+              <span className="text-sm">💫</span>
+              <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">Guest Mode</span>
+            </div>
+            
+            {/* Take a Tour Button */}
+            {onStartTour && (
+              <Button
+                type="primary"
+                size="small"
+                onClick={onStartTour}
+                icon={<ThunderboltOutlined />}
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #7c3aed 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  height: '32px',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)'
+                }}
+              >
+                Take a Tour
+              </Button>
+            )}
+          </div>
+        )}
 
         <Modal
           title={getModalTitle}

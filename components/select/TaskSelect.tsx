@@ -1,9 +1,11 @@
 import React, { useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Checkbox, Typography } from 'antd';
+import { Checkbox, Typography, Tooltip } from 'antd';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
+import { LockOutlined } from '@ant-design/icons';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { selectSelectedTaskNames, setSelectedTaskNames } from '@/stores/taskStore';
+import { useGuest } from '@/contexts/GuestContext';
 
 interface TaskSelectProps {
   multiSelect?: boolean;
@@ -20,6 +22,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 }) => {
   const dispatch = useDispatch();
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
+  const { isGuestMode } = useGuest();
 
   useEffect(() => {
     dispatch(setSelectedTaskNames([GEMINI_TASKS.RECOLOR_WALL.task_name]));
@@ -36,21 +39,25 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       value: GEMINI_TASKS.RECOLOR_WALL.task_name,
       label: GEMINI_TASKS.RECOLOR_WALL.label_name,
       icon: '🎨',
+      guestAllowed: true,
     },
     {
       value: GEMINI_TASKS.ADD_TEXTURE.task_name,
       label: GEMINI_TASKS.ADD_TEXTURE.label_name,
       icon: '🧱',
+      guestAllowed: false,
     },
     {
       value: GEMINI_TASKS.ADD_HOME_ITEM.task_name,
       label: GEMINI_TASKS.ADD_HOME_ITEM.label_name,
       icon: '🛋️',
+      guestAllowed: false,
     },
     {
       value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
       label: GEMINI_TASKS.CUSTOM_PROMPT.label_name,
       icon: '💬',
+      guestAllowed: false,
     },
   ];
 
@@ -98,42 +105,64 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       </Typography.Title>
 
       <div className="flex flex-col justify-center gap-2 max-w-2xl mx-auto">
-        {tasks.map((task) => (
-          <div
-            key={task.value}
-            className={`
-              relative flex items-center gap-3 px-4 py-2 rounded-xl border-2 transition-all duration-200 cursor-pointer
-              ${
-                selectedTaskNames.includes(task.value as GeminiTaskName)
-                  ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg'
-                  : 'border-gray-200 bg-white hover:border-gray-200 hover:shadow-md'
-              }
-            `}
-            onClick={() =>
-              handleTaskChange(task.value as GeminiTaskName)({
-                target: { checked: !selectedTaskNames.includes(task.value as GeminiTaskName) },
-              } as CheckboxChangeEvent)
-            }
-          >
-            <Checkbox
-              checked={selectedTaskNames.includes(task.value as GeminiTaskName)}
-              onChange={handleTaskChange(task.value as GeminiTaskName)}
-              className="pointer-events-none"
-            />
-            <div className="flex items-center gap-2 flex-1">
-              <span className="text-2xl">{task.icon}</span>
-              <span
-                className={`font-medium ${
-                  selectedTaskNames.includes(task.value as GeminiTaskName)
-                    ? 'text-blue-700'
-                    : 'text-gray-700'
-                }`}
-              >
-                {task.label}
-              </span>
+        {tasks.map((task) => {
+          const isDisabled = isGuestMode && !task.guestAllowed;
+          const isSelected = selectedTaskNames.includes(task.value as GeminiTaskName);
+
+          const taskContent = (
+            <div
+              key={task.value}
+              className={`
+                relative flex items-center gap-2 px-4 py-1 rounded-xl border-2 transition-all duration-200
+                ${isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
+                ${
+                  isSelected
+                    ? 'border-indigo-500 bg-gradient-to-r from-indigo-50 to-indigo-100 shadow-lg'
+                    : isDisabled
+                      ? 'border-gray-200 bg-gray-50'
+                      : 'border-gray-200 bg-white hover:border-gray-200 hover:shadow-md'
+                }
+              `}
+              onClick={() => {
+                if (!isDisabled) {
+                  handleTaskChange(task.value as GeminiTaskName)({
+                    target: { checked: !isSelected },
+                  } as CheckboxChangeEvent);
+                }
+              }}
+            >
+              <Checkbox
+                checked={isSelected}
+                disabled={isDisabled}
+                onChange={handleTaskChange(task.value as GeminiTaskName)}
+                className="sr-only"
+              />
+              <div className="flex items-center gap-2 flex-1 justify-left pr-8">
+                <span className="text-2xl">{task.icon}</span>
+                <span
+                  className={`font-medium ${
+                    isSelected ? 'text-indigo-700' : isDisabled ? 'text-gray-400' : 'text-gray-700'
+                  }`}
+                >
+                  {task.label}
+                </span>
+              </div>
+              {isDisabled && (
+                <LockOutlined className="text-gray-100 absolute right-3 top-1/2 -translate-y-1/2" />
+              )}
             </div>
-          </div>
-        ))}
+          );
+
+          if (isDisabled) {
+            return (
+              <Tooltip key={task.value} title="Log in to unlock this feature" placement="right">
+                {taskContent}
+              </Tooltip>
+            );
+          }
+
+          return taskContent;
+        })}
       </div>
     </div>
   );

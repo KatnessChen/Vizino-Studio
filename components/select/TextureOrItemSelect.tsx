@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { Radio, Modal, Input, Card, Button } from 'antd';
+import { useState, useCallback, useEffect } from 'react';
+import { Radio, Modal, Input, Card, Button, Tooltip } from 'antd';
 import { Alert } from '@mui/material';
 import { Snackbar } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { LockOutlined } from '@ant-design/icons';
 import { Texture, Item } from '@/types';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelector, useDispatch } from 'react-redux';
@@ -19,11 +20,11 @@ import {
 import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
-  MAX_FILE_SIZE_MB,
 } from '@/constants/constants';
 import ImageDisplayModal from '../modal/ImageDisplayModal';
 import BatchUploadModal from '../modal/BatchUploadModal';
 import AssetCard from '@/components/ui/AssetCard';
+import { useGuest } from '@/contexts/GuestContext';
 
 type AssetType = 'texture' | 'item';
 type Asset = Texture | Item;
@@ -42,6 +43,7 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   onError,
 }) => {
   const dispatch = useDispatch();
+  const { isGuestMode } = useGuest();
   const activeProjectId = useSelector((state: RootState) => state.project.activeProjectId);
 
   // Load data based on type
@@ -112,15 +114,20 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
 
   // Handle asset upload to Firestore
   const handleAssetUpload = useCallback(
-    async (file: File, name: string, description: string, dimensions?: { width: number; height: number; aspect_ratio: number }) => {
+    async (
+      file: File,
+      name: string,
+      description: string,
+      dimensions?: { width: number; height: number; aspect_ratio: number }
+    ) => {
       try {
-        const newAsset = await addAsset({ 
-          name, 
-          file, 
+        const newAsset = await addAsset({
+          name,
+          file,
           description,
           width: dimensions?.width,
           height: dimensions?.height,
-          aspect_ratio: dimensions?.aspect_ratio
+          aspect_ratio: dimensions?.aspect_ratio,
         });
 
         setUploadError(null);
@@ -157,16 +164,22 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
 
   // Handle batch asset upload
   const handleBatchAssetUpload = async (
-    filesWithMetadata: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
+    filesWithMetadata: Array<{
+      file: File;
+      width: number;
+      height: number;
+      name?: string;
+      description?: string;
+    }>
   ) => {
     for (const { file, name, description, width, height } of filesWithMetadata) {
       if (!name) continue; // Skip if no name
       try {
         const aspect_ratio = width && height ? width / height : undefined;
         await handleAssetUpload(
-          file, 
-          name, 
-          description || '', 
+          file,
+          name,
+          description || '',
           aspect_ratio && width && height ? { width, height, aspect_ratio } : undefined
         );
       } catch (error) {
@@ -257,19 +270,22 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{title || defaultTitle}</span>
-      <Button
-        type="dashed"
-        icon={<AddIcon style={{ fontSize: '18px' }} />}
-        onClick={() => setShowBatchUploadModal(true)}
-      >
-        {title || defaultTitle}
-      </Button>
+      <Tooltip title={isGuestMode ? `Login to add custom ${type}s` : ''} placement="left">
+        <Button
+          type="dashed"
+          icon={<AddIcon />}
+          onClick={() => setShowBatchUploadModal(true)}
+          disabled={isGuestMode}
+        >
+          {title || defaultTitle}
+          {isGuestMode && <LockOutlined />}
+        </Button>
+      </Tooltip>
     </div>
   );
 
   return (
     <Card title={cardTitle}>
-
       {(uploadError || loadAssetsError) && (
         <Alert
           title="Error"

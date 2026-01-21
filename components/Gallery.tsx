@@ -17,6 +17,7 @@ import {
   selectSelectedUpdatedImageIds,
   selectAllImages,
 } from '@/stores/imageStore';
+import { selectGuestImages } from '@/stores/guestStore';
 import { RootState } from '@/stores/store';
 import AssetCard from './ui/AssetCard';
 import SortableAssetCard from './ui/SortableAssetCard';
@@ -25,7 +26,7 @@ import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
 import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
 import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
-import { BarsOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { BarsOutlined, AppstoreOutlined, LockOutlined } from '@ant-design/icons';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
   DriveFileMoveOutline as DriveFileMoveOutline,
@@ -35,6 +36,7 @@ import {
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { PlusOutlined } from '@ant-design/icons';
+import { useGuest } from '@/contexts/GuestContext';
 
 interface GalleryProps {
   title: string;
@@ -48,7 +50,16 @@ interface GalleryProps {
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
   emptyMessage: string;
-  onUploadImage?: (file: File, metadata?: { width: number; height: number; aspect_ratio: number; name?: string; description?: string }) => void;
+  onUploadImage?: (
+    file: File,
+    metadata?: {
+      width: number;
+      height: number;
+      aspect_ratio: number;
+      name?: string;
+      description?: string;
+    }
+  ) => void;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -84,6 +95,7 @@ const Gallery: React.FC<GalleryProps> = ({
   onSingleRename,
   onSingleCopy,
 }) => {
+  const { isGuestMode } = useGuest();
   // State for ImageDisplayModal
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
   const [imageToDisplayInModal, setImageToDisplayInModal] = useState<ImageData | null>(null);
@@ -311,7 +323,13 @@ const Gallery: React.FC<GalleryProps> = ({
   const selectedUpdatedImageIds = useSelector((state: RootState) =>
     selectSelectedUpdatedImageIds(state)
   );
-  const allImages = useSelector((state: RootState) => selectAllImages(state));
+  
+  // Get allImages from Redux - handle guest mode separately
+  const storeAllImages = useSelector((state: RootState) => selectAllImages(state));
+  const guestImages = useSelector((state: RootState) => selectGuestImages(state));
+  
+  // In guest mode, use guestImages; otherwise use store images
+  const allImages = isGuestMode ? guestImages : storeAllImages;
 
   // Calculate total selected images across both original and generated
   const totalSelectedImages = useMemo(() => {
@@ -361,7 +379,13 @@ const Gallery: React.FC<GalleryProps> = ({
 
   // Handle batch file upload
   const handleBatchUpload = async (
-    filesWithMetadata: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
+    filesWithMetadata: Array<{
+      file: File;
+      width: number;
+      height: number;
+      name?: string;
+      description?: string;
+    }>
   ) => {
     if (!onUploadImage) return;
 
@@ -372,11 +396,11 @@ const Gallery: React.FC<GalleryProps> = ({
       try {
         const aspect_ratio = width && height ? width / height : undefined;
         await onUploadImage(file, {
-          width, 
-          height, 
-          aspect_ratio: aspect_ratio || 1, 
-          name, 
-          description
+          width,
+          height,
+          aspect_ratio: aspect_ratio || 1,
+          name,
+          description,
         });
       } catch (error) {
         console.error('Failed to upload file:', file.name, error);
@@ -493,24 +517,38 @@ const Gallery: React.FC<GalleryProps> = ({
 
         {/* Upload button (only show if upload is enabled) */}
         {onUploadImage && onUploadError && (
-          <Button
-            icon={<PlusOutlined />}
-            onClick={() => setShowBatchUploadModal(true)}
-            disabled={isImageLimitReached}
+          <Tooltip
+            title={
+              isGuestMode
+                ? 'Login to upload images'
+                : isImageLimitReached
+                  ? 'Image limit reached'
+                  : ''
+            }
+            placement="left"
           >
-            Images
-          </Button>
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => setShowBatchUploadModal(true)}
+              disabled={isImageLimitReached || isGuestMode}
+            >
+              Images
+              {isGuestMode && <LockOutlined />}
+            </Button>
+          </Tooltip>
         )}
 
         {/* Layout toggle (separate from toolbar) */}
-        {images.length > 0 && <Segmented
-          value={layoutMode}
-          onChange={(val) => setLayoutMode(val as 'Kanban' | 'List')}
-          options={[
-            { value: 'List', icon: <BarsOutlined /> },
-            { value: 'Kanban', icon: <AppstoreOutlined /> },
-          ]}
-        />}
+        {images.length > 0 && (
+          <Segmented
+            value={layoutMode}
+            onChange={(val) => setLayoutMode(val as 'Kanban' | 'List')}
+            options={[
+              { value: 'List', icon: <BarsOutlined /> },
+              { value: 'Kanban', icon: <AppstoreOutlined /> },
+            ]}
+          />
+        )}
       </div>
     </div>
   );

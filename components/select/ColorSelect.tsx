@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Button, Card, Radio } from 'antd';
+import { Button, Card, Radio, Tooltip } from 'antd';
 import { CheckCircle as CheckmarkBadgeIcon } from '@mui/icons-material';
 import { Alert as AntAlert } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { Color } from '@/types';
 import { PRESET_COLOR } from '@/constants/constants';
 import { Snackbar, Alert } from '@mui/material';
@@ -12,6 +12,7 @@ import { useCustomColors } from '@/hooks/useCustomColors';
 import { RootState } from '@/stores/store';
 import { setSelectedColor } from '@/stores/taskStore';
 import { sortColorsBySpectrum, getTextColor } from '@/utils/colorUtils';
+import { useGuest } from '@/contexts/GuestContext';
 
 interface ColorSelectProps {
   title?: string;
@@ -25,6 +26,7 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
   onSelectColor,
 }) => {
   const dispatch = useDispatch();
+  const { isGuestMode } = useGuest();
 
   const activeProjectId = useSelector((state: RootState) => state.project.activeProjectId);
   const { customColors, isLoadingColors, addColor } = useCustomColors(activeProjectId);
@@ -73,12 +75,16 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{title}</span>
-      <Button
-        icon={<PlusOutlined />}
-        onClick={() => setIsAddColorModalOpen(true)}
-      >
-        Color
-      </Button>
+      <Tooltip title={isGuestMode ? 'Login to add custom colors' : ''} placement="left">
+        <Button
+          icon={<PlusOutlined />}
+          onClick={() => setIsAddColorModalOpen(true)}
+          disabled={isGuestMode}
+        >
+          Color
+          {isGuestMode && <LockOutlined />}
+        </Button>
+      </Tooltip>
     </div>
   );
 
