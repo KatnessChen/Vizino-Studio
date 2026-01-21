@@ -41,6 +41,10 @@ import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE } from '@/constants/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuest } from '@/contexts/GuestContext';
+import { useUploadGate } from '@/hooks/useUploadGate';
+import { createGuestImage } from '@/services/guestFirestoreService';
+import { addGuestImage } from '@/stores/guestStore';
 
 interface GenerateMoreModalProps {
   isOpen: boolean;
@@ -60,7 +64,11 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
   // Get dispatch from Redux
   const dispatch = useDispatch();
   // Get adminSettings from Auth context
-  const { adminSettings } = useAuth();
+  const { adminSettings, isAuthenticated } = useAuth();
+  // Get guest context
+  const { guestSessionId, markImageGenerated } = useGuest();
+  // Get upload gate hook
+  const { gateGeneratedImageSave } = useUploadGate();
   // Get active project and space from Redux store
   const activeProjectId = useSelector(selectActiveProjectId);
   const activeSpaceId = useSelector(selectActiveSpaceId);
@@ -95,9 +103,9 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       const delay = -speed + i * 0.3;
       // Vary opacity between 0.12 and 0.22
       const opacity = 0.12 + (i % 10) * 0.01;
-      // Alternate between indigo and violet
-      const color1 = i % 2 === 0 ? 'rgba(99, 102, 241,' : 'rgba(139, 92, 246,';
-      const color2 = i % 2 === 0 ? 'rgba(139, 92, 246,' : 'rgba(99, 102, 241,';
+      // Alternate between indigo, violet, and purple shades
+      const color1 = i % 3 === 0 ? 'rgba(99, 102, 241,' : i % 3 === 1 ? 'rgba(124, 58, 237,' : 'rgba(147, 51, 234,';
+      const color2 = i % 3 === 0 ? 'rgba(124, 58, 237,' : i % 3 === 1 ? 'rgba(147, 51, 234,' : 'rgba(99, 102, 241,';
       // Vary gradient positions
       const start = 20 + (i % 12);
       const mid1 = 38 + (i % 8);
@@ -182,6 +190,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
   const { processImage, isProcessingImage, errorMessage, setErrorMessage, cancelProcessing } =
     useImageProcessing({
       userId,
+      guestSessionId,
       selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
       options: {
         selectedColor,
@@ -290,7 +299,8 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
       return;
     }
 
-    if (!userId) {
+    // Check if we have a valid identifier (userId or guestSessionId)
+    if (!userId && !guestSessionId) {
       setErrorMessage('User ID is required to process images.');
       return;
     }
@@ -355,8 +365,20 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
     imageData: { base64: string; mimeType: string },
     customName: string
   ) => {
-    if (!sourceImage || !userId || !activeProjectId || !activeSpaceId || !activeTaskName) {
+    if (!sourceImage || !activeTaskName) {
       setErrorMessage('Missing required data to save image.');
+      return;
+    }
+
+    // For authenticated users, require project/space context
+    if (isAuthenticated && (!userId || !activeProjectId || !activeSpaceId)) {
+      setErrorMessage('Missing project/space context. Please select a space.');
+      return;
+    }
+
+    // For guests, require session ID
+    if (!isAuthenticated && !guestSessionId) {
+      setErrorMessage('Guest session not initialized.');
       return;
     }
 
@@ -408,101 +430,161 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
         selectedItem
       );
 
-      // Create optimistic image object (matches LandingPage implementation)
-      const optimisticImage = {
-        id: tempImageId,
-        name: imageName,
-        mimeType: imageData.mimeType,
-        spaceId: activeSpaceId,
-        evolutionChain: [operation],
-        parentImageId: sourceImage.id,
-        imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
-        storageFilePath: '',
-        isDeleted: false,
-        deletedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      // Add optimistic image to Redux store immediately for better UX
-      dispatch(
-        addImageOptimistic({
-          projectId: activeProjectId!,
-          spaceId: activeSpaceId!,
-          image: optimisticImage,
-        })
-      );
-
-      // Reset state and close modal immediately for better UX
-      setCustomPrompt('');
-      setGeneratedImage(null);
-      setErrorMessage(null);
-      setValidationError(null);
-      setIsSavingImage(false);
-
-      // Reset sourceImage in Redux
-      dispatch(setSourceImage(null));
-
-      // Save customPrompt to Redux for later use
-      const promptToSave = customPrompt.trim() || undefined;
-
-      if (promptToSave) {
-        dispatch(setReduxCustomPrompt(promptToSave));
-      }
-
-      // Show success message
-      message.success('Image saved successfully!');
-
-      // Close modal immediately
-      onSuccess();
-
-      // Save processed image to Firestore in background
-      await createImage(
-        userId,
-        activeProjectId,
-        activeSpaceId,
-        null,
-        {
+      // For authenticated users, use optimistic updates and save to users/
+      if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
+        // Create optimistic image object
+        const optimisticImage = {
           id: tempImageId,
           name: imageName,
           mimeType: imageData.mimeType,
-        },
-        {
-          base64: imageData.base64,
-          base64MimeType: imageData.mimeType,
-          parentImage: sourceImage,
-          operation,
+          spaceId: activeSpaceId,
+          evolutionChain: [operation],
+          parentImageId: sourceImage.id,
+          imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
+          storageFilePath: '',
+          isDeleted: false,
+          deletedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Add optimistic image to Redux store immediately for better UX
+        dispatch(
+          addImageOptimistic({
+            projectId: activeProjectId,
+            spaceId: activeSpaceId,
+            image: optimisticImage,
+          })
+        );
+
+        // Reset state and close modal immediately for better UX
+        setCustomPrompt('');
+        setGeneratedImage(null);
+        setErrorMessage(null);
+        setValidationError(null);
+        setIsSavingImage(false);
+
+        // Reset sourceImage in Redux
+        dispatch(setSourceImage(null));
+
+        // Save customPrompt to Redux for later use
+        const promptToSave = customPrompt.trim() || undefined;
+        if (promptToSave) {
+          dispatch(setReduxCustomPrompt(promptToSave));
         }
-      );
 
-      // Fetch updated space images to get real Firebase Storage URL
-      const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
-      dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+        // Show success message
+        message.success('Image saved successfully!');
 
-      // Save custom prompt to Firestore if provided
-      if (customPrompt.trim()) {
+        // Close modal immediately
+        onSuccess();
+
+        // Save processed image to Firestore in background
         try {
-          await saveCustomPrompt(userId, activeProjectId, activeTaskName, customPrompt.trim());
-        } catch (error) {
-          console.warn('Failed to save custom prompt to Firestore:', error);
-          // Don't throw - prompt saving is non-critical
+          await createImage(
+            userId,
+            activeProjectId,
+            activeSpaceId,
+            null,
+            {
+              id: tempImageId,
+              name: imageName,
+              mimeType: imageData.mimeType,
+            },
+            {
+              base64: imageData.base64,
+              base64MimeType: imageData.mimeType,
+              parentImage: sourceImage,
+              operation,
+            }
+          );
+
+          // Fetch updated space images to get real Firebase Storage URL
+          const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+          dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+
+          // Save custom prompt to Firestore if provided
+          if (customPrompt.trim()) {
+            try {
+              await saveCustomPrompt(userId, activeProjectId, activeTaskName, customPrompt.trim());
+            } catch (error) {
+              console.warn('Failed to save custom prompt to Firestore:', error);
+            }
+          }
+        } catch (saveError) {
+          console.error('Failed to save processed image:', saveError);
+          // Rollback optimistic update on error
+          dispatch(
+            removeImageOptimistic({
+              projectId: activeProjectId,
+              spaceId: activeSpaceId,
+              imageId: tempImageId,
+            })
+          );
+          message.error('Failed to save image. Please try again.');
         }
+      } else if (guestSessionId) {
+        // Guests can save their generated image to guest storage
+        // (The generation gate is in AsideSection, not here)
+        const now = Timestamp.fromDate(new Date());
+        
+        // Create the image data for Redux store
+        const guestImageData: ImageData = {
+          id: tempImageId,
+          name: imageName,
+          mimeType: imageData.mimeType,
+          spaceId: null,
+          evolutionChain: [operation],
+          parentImageId: sourceImage.id,
+          imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
+          storageFilePath: '',
+          order: null,
+          isDeleted: false,
+          deletedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          description: '',
+        };
+        
+        await createGuestImage(
+          guestSessionId,
+          null,
+          {
+            id: tempImageId,
+            name: imageName,
+            mimeType: imageData.mimeType,
+            description: '',
+          },
+          {
+            base64: imageData.base64,
+            base64MimeType: imageData.mimeType,
+            parentImage: sourceImage,
+            operation,
+          }
+        );
+        
+        // Add to Redux store for immediate display in gallery
+        dispatch(addGuestImage(guestImageData));
+
+        // Mark that guest has saved a generated image (triggers login requirement for future generations)
+        markImageGenerated();
+
+        // Reset state
+        setCustomPrompt('');
+        setGeneratedImage(null);
+        setErrorMessage(null);
+        setValidationError(null);
+        setIsSavingImage(false);
+        dispatch(setSourceImage(null));
+
+        message.success('Image saved successfully!');
+        onSuccess();
       }
     } catch (error) {
       console.error('Failed to save processed image:', error);
-
-      // Rollback optimistic update on error
-      dispatch(
-        removeImageOptimistic({
-          projectId: activeProjectId!,
-          spaceId: activeSpaceId!,
-          imageId: tempImageId,
-        })
-      );
-
       setErrorMessage(error instanceof Error ? error.message : 'Failed to save processed image.');
       setIsSavingImage(false);
-      setShowConfirmationModal(true); // Reopen confirmation modal on error
+      setShowConfirmationModal(true);
     }
   };
 
@@ -624,6 +706,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
               onClick={handleGenerate}
               disabled={isGenerateDisabled}
               size="large"
+              data-tour="modal-generate-button"
             >
               Generate
             </Button>
@@ -631,9 +714,9 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
         ]}
       >
         {/* Error Messages */}
-        {errorMessage && <Alert title={errorMessage} type="error" showIcon className="mb-4" />}
+        {errorMessage && <div className="mb-4"><Alert title={errorMessage} type="error" showIcon /></div>}
         {validationError && (
-          <Alert title={validationError} type="warning" showIcon className="mb-4" />
+          <div className="mb-4"><Alert title={validationError} type="warning" showIcon /></div>
         )}
 
         <div className="flex gap-8 flex-wrap relative">
@@ -662,7 +745,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
           <div className="flex flex-col flex-1 basis-[400px] gap-4 min-w-0 relative">
             <div>
               {/* Custom Prompt & Historical Prompts */}
-              <Typography.Title level={5} className="mb-2">
+            <Typography.Title level={5} className="mb-2">
                 Custom Prompt
               </Typography.Title>
               <div className="flex gap-0 flex-1 min-h-0 border border-gray-200 rounded-md overflow-hidden h-[420px] relative">
@@ -773,6 +856,7 @@ const GenerateMoreModal: React.FC<GenerateMoreModalProps> = ({
                       showCount
                       allowClear
                       className="flex-1 resize-none"
+                      data-tour="custom-prompt-input"
                     />
                   </div>
                 </div>

@@ -171,7 +171,10 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
       ]}
     >
       {/* Image Comparison Section */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div
+        style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}
+        data-tour="result-preview"
+      >
         {/* Original Image */}
         <div
           style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', minHeight: 400 }}
