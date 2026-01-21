@@ -14,6 +14,7 @@ import AdminSettingPage from './pages/AdminSettingPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginRequiredModal from './components/modal/LoginRequiredModal';
 import { GuestOnboardingTourRef } from './components/GuestOnboardingTour';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Main Layout Component - allows both authenticated and guest users
 const MainLayout: React.FC = () => {
@@ -30,19 +31,21 @@ const MainLayout: React.FC = () => {
 
   // Allow both authenticated and guest users to access the main app
   return (
-    <div className="h-screen flex flex-col overflow-scroll">
-      <Header />
-      <div className="flex-1 overflow-scroll">
-        <Routes>
-          <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
-          <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
-          <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+    <ErrorBoundary level="page">
+      <div className="h-screen flex flex-col overflow-scroll">
+        <Header />
+        <div className="flex-1 overflow-scroll">
+          <Routes>
+            <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
+            <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
+            <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </div>
+        {/* Global Login Required Modal */}
+        <LoginRequiredModal />
       </div>
-      {/* Global Login Required Modal */}
-      <LoginRequiredModal />
-    </div>
+    </ErrorBoundary>
   );
 };
 
@@ -63,12 +66,14 @@ const ProtectedAdminLayout: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-scroll">
-      <Header />
-      <div className="flex-1 overflow-scroll">
-        <AdminSettingPage />
+    <ErrorBoundary level="page">
+      <div className="h-screen flex flex-col overflow-scroll">
+        <Header />
+        <div className="flex-1 overflow-scroll">
+          <AdminSettingPage />
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
@@ -91,13 +96,15 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Provider store={store}>
-      <AuthProvider>
-        <GuestProvider>
-          <AppContent />
-        </GuestProvider>
-      </AuthProvider>
-    </Provider>
+    <ErrorBoundary level="app">
+      <Provider store={store}>
+        <AuthProvider>
+          <GuestProvider>
+            <AppContent />
+          </GuestProvider>
+        </AuthProvider>
+      </Provider>
+    </ErrorBoundary>
   );
 };
 

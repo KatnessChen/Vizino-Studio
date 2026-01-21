@@ -73,6 +73,7 @@ import {
   setHasSeenGreeting,
   setShowLoginRequiredModal
 } from '@/stores/guestStore';
+import { ThrowErrorComponent } from '@/App';
 
 interface LandingPageProps {
   tourRef: React.RefObject<GuestOnboardingTourRef | null>;
