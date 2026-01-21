@@ -12,13 +12,18 @@ export type { GeminiTask };
 
 // TODO: explore more model solutions and make this selectable to users
 // https://ai.google.dev/gemini-api/docs/models
-const defaultModel = 'gemini-2.5-flash';
+const defaultModel = 'gemini-2.5-flash-image';
 
 const getBase64FromImageData = async (userId: string | undefined, imageData: ImageData) => {
   // Fetch the image from Firebase Storage using SDK
   const storageFilePath = imageData.storageFilePath;
 
+  // If no storage path, try to fetch directly from imageDownloadUrl (for demo images or external URLs)
   if (!storageFilePath) {
+    if (imageData.imageDownloadUrl) {
+      console.log('[Gemini] Fetching image from URL (no storage path):', imageData.imageDownloadUrl);
+      return await fetchImageAsBase64(imageData.imageDownloadUrl);
+    }
     throw new Error(GEMINI_ERRORS.IMAGE_STORAGE_PATH_MISSING(imageData.id));
   }
 

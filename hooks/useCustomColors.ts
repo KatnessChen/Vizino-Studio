@@ -1,4 +1,11 @@
-import { useEffect } from 'react';
+/**
+ * useCustomColors Hook
+ *
+ * Manages custom colors for the current context (user or guest).
+ * Uses the storage adapter pattern to abstract away the storage details.
+ */
+
+import { useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/stores/store';
 import {
@@ -8,56 +15,65 @@ import {
   setLoadingColors,
   setLoadColorsError,
 } from '@/stores/customAssetsStore';
-import {
-  fetchColors,
-  addColor as addColorFirestore,
-  deleteColor as deleteColorFirestore,
-} from '@/services/firestoreService';
-import { useAuth } from '@/contexts/AuthContext';
+import { useStorageAdapter } from '@/hooks/useStorageAdapter';
+import { useUploadGate } from '@/hooks/useUploadGate';
+import { Color } from '@/types';
+
+const GUEST_PROJECT_ID = 'guest-project';
 
 export const useCustomColors = (projectId: string | null) => {
   const dispatch = useDispatch();
-  const { user } = useAuth();
+  const { adapter, isReady, isGuestMode } = useStorageAdapter();
+  const { gateUpload } = useUploadGate();
+
+  // Use virtual project ID for guests
+  const effectiveProjectId = isGuestMode ? GUEST_PROJECT_ID : projectId;
+
+  // Use ref to track if we've already started loading for this project
+  const loadingStartedRef = useRef<string | null>(null);
 
   // Get project-specific assets from store
   const projectAssets = useSelector((state: RootState) =>
-    projectId ? state.customAssets.projects[projectId] : undefined
+    effectiveProjectId ? state.customAssets.projects[effectiveProjectId] : undefined
   );
 
   const customColors = projectAssets?.customColors ?? [];
   const isLoadingColors = projectAssets?.isLoadingColors ?? false;
   const loadColorsError = projectAssets?.loadColorsError ?? null;
 
-  // Load custom colors with cache check
+  // Load custom colors - only once per project
   useEffect(() => {
-    if (!user?.uid || !projectId) {
+    // Skip if not ready or no project
+    if (!isReady || !effectiveProjectId) return;
+
+    // Skip if already loaded (has colors)
+    if (projectAssets?.customColors && projectAssets.customColors.length > 0) {
       return;
     }
 
-    // Check if colors are already loaded in store
-    const hasColors = projectAssets && projectAssets.customColors.length > 0;
-    if (hasColors) {
-      console.log('Using cached custom colors for project:', projectId);
+    // Skip if already loading
+    if (projectAssets?.isLoadingColors) {
       return;
     }
 
-    // Check if already loading
-    const isLoading = projectAssets?.isLoadingColors;
-    if (isLoading) {
+    // Skip if we already started loading for this project
+    if (loadingStartedRef.current === effectiveProjectId) {
       return;
     }
+
+    // Mark that we're starting to load
+    loadingStartedRef.current = effectiveProjectId;
 
     const loadColors = async () => {
-      dispatch(setLoadingColors({ projectId, isLoadingColors: true }));
+      dispatch(setLoadingColors({ projectId: effectiveProjectId, isLoadingColors: true }));
       try {
-        const colors = await fetchColors(user.uid, projectId);
-        dispatch(setCustomColors({ projectId, colors }));
-        console.log('Loaded custom colors from Firestore:', projectId);
+        const colors = await adapter.fetchColors();
+        dispatch(setCustomColors({ projectId: effectiveProjectId, colors }));
       } catch (error) {
         console.error('Failed to load colors:', error);
         dispatch(
           setLoadColorsError({
-            projectId,
+            projectId: effectiveProjectId,
             error: error instanceof Error ? error.message : 'Unknown error',
           })
         );
@@ -66,36 +82,34 @@ export const useCustomColors = (projectId: string | null) => {
 
     loadColors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, projectId, dispatch]);
+  }, [isReady, effectiveProjectId]);
 
-  const addColor = async (colorData: { name: string; hex: string; description?: string }) => {
-    if (!user?.uid || !projectId) {
-      throw new Error('User or project not available');
+  const addColor = useCallback(async (colorData: { name: string; hex: string; description?: string }): Promise<Color> => {
+    if (!isReady || !effectiveProjectId) {
+      throw new Error('Storage not ready');
     }
 
-    try {
-      const newColor = await addColorFirestore(user.uid, projectId, colorData);
-      dispatch(addCustomColorAction({ projectId, color: newColor }));
-      return newColor;
-    } catch (error) {
-      console.error('Failed to add color:', error);
-      throw error;
-    }
-  };
-
-  const deleteColor = async (colorId: string) => {
-    if (!user?.uid || !projectId) {
-      throw new Error('User or project not available');
+    // For guests, check if upload should be gated
+    if (isGuestMode) {
+      const allowed = gateUpload('color', colorData);
+      if (!allowed) {
+        throw new Error('LOGIN_REQUIRED');
+      }
     }
 
-    try {
-      await deleteColorFirestore(user.uid, projectId, colorId);
-      dispatch(removeCustomColorAction({ projectId, colorId }));
-    } catch (error) {
-      console.error('Failed to delete color:', error);
-      throw error;
+    const newColor = await adapter.addColor(colorData);
+    dispatch(addCustomColorAction({ projectId: effectiveProjectId, color: newColor }));
+    return newColor;
+  }, [isReady, effectiveProjectId, isGuestMode, gateUpload, adapter, dispatch]);
+
+  const deleteColor = useCallback(async (colorId: string): Promise<void> => {
+    if (!isReady || !effectiveProjectId) {
+      throw new Error('Storage not ready');
     }
-  };
+
+    await adapter.deleteColor(colorId);
+    dispatch(removeCustomColorAction({ projectId: effectiveProjectId, colorId }));
+  }, [isReady, effectiveProjectId, adapter, dispatch]);
 
   return {
     customColors,

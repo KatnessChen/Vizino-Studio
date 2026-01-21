@@ -27,6 +27,7 @@ interface Item {
 
 interface UseImageProcessingProps {
   userId: string | undefined;
+  guestSessionId?: string | null;
   selectedTaskName: GeminiTaskName;
   options: {
     selectedColor?: Color | null;
@@ -37,12 +38,16 @@ interface UseImageProcessingProps {
 
 export const useImageProcessing = ({
   userId,
+  guestSessionId,
   selectedTaskName,
   options: { selectedColor, selectedTexture, selectedItem },
 }: UseImageProcessingProps) => {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Use userId if available, otherwise use guestSessionId for guest mode
+  const effectiveUserId = userId || guestSessionId || undefined;
 
   const cancelProcessing = useCallback(() => {
     if (abortControllerRef.current) {
@@ -65,7 +70,7 @@ export const useImageProcessing = ({
       setIsProcessingImage(true);
       setErrorMessage(null);
 
-      if (!userId) {
+      if (!effectiveUserId) {
         setErrorMessage('User ID is required to process images.');
         setIsProcessingImage(false);
         return null;
@@ -82,7 +87,7 @@ export const useImageProcessing = ({
           }
 
           result = await generateRecoloredImage(
-            userId,
+            effectiveUserId,
             imageData,
             selectedColor.name,
             selectedColor.hex,
@@ -96,7 +101,7 @@ export const useImageProcessing = ({
             return null;
           }
           result = await generateRetexturedImage(
-            userId,
+            effectiveUserId,
             imageData,
             selectedTexture.textureImageDownloadUrl,
             selectedTexture.mimeType || 'image/jpeg',
@@ -111,7 +116,7 @@ export const useImageProcessing = ({
             return null;
           }
           result = await generateItemPlacedImage(
-            userId,
+            effectiveUserId,
             imageData,
             selectedItem.itemImageDownloadUrl,
             selectedItem.mimeType || 'image/jpeg',
@@ -125,12 +130,12 @@ export const useImageProcessing = ({
             setIsProcessingImage(false);
             return null;
           }
-          result = await generateCustomPromptImage(userId, imageData, customPrompt, signal);
+          result = await generateCustomPromptImage(effectiveUserId, imageData, customPrompt, signal);
         } else {
           throw new Error('Unknown task type');
         }
 
-        // Increment task usage in Firestore
+        // Increment task usage in Firestore (only for authenticated users)
         if (userId) {
           try {
             await incrementTaskUsage(userId, selectedTaskName);
@@ -184,7 +189,7 @@ export const useImageProcessing = ({
         return null;
       }
     },
-    [userId, selectedTaskName, selectedColor, selectedTexture, selectedItem]
+    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem]
   );
 
   return {
