@@ -39,11 +39,18 @@ export const useAppInit = () => {
 
   useEffect(() => {
     if (!user) {
+      // For guests (not logged in), clear user-specific state but mark app as initiated
+      // This allows guests to use the app without authentication
       dispatch(setProjects([]));
       dispatch(setActiveProjectId(null));
       dispatch(setActiveSpaceId(null));
-      dispatch(setIsAppInitiated(false));
+      dispatch(setIsAppInitiated(true)); // Mark as initiated so guests can use the app
       hasInitialized.current = false;
+      
+      // Clear URL path for guest mode - navigate to root if there's a path
+      if (projectSlugId || spaceSlugId) {
+        navigate('/', { replace: true });
+      }
       return;
     }
 
