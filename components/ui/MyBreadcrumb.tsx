@@ -53,6 +53,7 @@ import {
 } from '@/stores/customAssetsStore';
 import { setSelectedColor, setSelectedTexture } from '@/stores/taskStore';
 import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
+import { selectHasGeneratedImage } from '@/stores/guestStore';
 import { generateRoute } from '@/constants/routes';
 
 export const ModalMode = {
@@ -77,6 +78,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
 }) => {
   const { user, adminSettings, isAuthenticated } = useAuth();
   const { isGuestMode } = useGuest();
+  const hasGeneratedImage = useSelector(selectHasGeneratedImage);
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const projects = useSelector(selectProjects);
@@ -560,8 +562,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
               <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">Guest Mode</span>
             </div>
             
-            {/* Take a Tour Button */}
-            {onStartTour && (
+            {/* Take a Tour Button - Only show if guest hasn't generated any images yet */}
+            {onStartTour && !hasGeneratedImage && (
               <Button
                 type="primary"
                 size="small"

@@ -117,7 +117,14 @@ const AsideSection: React.FC = () => {
   const operationLimitCheck = selectedImage
     ? checkOperationLimit(selectedImage, adminSettings.mock_limit_reached)
     : null;
-  const { isDisabled, disableReason } = useGenerateButtonState({
+  
+  const {
+    isDisabled,
+    disableReason,
+    guestHasUsedGeneration,
+    shouldShowLockedStyle,
+    buttonOpacity,
+  } = useGenerateButtonState({
     activeTaskName: selectedTaskNames[0] || null,
     isProcessingImage,
     isSavingImage: false, // AsideSection doesn't track saving state, only processing
@@ -125,14 +132,10 @@ const AsideSection: React.FC = () => {
     selectedColor,
     selectedTexture,
     selectedItem,
+    isGuestMode,
+    hasGeneratedImage,
+    hasSelectedImage: !!selectedImage,
   });
-
-  // Check if guest has already generated an image
-  const guestHasUsedGeneration = isGuestMode && hasGeneratedImage;
-  const finalIsDisabled = isDisabled || guestHasUsedGeneration;
-  const finalDisableReason = guestHasUsedGeneration
-    ? 'Login to generate more images'
-    : disableReason;
 
   // Determine selection state message
   const selectionMessage = useMemo(() => {
@@ -198,27 +201,23 @@ const AsideSection: React.FC = () => {
 
       {/* Generate Button - stick to bottom */}
       <div className="px-6 mt-auto pb-6" data-tour="generate-button">
-        <Tooltip
-          title={finalIsDisabled && finalDisableReason ? finalDisableReason : ''}
-          placement="right"
-        >
-          <div className="relative">
-            <Button
-              block
-              size="large"
-              htmlType="button"
-              disabled={finalIsDisabled || !selectedImage}
-              onClick={handleGenerate}
-              className={`btn-generate h-11 text-base font-semibold rounded-md shadow-sm ${finalIsDisabled || !selectedImage ? 'btn-disabled' : ''}`}
-            >
-              <AutoAwesomeIcon className="text-lg mr-2 align-middle" />
-              Generate
-            </Button>
-            {guestHasUsedGeneration && (
-              <LockOutlined className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            )}
-          </div>
-        </Tooltip>
+        <div className="relative">
+          <Button
+            block
+            size="large"
+            htmlType="button"
+            disabled={isDisabled}
+            onClick={handleGenerate}
+            className={`btn-generate h-11 text-base font-semibold rounded-md shadow-sm ${isDisabled ? 'btn-disabled' : ''}`}
+            style={buttonOpacity ? { opacity: buttonOpacity } : undefined}
+          >
+            <AutoAwesomeIcon className="text-lg mr-2 align-middle" />
+            Generate
+          </Button>
+          {shouldShowLockedStyle && (
+            <LockOutlined className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+          )}
+        </div>
       </div>
     </aside>
   );

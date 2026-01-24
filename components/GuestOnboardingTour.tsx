@@ -19,6 +19,7 @@ import { setSourceImage, setIsGenerateModalOpen, setSelectedColor } from '@/stor
 import { setSelectedOriginalImageIds } from '@/stores/imageStore';
 import { getDemoImages, getDefaultDemoImageId } from '@/constants/demoImages';
 import { PRESET_COLOR } from '@/constants/constants';
+import { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 
 interface GuestOnboardingTourProps {
   // Refs are optional since we use data-tour selectors for most targets
@@ -26,16 +27,18 @@ interface GuestOnboardingTourProps {
   originalGalleryRef?: React.RefObject<HTMLElement>;
   colorSelectRef?: React.RefObject<HTMLElement>;
   generateButtonRef?: React.RefObject<HTMLElement>;
+  generateModalRef: React.RefObject<GenerateMoreModalRef | null>;
 }
 
 export interface GuestOnboardingTourRef {
   openTour: () => void;
+  closeTour: () => void;
 }
 
 const TOUR_STORAGE_KEY = 'guest-tour-completed';
 
 const GuestOnboardingTour = forwardRef<GuestOnboardingTourRef, GuestOnboardingTourProps>(
-  ({ designGoalRef, originalGalleryRef, colorSelectRef, generateButtonRef }, ref) => {
+  ({ designGoalRef, originalGalleryRef, colorSelectRef, generateButtonRef, generateModalRef }, ref) => {
     const { isGuestMode } = useGuest();
     const dispatch = useDispatch();
     const [open, setOpen] = useState(false);
@@ -83,16 +86,26 @@ const GuestOnboardingTour = forwardRef<GuestOnboardingTourRef, GuestOnboardingTo
       localStorage.setItem(TOUR_STORAGE_KEY, 'true');
     };
 
+    const handleFinish = () => {
+      // If finishing on step 6 (the Generate step), trigger the generate button
+      if (currentStep === 5) {
+        // Step 6 is index 5
+        generateModalRef.current?.triggerGenerate();
+      }
+      handleClose();
+    };
+
     const openTour = useCallback(() => {
       setCurrentStep(0);
       setOpen(true);
     }, []);
 
-    // Expose openTour to parent via ref
+    // Expose openTour and closeTour to parent via ref
     useImperativeHandle(
       ref,
       () => ({
         openTour,
+        closeTour: handleClose,
       }),
       [openTour]
     );
@@ -219,7 +232,7 @@ const GuestOnboardingTour = forwardRef<GuestOnboardingTourRef, GuestOnboardingTo
           current={currentStep}
           onChange={handleStepChange}
           onClose={handleClose}
-          onFinish={handleClose}
+          onFinish={handleFinish}
           mask={{
             style: {
               boxShadow: 'inset 0 0 15px #333',

@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Timestamp } from 'firebase/firestore';
 import { message, Tag } from 'antd';
 import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
-import GenerateMoreModal from '@/components/modal/GenerateMoreModal';
+import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
 import EmptyState from '@/components/EmptyState';
 import GenericConfirmModal from '@/components/modal/GenericConfirmModal';
@@ -67,13 +67,12 @@ import {
 } from '@/stores/taskStore';
 import GuestOnboardingTour, { GuestOnboardingTourRef } from '@/components/GuestOnboardingTour';
 import { getDemoImages, getDefaultGuestColor, getDefaultDemoImageId } from '@/constants/demoImages';
-import { 
-  selectGuestImages, 
-  selectHasSeenGreeting, 
+import {
+  selectGuestImages,
+  selectHasSeenGreeting,
   setHasSeenGreeting,
-  setShowLoginRequiredModal
+  setShowLoginRequiredModal,
 } from '@/stores/guestStore';
-import { ThrowErrorComponent } from '@/App';
 
 interface LandingPageProps {
   tourRef: React.RefObject<GuestOnboardingTourRef | null>;
@@ -81,9 +80,12 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // Get authenticated user
-  const { user, adminSettings, isAuthenticated } = useAuth();
+  const { user, adminSettings } = useAuth();
   const { isGuestMode } = useGuest();
   const dispatch = useDispatch();
+
+  // Ref for GenerateMoreModal to trigger generation from Tour
+  const generateModalRef = useRef<GenerateMoreModalRef>(null);
 
   const isAppInitiated = useSelector(selectIsAppInitiated);
   const initError = useSelector(selectInitError);
@@ -1243,6 +1245,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       {/* Generate More Modal */}
       {showGenerateMoreModal && sourceImage && (
         <GenerateMoreModal
+          ref={generateModalRef}
           isOpen={showGenerateMoreModal()}
           sourceImage={sourceImage}
           userId={user?.uid}
@@ -1251,6 +1254,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             handleGenerateMoreSuccess();
           }}
           onCancel={handleGenerateMoreCancel}
+          onGenerateClick={() => {
+            // Close the tour when generate button is clicked
+            tourRef.current?.closeTour();
+          }}
         />
       )}
 
@@ -1268,7 +1275,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       )}
 
       {/* Guest Onboarding Tour */}
-      <GuestOnboardingTour ref={tourRef} />
+      <GuestOnboardingTour ref={tourRef} generateModalRef={generateModalRef} />
 
       {/* Initial Greeting Modal for Guests */}
       <GreetingModal

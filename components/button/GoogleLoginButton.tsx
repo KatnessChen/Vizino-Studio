@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Spin } from 'antd';
+import { Button } from 'antd';
 import { GoogleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { signInWithGoogle } from '@/services/authService';
 
@@ -38,7 +38,6 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
   return (
     <Button
-      type="primary"
       block={fullWidth}
       disabled={disabled || loading}
       onClick={handleGoogleLogin}
@@ -49,6 +48,10 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
+        background: 'linear-gradient(135deg, #e0e7ff 0%, #f5f3ff 100%)',
+        color: '#4f46e5',
+        border: '1px solid #c7d2fe',
+        borderRadius: '0.375rem',
       }}
     >
       {loading ? 'Signing in...' : 'Sign in with Google'}
