@@ -11,6 +11,7 @@ import AddColorModal from '../modal/AddColorModal';
 import { useCustomColors } from '@/hooks/useCustomColors';
 import { RootState } from '@/stores/store';
 import { setSelectedColor } from '@/stores/taskStore';
+import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { sortColorsBySpectrum, getTextColor } from '@/utils/colorUtils';
 import { useGuest } from '@/contexts/GuestContext';
 
@@ -75,16 +76,20 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{title}</span>
-      <Tooltip title={isGuestMode ? 'Login to add custom colors' : ''} placement="left">
-        <Button
-          icon={<PlusOutlined />}
-          onClick={() => setIsAddColorModalOpen(true)}
-          disabled={isGuestMode}
-        >
-          Color
-          {isGuestMode && <LockOutlined />}
-        </Button>
-      </Tooltip>
+      <Button
+        icon={<PlusOutlined />}
+        onClick={() => {
+          if (isGuestMode) {
+            dispatch(setShowLoginRequiredModal(true));
+          } else {
+            setIsAddColorModalOpen(true);
+          }
+        }}
+        style={isGuestMode ? { opacity: 0.6 } : undefined}
+      >
+        Color
+        {isGuestMode && <LockOutlined />}
+      </Button>
     </div>
   );
 

@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Radio, Modal, Input, Card, Button, Tooltip } from 'antd';
+import { Radio, Modal, Input, Card, Button } from 'antd';
 import { Alert } from '@mui/material';
 import { Snackbar } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-import { LockOutlined } from '@ant-design/icons';
+import { PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { Texture, Item } from '@/types';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelector, useDispatch } from 'react-redux';
@@ -24,7 +23,9 @@ import {
 import ImageDisplayModal from '../modal/ImageDisplayModal';
 import BatchUploadModal from '../modal/BatchUploadModal';
 import AssetCard from '@/components/ui/AssetCard';
+import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { useGuest } from '@/contexts/GuestContext';
+import MyEmpty from '@/components/ui/MyEmpty';
 
 type AssetType = 'texture' | 'item';
 type Asset = Texture | Item;
@@ -270,17 +271,20 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   const cardTitle = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{title || defaultTitle}</span>
-      <Tooltip title={isGuestMode ? `Login to add custom ${type}s` : ''} placement="left">
-        <Button
-          type="dashed"
-          icon={<AddIcon />}
-          onClick={() => setShowBatchUploadModal(true)}
-          disabled={isGuestMode}
-        >
-          {title || defaultTitle}
-          {isGuestMode && <LockOutlined />}
-        </Button>
-      </Tooltip>
+      <Button
+        icon={<PlusOutlined />}
+        onClick={() => {
+          if (isGuestMode) {
+            dispatch(setShowLoginRequiredModal(true));
+          } else {
+            setShowBatchUploadModal(true);
+          }
+        }}
+        style={isGuestMode ? { opacity: 0.6 } : undefined}
+      >
+        {title || defaultTitle}
+        {isGuestMode && <LockOutlined />}
+      </Button>
     </div>
   );
 
@@ -318,76 +322,82 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
               padding: 0 !important;
             }
           `}</style>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '16px',
-            }}
-          >
-            <Radio.Group
-              value={selectedAsset?.id || undefined}
-              onChange={(e) => {
-                const asset = customAssets.find((a) => a.id === e.target.value);
-                if (asset) {
-                  // Toggle logic: if clicking the same asset, deselect it
-                  if (selectedAsset?.id === asset.id) {
-                    if (isTexture) {
-                      dispatch(setSelectedTexture(null));
-                    } else {
-                      dispatch(setSelectedItem(null));
-                    }
-                    if (onSelect) onSelect(null);
-                  } else {
-                    if (isTexture) {
-                      dispatch(setSelectedTexture(asset as Texture));
-                    } else {
-                      dispatch(setSelectedItem(asset as Item));
-                    }
-                    if (onSelect) onSelect(asset);
-                  }
-                }
+          {customAssets.length === 0 ? (
+            <div className="p-8">
+              <MyEmpty description={`No ${isTexture ? 'textures' : 'items'} found`} />
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '16px',
               }}
-              style={{ width: '100%', display: 'contents' }}
-              className={selectorRadioClassName}
             >
-              {customAssets.map((asset) => (
-                <Radio
-                  key={asset.id}
-                  value={asset.id}
-                  onClick={(e) => {
+              <Radio.Group
+                value={selectedAsset?.id || undefined}
+                onChange={(e) => {
+                  const asset = customAssets.find((a) => a.id === e.target.value);
+                  if (asset) {
                     // Toggle logic: if clicking the same asset, deselect it
                     if (selectedAsset?.id === asset.id) {
-                      e.preventDefault();
                       if (isTexture) {
                         dispatch(setSelectedTexture(null));
                       } else {
                         dispatch(setSelectedItem(null));
                       }
                       if (onSelect) onSelect(null);
+                    } else {
+                      if (isTexture) {
+                        dispatch(setSelectedTexture(asset as Texture));
+                      } else {
+                        dispatch(setSelectedItem(asset as Item));
+                      }
+                      if (onSelect) onSelect(asset);
                     }
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    minHeight: '160px',
-                    margin: 0,
-                    padding: 0,
-                  }}
-                >
-                  <AssetCard
-                    asset={asset}
-                    isSelected={selectedAsset?.id === asset.id}
-                    base64={base64Map.get(asset.id)}
-                    onViewExpand={() => {
-                      setSelectedAssetForView(asset);
-                      setShowImageModal(true);
+                  }
+                }}
+                style={{ width: '100%', display: 'contents' }}
+                className={selectorRadioClassName}
+              >
+                {customAssets.map((asset) => (
+                  <Radio
+                    key={asset.id}
+                    value={asset.id}
+                    onClick={(e) => {
+                      // Toggle logic: if clicking the same asset, deselect it
+                      if (selectedAsset?.id === asset.id) {
+                        e.preventDefault();
+                        if (isTexture) {
+                          dispatch(setSelectedTexture(null));
+                        } else {
+                          dispatch(setSelectedItem(null));
+                        }
+                        if (onSelect) onSelect(null);
+                      }
                     }}
-                  />
-                </Radio>
-              ))}
-            </Radio.Group>
-          </div>
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      minHeight: '160px',
+                      margin: 0,
+                      padding: 0,
+                    }}
+                  >
+                    <AssetCard
+                      asset={asset}
+                      isSelected={selectedAsset?.id === asset.id}
+                      base64={base64Map.get(asset.id)}
+                      onViewExpand={() => {
+                        setSelectedAssetForView(asset);
+                        setShowImageModal(true);
+                      }}
+                    />
+                  </Radio>
+                ))}
+              </Radio.Group>
+            </div>
+          )}
         </>
       )}
 

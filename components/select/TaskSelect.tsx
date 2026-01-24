@@ -5,6 +5,7 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { LockOutlined } from '@ant-design/icons';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { selectSelectedTaskNames, setSelectedTaskNames } from '@/stores/taskStore';
+import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { useGuest } from '@/contexts/GuestContext';
 
 interface TaskSelectProps {
@@ -114,7 +115,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
               key={task.value}
               className={`
                 relative flex items-center gap-2 px-4 py-1 rounded-xl border-2 transition-all duration-200
-                ${isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
+                ${isDisabled ? 'cursor-pointer opacity-60' : 'cursor-pointer'}
                 ${
                   isSelected
                     ? 'border-indigo-500 bg-gradient-to-r from-indigo-50 to-indigo-100 shadow-lg'
@@ -124,16 +125,18 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
                 }
               `}
               onClick={() => {
-                if (!isDisabled) {
+                if (isDisabled) {
+                  // Show login modal for disabled tasks
+                  dispatch(setShowLoginRequiredModal(true));
+                } else if (!isSelected) {
                   handleTaskChange(task.value as GeminiTaskName)({
-                    target: { checked: !isSelected },
+                    target: { checked: true },
                   } as CheckboxChangeEvent);
                 }
               }}
             >
               <Checkbox
                 checked={isSelected}
-                disabled={isDisabled}
                 onChange={handleTaskChange(task.value as GeminiTaskName)}
                 className="sr-only"
               />
@@ -148,18 +151,10 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
                 </span>
               </div>
               {isDisabled && (
-                <LockOutlined className="text-gray-100 absolute right-3 top-1/2 -translate-y-1/2" />
+                <LockOutlined className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
               )}
             </div>
           );
-
-          if (isDisabled) {
-            return (
-              <Tooltip key={task.value} title="Log in to unlock this feature" placement="right">
-                {taskContent}
-              </Tooltip>
-            );
-          }
 
           return taskContent;
         })}

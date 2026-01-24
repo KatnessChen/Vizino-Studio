@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   DndContext,
   DragEndEvent,
@@ -36,6 +36,7 @@ import {
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { PlusOutlined } from '@ant-design/icons';
+import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { useGuest } from '@/contexts/GuestContext';
 
 interface GalleryProps {
@@ -95,6 +96,7 @@ const Gallery: React.FC<GalleryProps> = ({
   onSingleRename,
   onSingleCopy,
 }) => {
+  const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
   // State for ImageDisplayModal
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
@@ -323,11 +325,11 @@ const Gallery: React.FC<GalleryProps> = ({
   const selectedUpdatedImageIds = useSelector((state: RootState) =>
     selectSelectedUpdatedImageIds(state)
   );
-  
+
   // Get allImages from Redux - handle guest mode separately
   const storeAllImages = useSelector((state: RootState) => selectAllImages(state));
   const guestImages = useSelector((state: RootState) => selectGuestImages(state));
-  
+
   // In guest mode, use guestImages; otherwise use store images
   const allImages = isGuestMode ? guestImages : storeAllImages;
 
@@ -424,7 +426,7 @@ const Gallery: React.FC<GalleryProps> = ({
               alignItems: 'center',
               gap: '6px',
               padding: '4px 8px 4px 16px',
-              backgroundColor: '#bd6dff',
+              backgroundColor: 'indigo',
               borderRadius: '8px',
               height: '32px',
               color: '#ffffff',
@@ -517,25 +519,21 @@ const Gallery: React.FC<GalleryProps> = ({
 
         {/* Upload button (only show if upload is enabled) */}
         {onUploadImage && onUploadError && (
-          <Tooltip
-            title={
-              isGuestMode
-                ? 'Login to upload images'
-                : isImageLimitReached
-                  ? 'Image limit reached'
-                  : ''
-            }
-            placement="left"
+          <Button
+            icon={<PlusOutlined />}
+            onClick={() => {
+              if (isGuestMode) {
+                dispatch(setShowLoginRequiredModal(true));
+              } else if (!isImageLimitReached) {
+                setShowBatchUploadModal(true);
+              }
+            }}
+            disabled={isImageLimitReached && !isGuestMode}
+            style={isGuestMode ? { opacity: 0.6 } : undefined}
           >
-            <Button
-              icon={<PlusOutlined />}
-              onClick={() => setShowBatchUploadModal(true)}
-              disabled={isImageLimitReached || isGuestMode}
-            >
-              Images
-              {isGuestMode && <LockOutlined />}
-            </Button>
-          </Tooltip>
+            Images
+            {isGuestMode && <LockOutlined />}
+          </Button>
         )}
 
         {/* Layout toggle (separate from toolbar) */}

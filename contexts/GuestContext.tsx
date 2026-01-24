@@ -9,7 +9,7 @@ import {
   setGuestImages,
   clearGuestState,
 } from '@/stores/guestStore';
-import { fetchGuestImages } from '@/services/guestFirestoreService';
+import { guestIndexedDB } from '@/utils/guestIndexedDB';
 
 interface GuestContextType {
   /**
@@ -36,7 +36,7 @@ interface GuestContextType {
   markImageGenerated: () => void;
 
   /**
-   * Clear guest session after successful login and migration
+   * Clear guest session after successful login
    */
   clearGuestSession: () => void;
 }
@@ -57,37 +57,36 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isLoading, isAuthenticated, guestSessionId, dispatch]);
 
-  // Load guest images from Firebase when session is initialized
+  // Load guest images from IndexedDB when session is initialized
   useEffect(() => {
     const loadGuestImages = async () => {
       if (!guestSessionId || isAuthenticated) return;
-      
+
       try {
-        console.log('[GuestContext] Loading guest images...');
-        const images = await fetchGuestImages(guestSessionId);
+        console.log('[GuestContext] Loading guest images from IndexedDB...');
+        const entries = await guestIndexedDB.getImages();
+        const images = entries.map((entry) => entry.imageData);
         dispatch(setGuestImages(images));
-        
+
         // If guest has any generated images, mark as having generated
-        const hasGenerated = images.some(img => img.parentImageId);
+        const hasGenerated = images.some((img) => img.parentImageId);
         if (hasGenerated) {
           dispatch(setHasGeneratedImage(true));
         }
-        
-        console.log('[GuestContext] Loaded', images.length, 'guest images');
+
+        console.log('[GuestContext] Loaded', images.length, 'guest images from IndexedDB');
       } catch (error) {
         console.error('[GuestContext] Failed to load guest images:', error);
       }
     };
-    
+
     loadGuestImages();
   }, [guestSessionId, isAuthenticated, dispatch]);
 
   // Clear guest state when user logs in
   useEffect(() => {
     if (isAuthenticated && guestSessionId) {
-      // Note: Migration should happen before clearing
-      // This is a fallback in case migration wasn't triggered
-      console.log('[GuestContext] User authenticated, guest session will be cleared after migration');
+      console.log('[GuestContext] User authenticated, clearing guest session');
     }
   }, [isAuthenticated, guestSessionId]);
 
@@ -95,8 +94,17 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     dispatch(setHasGeneratedImage(true));
   };
 
-  const clearGuestSession = () => {
+  const clearGuestSession = async () => {
+    // Clear Redux state
     dispatch(clearGuestState());
+    
+    // Clear IndexedDB
+    try {
+      await guestIndexedDB.clearAll();
+      console.log('[GuestContext] Guest IndexedDB cleared');
+    } catch (error) {
+      console.error('[GuestContext] Failed to clear guest IndexedDB:', error);
+    }
   };
 
   const value: GuestContextType = {

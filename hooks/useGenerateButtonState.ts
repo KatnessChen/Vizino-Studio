@@ -11,6 +11,10 @@ interface UseGenerateButtonStateProps {
   selectedItem: Item | null;
   customPrompt?: string;
   isCustomPromptRequired?: boolean;
+  // Guest mode related
+  isGuestMode?: boolean;
+  hasGeneratedImage?: boolean;
+  hasSelectedImage?: boolean;
 }
 
 export const useGenerateButtonState = ({
@@ -23,10 +27,21 @@ export const useGenerateButtonState = ({
   selectedItem,
   customPrompt = '',
   isCustomPromptRequired = false,
+  isGuestMode = false,
+  hasGeneratedImage = false,
+  hasSelectedImage = false,
 }: UseGenerateButtonStateProps) => {
   let disableReason = '';
 
-  if (isProcessingImage) {
+  // Check if guest has already generated an image
+  const guestHasUsedGeneration = isGuestMode && hasGeneratedImage;
+
+  // If guest has used generation, they should login
+  if (guestHasUsedGeneration) {
+    disableReason = 'Login to generate more images';
+  } else if (!hasSelectedImage) {
+    disableReason = 'Please select an image.';
+  } else if (isProcessingImage) {
     disableReason = 'Processing image...';
   } else if (isSavingImage) {
     disableReason = 'Saving image...';
@@ -46,8 +61,15 @@ export const useGenerateButtonState = ({
 
   const isDisabled = disableReason !== '';
 
+  // For guests who have used generation, allow clicking (disable=false) but show visual feedback
+  const shouldBeDisabled = guestHasUsedGeneration ? false : isDisabled;
+
   return {
-    isDisabled,
+    isDisabled: shouldBeDisabled,
     disableReason,
+    guestHasUsedGeneration,
+    // For styling purposes
+    shouldShowLockedStyle: guestHasUsedGeneration,
+    buttonOpacity: guestHasUsedGeneration ? 0.6 : undefined,
   };
 };
