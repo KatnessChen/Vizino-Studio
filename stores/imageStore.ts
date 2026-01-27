@@ -48,17 +48,43 @@ export const selectAllImages = createSelector(
 
 /**
  * Selector to get only original images (without parentImageId) for the active space
+ * Sorted by order (ascending), with null orders falling back to createdAt
  */
-export const selectOriginalImages = createSelector(selectAllImages, (allImages): ImageData[] =>
-  allImages.filter((img) => !img.parentImageId)
-);
+export const selectOriginalImages = createSelector(selectAllImages, (allImages): ImageData[] => {
+  const originalImages = allImages.filter((img) => !img.parentImageId);
+
+  return originalImages.sort((a, b) => {
+    // If both have order values, sort by order
+    if (a.order !== null && b.order !== null) {
+      return a.order - b.order;
+    }
+    // If only one has order, prioritize it
+    if (a.order !== null) return -1;
+    if (b.order !== null) return 1;
+    // If both are null, fallback to createdAt
+    return a.createdAt.toMillis() - b.createdAt.toMillis();
+  });
+});
 
 /**
  * Selector to get only updated images (with parentImageId) for the active space
+ * Sorted by order (ascending), with null orders falling back to createdAt
  */
-export const selectUpdatedImages = createSelector(selectAllImages, (allImages): ImageData[] =>
-  allImages.filter((img) => img.parentImageId)
-);
+export const selectUpdatedImages = createSelector(selectAllImages, (allImages): ImageData[] => {
+  const updatedImages = allImages.filter((img) => img.parentImageId);
+
+  return updatedImages.sort((a, b) => {
+    // If both have order values, sort by order
+    if (a.order !== null && b.order !== null) {
+      return a.order - b.order;
+    }
+    // If only one has order, prioritize it
+    if (a.order !== null) return -1;
+    if (b.order !== null) return 1;
+    // If both are null, fallback to createdAt
+    return a.createdAt.toMillis() - b.createdAt.toMillis();
+  });
+});
 
 /**
  * Selector to get selected original image IDs

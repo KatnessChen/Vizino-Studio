@@ -8,6 +8,7 @@ interface ProjectState {
   activeSpaceId: string | null;
   isAppInitiated: boolean;
   initError: string | null;
+  isFetchingSpaceImages: boolean;
 }
 
 const initialState: ProjectState = {
@@ -16,6 +17,7 @@ const initialState: ProjectState = {
   activeSpaceId: null,
   isAppInitiated: false,
   initError: null,
+  isFetchingSpaceImages: false,
 };
 
 export const projectStore = createSlice({
@@ -98,6 +100,11 @@ export const projectStore = createSlice({
       state.initError = action.payload;
     },
 
+    // Fetching space images state
+    setIsFetchingSpaceImages: (state, action: PayloadAction<boolean>) => {
+      state.isFetchingSpaceImages = action.payload;
+    },
+
     // Optimistic updates for images
     addImageOptimistic: (
       state,
@@ -172,6 +179,52 @@ export const projectStore = createSlice({
         }
       }
     },
+    // Reorder images optimistically
+    reorderImagesOptimistic: (
+      state,
+      action: PayloadAction<{
+        projectId: string;
+        spaceId: string;
+        reorderedImages: Array<{ imageId: string; order: number }>;
+      }>
+    ) => {
+      const project = state.projects.find((p) => p.id === action.payload.projectId);
+      if (project) {
+        const space = project.spaces.find((s) => s.id === action.payload.spaceId);
+        if (space?.images) {
+          const now = Timestamp.fromDate(new Date());
+          action.payload.reorderedImages.forEach(({ imageId, order }) => {
+            const image = space.images!.find((img) => img.id === imageId);
+            if (image) {
+              image.order = order;
+              image.updatedAt = now;
+            }
+          });
+        }
+      }
+    },
+    // Rollback reorder on error
+    rollbackReorderImages: (
+      state,
+      action: PayloadAction<{
+        projectId: string;
+        spaceId: string;
+        previousOrders: Array<{ imageId: string; order: number | null }>;
+      }>
+    ) => {
+      const project = state.projects.find((p) => p.id === action.payload.projectId);
+      if (project) {
+        const space = project.spaces.find((s) => s.id === action.payload.spaceId);
+        if (space?.images) {
+          action.payload.previousOrders.forEach(({ imageId, order }) => {
+            const image = space.images!.find((img) => img.id === imageId);
+            if (image) {
+              image.order = order;
+            }
+          });
+        }
+      }
+    },
   },
   selectors: {
     selectProjects: (state) => state.projects,
@@ -179,6 +232,7 @@ export const projectStore = createSlice({
     selectActiveSpaceId: (state) => state.activeSpaceId,
     selectIsAppInitiated: (state) => state.isAppInitiated,
     selectInitError: (state) => state.initError,
+    selectIsFetchingSpaceImages: (state) => state.isFetchingSpaceImages,
     selectActiveProject: (state) =>
       state.activeProjectId
         ? state.projects.find((p) => p.id === state.activeProjectId)
@@ -207,10 +261,13 @@ export const {
   setActiveSpaceId,
   setIsAppInitiated,
   setInitError,
+  setIsFetchingSpaceImages,
   addImageOptimistic,
   removeImageOptimistic,
   removeImagesOptimistic,
   updateImageOptimistic,
+  reorderImagesOptimistic,
+  rollbackReorderImages,
 } = projectStore.actions;
 
 export const {
@@ -219,6 +276,7 @@ export const {
   selectActiveSpaceId,
   selectIsAppInitiated,
   selectInitError,
+  selectIsFetchingSpaceImages,
   selectActiveProject,
   selectActiveSpace,
 } = projectStore.selectors;

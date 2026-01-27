@@ -19,6 +19,17 @@ export interface ImageData {
   // Other metadata
   mimeType: string;
 
+  // User-defined ordering (100, 200, 300...)
+  // null for legacy images created before ordering feature
+  order: number | null;
+
+  description?: string;
+
+  // Dimensions
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null; // width / height
+
   // Soft delete
   isDeleted: boolean;
   deletedAt: Timestamp | null;
@@ -52,40 +63,40 @@ export interface ImageOperation {
    */
   options: {
     /**
-     * The ID of the color used, if applicable (e.g., "HC-170").
-     */
+      * The ID of the color used, if applicable (e.g., "HC-170").
+      */
     colorId: string | null;
 
     /**
-     * A snapshot of the color's details at the time of the operation.
-     * This is to preserve the color information even if the original color definition changes later.
-     */
+      * A snapshot of the color's details at the time of the operation.
+      * This is to preserve the color information even if the original color definition changes later.
+      */
     colorSnapshot: {
       name: string;
       hex: string;
     } | null;
 
     /**
-     * The ID of the texture used, if applicable.
-     */
+      * The ID of the texture used, if applicable.
+      */
     textureId: string | null;
 
     /**
-     * A snapshot of the texture's details at the time of the operation.
-     */
+      * A snapshot of the texture's details at the time of the operation.
+      */
     textureSnapshot: {
       name: string;
       url: string; // The URL of the texture image at that time
     } | null;
 
     /**
-     * The ID of the item used, if applicable.
-     */
+      * The ID of the item used, if applicable.
+      */
     itemId: string | null;
 
     /**
-     * A snapshot of the item's details at the time of the operation.
-     */
+      * A snapshot of the item's details at the time of the operation.
+      */
     itemSnapshot: {
       name: string;
       url: string; // The URL of the item image at that time
@@ -196,6 +207,9 @@ export interface Texture {
   description?: string;
   base64?: string;
   mimeType?: string;
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -207,6 +221,9 @@ export interface Item {
   description?: string;
   base64?: string;
   mimeType?: string;
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

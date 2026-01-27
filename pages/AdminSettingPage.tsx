@@ -46,7 +46,7 @@ const AdminSettingPage: React.FC = () => {
 
   return (
     <div
-      className="bg-gradient-to-br from-indigo-50 to-purple-50 py-8 px-4"
+      className="bg-gradient-to-br from-indigo-50 via-violet-50 to-purple-50 py-8 px-4"
       style={{ minHeight: 'calc(100vh - var(--header-height))' }}
     >
       {/* Go Back Button */}

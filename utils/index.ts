@@ -8,7 +8,13 @@ import { base64ToFile, imageDownloadUrlToBase64, formatTimestamp } from './fileU
 import { formatImageOperationData } from './imageOperationUtils';
 import { FirestoreDataHandler } from './FirestoreDataHandler';
 import { imageCache, cacheImageBase64s } from './imageCache';
-import { formatTaskName } from './stringUtils';
+import {
+  formatTaskName,
+  createSlug,
+  createShortId,
+  createSlugId,
+  extractShortId,
+} from './stringUtils';
 
 export {
   MIME_TYPE_MAP,
@@ -23,4 +29,8 @@ export {
   imageCache,
   cacheImageBase64s,
   formatTaskName,
+  createSlug,
+  createShortId,
+  createSlugId,
+  extractShortId,
 };

@@ -6,10 +6,23 @@
 import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
 
 // ═══════════════════════════════════════════════════════════
+// SHARED CONSTANTS
+// ═══════════════════════════════════════════════════════════
+
+const DIMENSION_REQUIREMENT = `
+  ⚠️ CRITICAL OUTPUT DIMENSIONS: The generated image MUST have the EXACT same pixel dimensions and aspect ratio as the SECOND IMAGE (interior photo).
+  - If SECOND IMAGE is 1920x1080 (16:9), output MUST be exactly 1920x1080 (16:9)
+  - If SECOND IMAGE is 1024x1024 (1:1), output MUST be exactly 1024x1024 (1:1)
+  - NEVER change the aspect ratio or dimensions - maintain pixel-perfect match
+  - Scale all content to fit within the exact original dimensions
+  - NO cropping, padding, or dimension changes allowed
+`;
+
+// ═══════════════════════════════════════════════════════════
 // PROMPTS
 // ═══════════════════════════════════════════════════════════
 
-export const getWallRecolorPrompt = (
+export const getRecolorTaskDefaultPrompt = (
   colorName: string | undefined,
   colorHex: string | undefined,
   customPrompt: string | undefined
@@ -34,10 +47,13 @@ export const getWallRecolorPrompt = (
       : ''
   }
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic recolored image where ALL walls display ${colorName} (${colorHex}) with maximum visual distinction from the original.
+  Deliver: A high-quality, photorealistic recolored image where ALL walls display ${colorName} (${colorHex}) with maximum visual distinction from the original.${DIMENSION_REQUIREMENT}
 `;
 
-export const getAddTexturePrompt = (textureName: string, customPrompt: string | undefined) => `
+export const getAddTextureDefaultPrompt = (
+  textureName: string,
+  customPrompt: string | undefined
+) => `
   You are an expert interior designer and professional image editor specializing in applying textures to wall surfaces.
 
   You will receive TWO images:
@@ -61,11 +77,13 @@ export const getAddTexturePrompt = (textureName: string, customPrompt: string | 
   ${customPrompt || ''}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic image where the wall surface(s) display the ${textureName} texture (sampled from the first image) applied seamlessly and professionally, following the user's scope or defaulting to all walls.
+  Deliver: A high-quality, photorealistic image where the wall surface(s) display the ${textureName} texture (sampled from the first image) applied seamlessly and professionally, following the user's scope or defaulting to all walls.${DIMENSION_REQUIREMENT}
 `;
 
-export const getItemPrompt = (itemName: string, customPrompt: string | undefined) => `
+export const getAddObjectDefaultPrompt = (itemName: string, customPrompt: string | undefined) => `
   You are an expert interior designer and professional image editor specializing in seamlessly placing objects, characters, or elements into interior spaces.
+
+  ⚠️ CRITICAL OUTPUT REQUIREMENT: The generated image MUST have the EXACT same pixel dimensions and aspect ratio as the SECOND IMAGE (interior photo). Maintain pixel-perfect dimensions - no changes allowed.
 
   You will receive TWO images:
   1. FIRST IMAGE: A specific element (${itemName})
@@ -76,20 +94,43 @@ export const getItemPrompt = (itemName: string, customPrompt: string | undefined
   CRITICAL INSTRUCTIONS:
   1. Analyze the element from the FIRST image carefully - understand its dimensions, style, and characteristics.
   2. Place the ${itemName} into the interior photo based on the user's specific placement and direction instructions.
-  3. Ensure the element's scale and proportions are REALISTIC and appropriate for the room size and perspective.
-  4. Match the element's lighting, shadows, and reflections to the existing room lighting conditions.
-  5. Adjust the element's color temperature to match the ambient lighting of the space.
-  6. Place shadows beneath and around the element that are consistent with the room's light sources.
-  7. Ensure the element follows the room's perspective and vanishing points correctly.
-  8. Make the element look like it naturally belongs in the space - not floating or misaligned.
-  9. If the element should replace existing furniture or objects, remove the original ones seamlessly.
-  10. Maintain the quality and resolution of the original interior photo.
+  3. Ensure the element's scale and proportions are REALISTIC and appropriate for the room size and perspective. If the available space is insufficient, proportionally scale down the element or remove movable existing furniture to accommodate it.
+  4. Always position the element firmly on the floor surface - never allow it to appear floating or suspended in mid-air.
+  5. Treat the element as a three-dimensional object that can be rotated. If the user specifies a particular orientation or if spatial constraints require it, rotate the element accordingly to fit naturally within the room's layout.
+  6. Match the element's lighting, shadows, and reflections to the existing room lighting conditions.
+  7. Adjust the element's color temperature to match the ambient lighting of the space.
+  8. Place realistic shadows beneath and around the element that are consistent with the room's light sources.
+  9. Ensure the element follows the room's perspective and vanishing points correctly.
+  10. Make the element look like it naturally belongs in the space - not floating or misaligned.
+  11. If the element should replace existing furniture or objects, remove the original ones seamlessly.
+  12. Maintain the quality and resolution of the original interior photo.
 
   CUSTOM USER INSTRUCTIONS (PLACEMENT LOCATION AND DETAILS):
   ${customPrompt || ''}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.
+  Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.${DIMENSION_REQUIREMENT}
+`;
+
+export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
+  You are an expert interior designer and professional image editor with advanced capabilities in transforming interior spaces.
+
+  Your task is to modify the provided interior photo according to the user's custom instructions below.
+
+  CRITICAL QUALITY STANDARDS:
+  1. Maintain photorealistic quality and natural appearance
+  2. Preserve proper lighting, shadows, and perspective
+  3. Ensure all modifications blend seamlessly with the original environment
+  4. Keep architectural elements and proportions realistic
+  5. Maintain image resolution and clarity
+  6. Apply changes only as specified in the user instructions
+  7. Preserve the overall composition and aesthetic quality
+
+  USER INSTRUCTIONS:
+  ${customPrompt}
+
+  FINAL OUTPUT REQUIREMENT:
+  Deliver: A high-quality, photorealistic modified image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.${DIMENSION_REQUIREMENT}
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -119,21 +160,28 @@ export const getPromptByTask = (
       if (!colorName || !colorHex) {
         throw new Error('colorName and colorHex are required for RECOLOR_WALL task');
       }
-      return getWallRecolorPrompt(colorName, colorHex, customPrompt);
+      return getRecolorTaskDefaultPrompt(colorName, colorHex, customPrompt);
 
     case GEMINI_TASKS.ADD_TEXTURE.task_name:
       if (!textureName) {
         throw new Error('textureName is required for ADD_TEXTURE task');
       }
-      return getAddTexturePrompt(textureName, customPrompt);
+      return getAddTextureDefaultPrompt(textureName, customPrompt);
 
     case GEMINI_TASKS.ADD_HOME_ITEM.task_name:
       if (!itemName) {
         throw new Error('itemName is required for ADD_HOME_ITEM task');
       }
-      return getItemPrompt(itemName, customPrompt);
+      return getAddObjectDefaultPrompt(itemName, customPrompt);
+
+    case GEMINI_TASKS.CUSTOM_PROMPT.task_name:
+      if (!customPrompt) {
+        throw new Error('customPrompt is required for CUSTOM_PROMPT task');
+      }
+      return getUseCustomPromptDefaultPrompt(customPrompt);
 
     default:
-      throw new Error(`Unknown task: ${(task as any).task_name}`);
+      // Exhaustive check - all task types should be handled above
+      return getUseCustomPromptDefaultPrompt('Unsupported task type');
   }
 };

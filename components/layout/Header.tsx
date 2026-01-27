@@ -42,13 +42,18 @@ const Header: React.FC = () => {
   return (
     <>
       {/* Header Bar */}
-      <nav className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-indigo-400 to-purple-600 shadow-lg">
+      <nav className="fixed top-0 left-0 w-full z-50 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 shadow-lg">
         <div className="flex items-center justify-between px-6 py-2">
           {/* Brand Section */}
-          <div className="flex items-center cursor-pointer" onClick={() => navigate(ROUTES.HOME)}>
-            <div className="text-xl text-white/85">Vizion</div>
-            <div className="text-white/70 font-light mt-1 ml-2">Your AI Image Designer</div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center cursor-pointer" onClick={() => navigate(ROUTES.HOME)}>
+              <div className="text-xl text-white">Vizino AI</div>
+              <div className="text-white/80 font-medium text-xs mt-1.5 ml-3 tracking-wide uppercase">
+                Precise AI Design
+              </div>
+            </div>
           </div>
+
           {/* Right Section - Profile */}
           <div className="flex items-center gap-2">
             {isAdmins && (

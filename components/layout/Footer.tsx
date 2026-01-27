@@ -8,9 +8,9 @@ const Footer: React.FC = () => {
     <footer className="bg-white border-t border-gray-200">
       <div className="mx-auto py-4 px-6">
         <div className="flex items-center justify-between text-sm text-gray-600">
-          <p>© {currentYear} Vizion Studio. All rights reserved.</p>
+          <p>© {currentYear} Vizino Studio. All rights reserved.</p>
           <p className="font-semibold">
-            <Tag>v.0.6.0</Tag>
+            <Tag>v.0.7.0</Tag>
           </p>
         </div>
       </div>

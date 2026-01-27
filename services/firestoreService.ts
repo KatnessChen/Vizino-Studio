@@ -41,6 +41,44 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 /**
+ * Gets the maximum order value for images in a space.
+ * Used to determine the order for newly created or duplicated images.
+ *
+ * @param userId The ID of the user.
+ * @param projectId The ID of the project.
+ * @param spaceId The ID of the space.
+ * @returns The maximum order value, or 0 if no images exist.
+ */
+async function getMaxImageOrder(
+  userId: string,
+  projectId: string,
+  spaceId: string
+): Promise<number> {
+  const imagesCollectionRef = collection(
+    db,
+    'users',
+    userId,
+    'projects',
+    projectId,
+    'spaces',
+    spaceId,
+    'images'
+  );
+  const imagesQuery = query(imagesCollectionRef, where('isDeleted', '==', false));
+  const imagesSnapshot = await getDocs(imagesQuery);
+
+  let maxOrder = 0;
+  imagesSnapshot.forEach((doc) => {
+    const imageData = doc.data() as ImageData;
+    if (imageData.order && imageData.order > maxOrder) {
+      maxOrder = imageData.order;
+    }
+  });
+
+  return maxOrder;
+}
+
+/**
  * Creates a new project in Firestore for a user.
  *
  * @param userId The ID of the user.
@@ -447,7 +485,8 @@ export async function createImage(
   projectId: string,
   spaceId: string,
   imageFile: Blob | File | null,
-  imageMetadata: Pick<ImageData, 'id' | 'name' | 'mimeType'>,
+  imageMetadata: Pick<ImageData, 'id' | 'name' | 'mimeType' | 'description'> &
+    Partial<Pick<ImageData, 'width' | 'height' | 'aspect_ratio'>>,
   processingInfo?: {
     parentImage?: ImageData | null;
     operation?: ImageOperation | null;
@@ -501,7 +540,11 @@ export async function createImage(
     const imageDownloadUrl = await getDownloadURL(storageRef);
     console.log('Image download URL obtained:', imageDownloadUrl);
 
-    // Step 2: Create the image document in Firestore with storage information
+    // Step 2: Calculate order value for the new image
+    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Step 3: Create the image document in Firestore with storage information
     const now = Timestamp.fromDate(new Date());
 
     // Build evolution chain by spreading parent chain and appending current operation
@@ -517,10 +560,16 @@ export async function createImage(
       parentImageId: parentImage?.id || null,
       imageDownloadUrl,
       storageFilePath,
+      order: newImageOrder,
       isDeleted: false,
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
+      description: imageMetadata.description || '',
+      // Persist dimensions if provided
+      width: imageMetadata.width ?? null,
+      height: imageMetadata.height ?? null,
+      aspect_ratio: imageMetadata.aspect_ratio ?? null,
     };
 
     console.log({ newImageData });
@@ -718,8 +767,7 @@ export async function duplicateImage(
   projectId: string,
   spaceId: string,
   sourceImageId: string,
-  newImageName: string,
-  mode: 'keep-history' | 'duplicate-as-original'
+  newImageName: string
 ): Promise<ImageData> {
   if (!userId || !projectId || !spaceId || !sourceImageId) {
     throw new Error('User ID, Project ID, Space ID, and Source Image ID are required.');
@@ -730,8 +778,6 @@ export async function duplicateImage(
   }
 
   try {
-    console.log(`Duplicating image ${sourceImageId} in mode: ${mode}`);
-
     // Fetch the source image
     const sourceDocRef = doc(
       db,
@@ -756,31 +802,29 @@ export async function duplicateImage(
     const newImageId = crypto.randomUUID();
     const now = Timestamp.fromDate(new Date());
 
-    // Determine the new image's evolution chain
-    const buildEvolutionChain = (): ImageOperation[] => {
-      if (mode === 'duplicate-as-original') {
-        // Start fresh without history
-        return [];
-      } else {
-        // Keep the entire evolution chain from the source image
-        return sourceImageData.evolutionChain || [];
-      }
-    };
+    // Get the maximum order for the new image
+    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Create the new image document
     const newImageData: ImageData = {
       id: newImageId,
       name: newImageName.trim(),
       spaceId,
-      evolutionChain: buildEvolutionChain(),
-      parentImageId: mode === 'duplicate-as-original' ? null : sourceImageData.parentImageId,
+      evolutionChain: sourceImageData.evolutionChain || [],
+      parentImageId: sourceImageData.parentImageId,
       imageDownloadUrl: sourceImageData.imageDownloadUrl,
       storageFilePath: sourceImageData.storageFilePath,
       mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
       isDeleted: false,
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
     };
 
     // Write to Firestore
@@ -813,6 +857,232 @@ export async function duplicateImage(
       throw new Error(`Failed to duplicate image: ${error.message}`);
     }
     throw new Error('Failed to duplicate image in Firebase.');
+  }
+}
+
+/**
+ * Moves an image to a different space while preserving generation history.
+ * This creates a new copy of the image with evolutionChain and parentImageId intact.
+ *
+ * @param userId The ID of the user.
+ * @param sourceProjectId The ID of the source project.
+ * @param sourceSpaceId The ID of the source space.
+ * @param sourceImageId The ID of the source image.
+ * @param targetProjectId The ID of the target project.
+ * @param targetSpaceId The ID of the target space.
+ * @returns The newly created ImageData in the target space.
+ */
+export async function moveImageToSpace(
+  userId: string,
+  sourceProjectId: string,
+  sourceSpaceId: string,
+  sourceImageId: string,
+  targetProjectId: string,
+  targetSpaceId: string
+): Promise<ImageData> {
+  if (
+    !userId ||
+    !sourceProjectId ||
+    !sourceSpaceId ||
+    !sourceImageId ||
+    !targetProjectId ||
+    !targetSpaceId
+  ) {
+    throw new Error('All parameters are required for moving an image.');
+  }
+
+  try {
+    // Fetch the source image
+    const sourceDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      sourceProjectId,
+      'spaces',
+      sourceSpaceId,
+      'images',
+      sourceImageId
+    );
+
+    const sourceImageDoc = await getDoc(sourceDocRef);
+    if (!sourceImageDoc.exists()) {
+      throw new Error(`Source image not found: ${sourceImageId}`);
+    }
+
+    const sourceImageData = sourceImageDoc.data() as ImageData;
+
+    // Generate new image ID
+    const newImageId = crypto.randomUUID();
+    const now = Timestamp.fromDate(new Date());
+
+    // Get the maximum order for the target space
+    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Create the new image document WITH generation history preserved
+    const newImageData: ImageData = {
+      id: newImageId,
+      name: sourceImageData.name,
+      spaceId: targetSpaceId,
+      evolutionChain: sourceImageData.evolutionChain || [], // Keep evolution chain
+      parentImageId: sourceImageData.parentImageId, // Keep parent reference
+      imageDownloadUrl: sourceImageData.imageDownloadUrl,
+      storageFilePath: sourceImageData.storageFilePath,
+      mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
+    };
+
+    // Write to Firestore in target space
+    const newDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      targetProjectId,
+      'spaces',
+      targetSpaceId,
+      'images',
+      newImageId
+    );
+
+    const batch = writeBatch(db);
+    const { parentImageId, ...firestoreData } = newImageData;
+    batch.set(newDocRef, {
+      ...firestoreData,
+      parentImageId,
+    });
+
+    await batch.commit();
+    console.log(`Image moved successfully to space ${targetSpaceId}: ${newImageId}`);
+
+    // Soft delete the original image in the source space
+    await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
+
+    return newImageData;
+  } catch (error) {
+    console.error('Failed to move image:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to move image: ${error.message}`);
+    }
+    throw new Error('Failed to move image in Firebase.');
+  }
+}
+
+/**
+ * Copy a generated image into the target space as a new original image.
+ * This clears the evolution chain and parentImageId so it acts as an original image.
+ */
+export async function copyImageAsOriginal(
+  userId: string,
+  sourceProjectId: string,
+  sourceSpaceId: string,
+  sourceImageId: string,
+  targetProjectId: string,
+  targetSpaceId: string
+): Promise<ImageData> {
+  if (
+    !userId ||
+    !sourceProjectId ||
+    !sourceSpaceId ||
+    !sourceImageId ||
+    !targetProjectId ||
+    !targetSpaceId
+  ) {
+    throw new Error('All parameters are required for copying an image as original.');
+  }
+
+  try {
+    // Fetch the source image
+    const sourceDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      sourceProjectId,
+      'spaces',
+      sourceSpaceId,
+      'images',
+      sourceImageId
+    );
+
+    const sourceImageDoc = await getDoc(sourceDocRef);
+    if (!sourceImageDoc.exists()) {
+      throw new Error(`Source image not found: ${sourceImageId}`);
+    }
+
+    const sourceImageData = sourceImageDoc.data() as ImageData;
+
+    // Generate new image ID
+    const newImageId = crypto.randomUUID();
+    const now = Timestamp.fromDate(new Date());
+
+    // Get the maximum order for the target space
+    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Create the new image document WITHOUT generation history (original)
+    const newImageData: ImageData = {
+      id: newImageId,
+      name: sourceImageData.name,
+      spaceId: targetSpaceId,
+      evolutionChain: [], // Clear evolution chain
+      parentImageId: null, // No parent
+      imageDownloadUrl: sourceImageData.imageDownloadUrl,
+      storageFilePath: sourceImageData.storageFilePath,
+      mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
+    };
+
+    // Write to Firestore in target space
+    const newDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      targetProjectId,
+      'spaces',
+      targetSpaceId,
+      'images',
+      newImageId
+    );
+
+    const batch = writeBatch(db);
+    const { parentImageId, ...firestoreData } = newImageData;
+    batch.set(newDocRef, {
+      ...firestoreData,
+      parentImageId,
+    });
+
+    await batch.commit();
+    console.log(`Image copied as original successfully: ${newImageId}`);
+
+    // Soft delete the original image in the source space
+    await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
+
+    return newImageData;
+  } catch (error) {
+    console.error('Failed to copy image as original:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to copy image as original: ${error.message}`);
+    }
+    throw new Error('Failed to copy image as original in Firebase.');
   }
 }
 
@@ -995,7 +1265,14 @@ export async function deleteColor(
 export async function addTexture(
   userId: string,
   projectId: string,
-  textureData: { name: string; file: File; description?: string }
+  textureData: {
+    name: string;
+    file: File;
+    description?: string;
+    width?: number;
+    height?: number;
+    aspect_ratio?: number;
+  }
 ): Promise<Texture> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1026,6 +1303,9 @@ export async function addTexture(
       name: textureData.name.trim(),
       textureImageDownloadUrl,
       description: textureData.description?.trim() || '',
+      width: textureData.width ?? null,
+      height: textureData.height ?? null,
+      aspect_ratio: textureData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1041,6 +1321,9 @@ export async function addTexture(
       name: textureDoc.name,
       textureImageDownloadUrl: textureDoc.textureImageDownloadUrl,
       description: textureDoc.description,
+      width: textureDoc.width,
+      height: textureDoc.height,
+      aspect_ratio: textureDoc.aspect_ratio,
     };
   } catch (error) {
     console.error('Failed to add texture:', error);
@@ -1076,6 +1359,9 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
         name: data.name,
         textureImageDownloadUrl: data.textureImageDownloadUrl,
         description: data.description,
+        width: data.width,
+        height: data.height,
+        aspect_ratio: data.aspect_ratio,
       };
     });
 
@@ -1233,7 +1519,14 @@ async function cacheTextureImages(textures: Texture[]): Promise<void> {
 export async function addItem(
   userId: string,
   projectId: string,
-  itemData: { name: string; file: File; description?: string }
+  itemData: {
+    name: string;
+    file: File;
+    description?: string;
+    width?: number;
+    height?: number;
+    aspect_ratio?: number;
+  }
 ): Promise<Item> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1262,6 +1555,9 @@ export async function addItem(
       name: itemData.name.trim(),
       itemImageDownloadUrl,
       description: itemData.description?.trim() || '',
+      width: itemData.width ?? null,
+      height: itemData.height ?? null,
+      aspect_ratio: itemData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1277,6 +1573,9 @@ export async function addItem(
       name: itemDoc.name,
       itemImageDownloadUrl: itemDoc.itemImageDownloadUrl,
       description: itemDoc.description,
+      width: itemDoc.width,
+      height: itemDoc.height,
+      aspect_ratio: itemDoc.aspect_ratio,
     };
   } catch (error) {
     console.error('Failed to add item:', error);
@@ -1312,6 +1611,9 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
         name: data.name,
         itemImageDownloadUrl: data.itemImageDownloadUrl,
         description: data.description,
+        width: data.width,
+        height: data.height,
+        aspect_ratio: data.aspect_ratio,
       };
     });
 
@@ -1507,4 +1809,59 @@ export async function fetchAllCustomPrompts(
         ...doc.data(),
       }) as CustomPrompt
   );
+}
+
+/**
+ * Batch update the order property of multiple images
+ * @param userId The ID of the user
+ * @param projectId The ID of the project
+ * @param spaceId The ID of the space
+ * @param updates Array of {imageId, order} objects to update
+ */
+export async function batchUpdateImagesOrder(
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  updates: Array<{ imageId: string; order: number }>
+): Promise<void> {
+  if (!userId || !projectId || !spaceId) {
+    throw new Error('User ID, Project ID, and Space ID are required.');
+  }
+
+  if (!updates || updates.length === 0) {
+    return; // Nothing to update
+  }
+
+  try {
+    const batch = writeBatch(db);
+    const now = Timestamp.fromDate(new Date());
+
+    for (const { imageId, order } of updates) {
+      const imageDocRef = doc(
+        db,
+        'users',
+        userId,
+        'projects',
+        projectId,
+        'spaces',
+        spaceId,
+        'images',
+        imageId
+      );
+
+      batch.update(imageDocRef, {
+        order,
+        updatedAt: now,
+      });
+    }
+
+    await batch.commit();
+    console.log(`Successfully updated order for ${updates.length} images`);
+  } catch (error) {
+    console.error('Failed to batch update images order:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to update images order: ${error.message}`);
+    }
+    throw new Error('Failed to update images order in Firestore.');
+  }
 }

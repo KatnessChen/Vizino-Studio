@@ -4,6 +4,7 @@ import projectReducer from './projectStore';
 import imageReducer from './imageStore';
 import customAssetsReducer from './customAssetsStore';
 import taskReducer from './taskStore';
+import guestReducer from './guestStore';
 
 export const store = configureStore({
   reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
     image: imageReducer,
     customAssets: customAssetsReducer,
     task: taskReducer,
+    guest: guestReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Alert, Typography } from 'antd';
-import TaskSelector from '@/components/TaskSelector';
+import { Typography, Button, Tooltip } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
+import TaskSelect from '@/components/select/TaskSelect';
 import SelectedAssets from '@/components/SelectedAssets';
-import ToolkitPanel from './ToolkitPanel';
 import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
 import {
   selectSelectedOriginalImageIds,
@@ -19,28 +19,56 @@ import {
   setIsGenerateModalOpen,
   setSourceImage,
 } from '@/stores/taskStore';
+import {
+  selectHasGeneratedImage,
+  selectGuestImages,
+  setShowLoginRequiredModal,
+} from '@/stores/guestStore';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';
 import { checkOperationLimit } from '@/utils/limitationUtils';
 import { imageCache } from '@/utils/imageCache';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuest } from '@/contexts/GuestContext';
+import { getDemoImages } from '@/constants/demoImages';
+
+export const cardHeight = '120px';
 
 const AsideSection: React.FC = () => {
   const dispatch = useDispatch();
   const { user, adminSettings } = useAuth();
+  const { isGuestMode } = useGuest();
   const selectedOriginalImageIds = useSelector(selectSelectedOriginalImageIds);
   const selectedUpdatedImageIds = useSelector(selectSelectedUpdatedImageIds);
-  const originalImages = useSelector(selectOriginalImages);
-  const updatedImages = useSelector(selectUpdatedImages);
+  const storeOriginalImages = useSelector(selectOriginalImages);
+  const storeUpdatedImages = useSelector(selectUpdatedImages);
+  const guestImages = useSelector(selectGuestImages);
+
+  const originalImages = useMemo(() => {
+    if (isGuestMode && storeOriginalImages.length === 0) {
+      return getDemoImages();
+    }
+    return storeOriginalImages;
+  }, [isGuestMode, storeOriginalImages]);
+
+  // For guests, use guest generated images; for users, use space updated images
+  const updatedImages = useMemo(() => {
+    if (isGuestMode) {
+      return guestImages.filter((img) => img.parentImageId);
+    }
+    return storeUpdatedImages;
+  }, [isGuestMode, guestImages, storeUpdatedImages]);
+
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
   const selectedColor = useSelector(selectSelectedColor);
   const selectedTexture = useSelector(selectSelectedTexture);
   const selectedItem = useSelector(selectSelectedItem);
+  const hasGeneratedImage = useSelector(selectHasGeneratedImage);
 
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
 
   // Use image processing hook to get sourceImage state
-  const { processingImage } = useImageProcessing({
+  const { isProcessingImage } = useImageProcessing({
     userId: user?.uid,
     selectedTaskName: selectedTaskNames[0] || null,
     options: {
@@ -89,14 +117,24 @@ const AsideSection: React.FC = () => {
   const operationLimitCheck = selectedImage
     ? checkOperationLimit(selectedImage, adminSettings.mock_limit_reached)
     : null;
-  const { isDisabled, disableReason } = useGenerateButtonState({
+  
+  const {
+    isDisabled,
+    disableReason,
+    guestHasUsedGeneration,
+    shouldShowLockedStyle,
+    buttonOpacity,
+  } = useGenerateButtonState({
     activeTaskName: selectedTaskNames[0] || null,
-    processingImage,
-    savingImage: false, // AsideSection doesn't track saving state, only processing
+    isProcessingImage,
+    isSavingImage: false, // AsideSection doesn't track saving state, only processing
     canAddOperation: operationLimitCheck?.canAdd ?? false,
     selectedColor,
     selectedTexture,
     selectedItem,
+    isGuestMode,
+    hasGeneratedImage,
+    hasSelectedImage: !!selectedImage,
   });
 
   // Determine selection state message
@@ -109,6 +147,12 @@ const AsideSection: React.FC = () => {
   }, [selectedOriginalImageIds.size, selectedUpdatedImageIds.size]);
 
   const handleGenerate = () => {
+    // If guest has already generated, show login modal
+    if (guestHasUsedGeneration) {
+      dispatch(setShowLoginRequiredModal(true));
+      return;
+    }
+
     if (selectedImage) {
       dispatch(setSourceImage(selectedImage));
       dispatch(setIsGenerateModalOpen(true));
@@ -120,28 +164,19 @@ const AsideSection: React.FC = () => {
       className="h-full w-[250px] bg-white flex flex-col shadow-lg border-r border-gray-200 overflow-y-auto gap-6"
       style={{ height: 'calc(100vh - var(--header-height))' }}
     >
-      <TaskSelector />
-
-      <div className="px-6">
-        <SelectedAssets />
+      <div data-tour="design-goal">
+        <TaskSelect />
       </div>
 
       {/* Selected Image Display */}
       <div className="px-6">
-        <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
-          Image to Redesign
+        <Typography.Title level={5} className="m-0 mb-2">
+          Target Image
         </Typography.Title>
         {selectionMessage ? (
           <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '4px',
-              border: '1px dashed #d1d5db',
-              color: '#9ca3af',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-            }}
+            className={`flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
+            style={{ height: cardHeight }}
           >
             {selectionMessage}
           </div>
@@ -150,52 +185,39 @@ const AsideSection: React.FC = () => {
             <img
               src={cachedImageSrc || selectedImage.imageDownloadUrl}
               alt={selectedImage.name}
-              style={{
-                width: '100%',
-                height: 'auto',
-                borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                marginBottom: '8px',
-              }}
+              className={`w-full rounded border border-gray-200 object-cover`}
+              style={{ height: cardHeight }}
             />
-            <div style={{ fontSize: '0.875rem', color: '#374151' }}>
-              <div style={{ fontWeight: 500, marginBottom: '4px' }}>{selectedImage.name}</div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                {selectedImage.evolutionChain.length} operation
-                {selectedImage.evolutionChain.length > 1 ? 's' : ''}
-              </div>
-            </div>
           </div>
         ) : null}
       </div>
 
-      {/* Generate Button */}
-      <div className="px-6">
-        <button
-          disabled={isDisabled || !selectedImage}
-          onClick={handleGenerate}
-          className={`flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors w-full ${
-            isDisabled || !selectedImage
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500'
-          }`}
-          style={{
-            height: '44px',
-            fontSize: '1rem',
-            fontWeight: 600,
-          }}
-        >
-          <AutoAwesomeIcon sx={{ fontSize: 20, marginRight: 1, color: 'inherit' }} />
-          Redesign
-        </button>
-        {isDisabled && disableReason && selectedImage && (
-          <Alert title={disableReason} type="warning" style={{ marginTop: '8px' }} />
-        )}
-      </div>
+      {/* Only show SelectedAssets if not using Custom Prompt task */}
+      {selectedTaskNames[0] !== 'custom_prompt' && (
+        <div className="px-6">
+          <SelectedAssets />
+        </div>
+      )}
 
-      {/* Toolkit Panel at the bottom */}
-      <div className="mt-auto border-t border-gray-200">
-        <ToolkitPanel />
+      {/* Generate Button - stick to bottom */}
+      <div className="px-6 mt-auto pb-6" data-tour="generate-button">
+        <div className="relative">
+          <Button
+            block
+            size="large"
+            htmlType="button"
+            disabled={isDisabled}
+            onClick={handleGenerate}
+            className={`btn-generate h-11 text-base font-semibold rounded-md shadow-sm ${isDisabled ? 'btn-disabled' : ''}`}
+            style={buttonOpacity ? { opacity: buttonOpacity } : undefined}
+          >
+            <AutoAwesomeIcon className="text-lg mr-2 align-middle" />
+            Generate
+          </Button>
+          {shouldShowLockedStyle && (
+            <LockOutlined className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+          )}
+        </div>
       </div>
     </aside>
   );

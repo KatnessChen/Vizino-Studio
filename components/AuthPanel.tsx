@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Stack, Divider } from '@mui/material';
-import GoogleLoginButton from './GoogleLoginButton';
-import LogoutButton from './LogoutButton';
+import { useDispatch } from 'react-redux';
+import GoogleLoginButton from './button/GoogleLoginButton';
+import LogoutButton from './button/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuest } from '@/contexts/GuestContext';
+import { clearGuestState } from '@/stores/guestStore';
+import { resetTaskState } from '@/stores/taskStore';
 
 const AuthPanel: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const [error, setError] = React.useState<string | null>(null);
+  const { clearGuestSession } = useGuest();
+  const dispatch = useDispatch();
 
-  const handleLoginSuccess = () => {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLoginSuccess = async () => {
     setError(null);
+
+    // Clear guest session (IndexedDB + Redux)
+    try {
+      await clearGuestSession();
+      dispatch(clearGuestState());
+      dispatch(resetTaskState());
+      console.log('[AuthPanel] Guest session cleared after login');
+    } catch (error) {
+      console.error('[AuthPanel] Failed to clear guest session:', error);
+    }
   };
 
   const handleLoginError = (errorMsg: string) => {
@@ -29,6 +46,7 @@ const AuthPanel: React.FC = () => {
 
   const firstName = user?.displayName?.split(' ')[0] || '';
 
+  // Show loading state during authentication check
   if (isLoading) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -42,8 +60,26 @@ const AuthPanel: React.FC = () => {
       {!isAuthenticated ? (
         // Login View
         <Box>
-          <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3 }}>
-            Welcome to Vizion Studio
+          <Typography variant="h6" component="h2" gutterBottom>
+            Welcome to Vizino AI
+          </Typography>
+          <Typography
+            variant="body2"
+            color="textSecondary"
+            sx={{
+              mb: 3,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              fontSize: '10px',
+              color: 'indigo.600',
+            }}
+          >
+            From Visual Instruction to Precise Design
+          </Typography>
+
+          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+            Sign in to unlock advanced AI features and precise design tools.
           </Typography>
 
           {error && (
@@ -62,20 +98,11 @@ const AuthPanel: React.FC = () => {
             </Box>
           )}
 
-          <GoogleLoginButton
-            onSuccess={handleLoginSuccess}
-            onError={handleLoginError}
-            variant="contained"
-            fullWidth
-          />
+          <GoogleLoginButton onSuccess={handleLoginSuccess} onError={handleLoginError} fullWidth />
         </Box>
       ) : (
         // Authenticated View
         <Box>
-          <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3 }}>
-            Hi {firstName || ''}, Welcome back!
-          </Typography>
-
           <Stack spacing={2} sx={{ mb: 3 }}>
             <Box>
               <Typography variant="subtitle2" color="textSecondary">
@@ -110,11 +137,7 @@ const AuthPanel: React.FC = () => {
             </Box>
           )}
 
-          <LogoutButton
-            onSuccess={handleLogoutSuccess}
-            onError={handleLogoutError}
-            variant="outlined"
-          />
+          <LogoutButton onSuccess={handleLogoutSuccess} onError={handleLogoutError} />
         </Box>
       )}
     </Box>

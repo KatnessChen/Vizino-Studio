@@ -1,0 +1,20 @@
+/* Responsive viewport helpers
+
+   - .app-viewport applies a minimum layout width (1024px) so the app
+     retains desktop layout on narrow screens and enables horizontal
+     scrolling rather than collapsing components.
+
+   - Keep styles small and editable for easy tuning.
+*/
+
+.app-viewport {
+  min-width: 1024px;
+  box-sizing: border-box;
+}
+
+/* On wide screens, center the content and constrain max width for aesthetics */
+@media (min-width: 1280px) {
+  .app-viewport {
+    margin: 0 auto;
+  }
+}

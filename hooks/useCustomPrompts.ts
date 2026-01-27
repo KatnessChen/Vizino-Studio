@@ -59,7 +59,7 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
     }
   }, [userId, projectId, dispatch]);
 
-  // Search prompts by keyword
+  // Filter prompts by keyword
   const searchPrompts = useCallback(
     (keyword: string) => {
       if (!projectId) return [];

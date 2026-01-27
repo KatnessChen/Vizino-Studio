@@ -1,4 +1,11 @@
-import { useEffect } from 'react';
+/**
+ * useCustomAssets Hook
+ *
+ * Manages custom textures and items for the current context (user or guest).
+ * Uses the storage adapter pattern to abstract away the storage details.
+ */
+
+import { useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/stores/store';
 import {
@@ -13,28 +20,32 @@ import {
   setLoadTexturesError,
   setLoadItemsError,
 } from '@/stores/customAssetsStore';
-import {
-  fetchTextures,
-  fetchItems,
-  addTexture as addTextureFirestore,
-  addItem as addItemFirestore,
-  deleteTexture as deleteTextureFirestore,
-  deleteItem as deleteItemFirestore,
-} from '@/services/firestoreService';
-import { useAuth } from '@/contexts/AuthContext';
+import { useStorageAdapter } from '@/hooks/useStorageAdapter';
+import { useUploadGate } from '@/hooks/useUploadGate';
+import { Texture, Item } from '@/types';
 
 type AssetType = 'texture' | 'item';
 
+const GUEST_PROJECT_ID = 'guest-project';
+
 export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: string | null) => {
   const dispatch = useDispatch();
-  const { user } = useAuth();
+  const { adapter, isReady, isGuestMode } = useStorageAdapter();
+  const { gateUpload } = useUploadGate();
+
+  const isTexture = assetType === 'texture';
+
+  // Use virtual project ID for guests
+  const effectiveProjectId = isGuestMode ? GUEST_PROJECT_ID : projectId;
+
+  // Use ref to track if we've already started loading for this project/asset type
+  const loadingStartedRef = useRef<string | null>(null);
+  const loadingKey = `${effectiveProjectId}-${assetType}`;
 
   // Get project-specific assets from store
   const projectAssets = useSelector((state: RootState) =>
-    projectId ? state.customAssets.projects[projectId] : undefined
+    effectiveProjectId ? state.customAssets.projects[effectiveProjectId] : undefined
   );
-
-  const isTexture = assetType === 'texture';
 
   const customAssets = isTexture
     ? (projectAssets?.customTextures ?? [])
@@ -46,53 +57,59 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
     ? (projectAssets?.loadTexturesError ?? null)
     : (projectAssets?.loadItemsError ?? null);
 
-  // Load custom assets with cache check
+  // Load custom assets - only once per project/asset type
   useEffect(() => {
-    if (!user?.uid || !projectId) {
-      return;
-    }
+    // Skip if not ready or no project
+    if (!isReady || !effectiveProjectId) return;
 
-    // Check if assets are already loaded in store
-    const hasAssets =
-      projectAssets &&
-      (isTexture ? projectAssets.customTextures.length > 0 : projectAssets.customItems.length > 0);
+    // Skip if already loaded (has assets)
+    const hasAssets = isTexture
+      ? (projectAssets?.customTextures?.length ?? 0) > 0
+      : (projectAssets?.customItems?.length ?? 0) > 0;
     if (hasAssets) {
-      console.log(`Using cached custom ${assetType}s for project:`, projectId);
       return;
     }
 
-    // Check if already loading
-    const isLoading = isTexture ? projectAssets?.isLoadingTextures : projectAssets?.isLoadingItems;
+    // Skip if already loading
+    const isLoading = isTexture
+      ? projectAssets?.isLoadingTextures
+      : projectAssets?.isLoadingItems;
     if (isLoading) {
       return;
     }
 
+    // Skip if we already started loading for this key
+    if (loadingStartedRef.current === loadingKey) {
+      return;
+    }
+
+    // Mark that we're starting to load
+    loadingStartedRef.current = loadingKey;
+
     const loadAssets = async () => {
       try {
         if (isTexture) {
-          dispatch(setLoadingTextures({ projectId, isLoadingTextures: true }));
-          const textures = await fetchTextures(user.uid, projectId);
-          dispatch(setCustomTextures({ projectId, textures }));
-          console.log(`Loaded custom ${assetType}s from Firestore:`, projectId);
+          dispatch(setLoadingTextures({ projectId: effectiveProjectId, isLoadingTextures: true }));
+          const textures = await adapter.fetchTextures();
+          dispatch(setCustomTextures({ projectId: effectiveProjectId, textures }));
         } else {
-          dispatch(setLoadingItems({ projectId, isLoadingItems: true }));
-          const items = await fetchItems(user.uid, projectId);
-          dispatch(setCustomItems({ projectId, items }));
-          console.log(`Loaded custom ${assetType}s from Firestore:`, projectId);
+          dispatch(setLoadingItems({ projectId: effectiveProjectId, isLoadingItems: true }));
+          const items = await adapter.fetchItems();
+          dispatch(setCustomItems({ projectId: effectiveProjectId, items }));
         }
       } catch (error) {
         console.error(`Failed to load ${assetType}s:`, error);
         if (isTexture) {
           dispatch(
             setLoadTexturesError({
-              projectId,
+              projectId: effectiveProjectId,
               error: error instanceof Error ? error.message : 'Unknown error',
             })
           );
         } else {
           dispatch(
             setLoadItemsError({
-              projectId,
+              projectId: effectiveProjectId,
               error: error instanceof Error ? error.message : 'Unknown error',
             })
           );
@@ -102,47 +119,52 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
 
     loadAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, projectId, dispatch, assetType]);
+  }, [isReady, effectiveProjectId, assetType]);
 
-  const addAsset = async (assetData: { name: string; file: File; description?: string }) => {
-    if (!user?.uid || !projectId) {
-      throw new Error('User or project not available');
+  const addAsset = useCallback(async (assetData: {
+    name: string;
+    file: File;
+    description?: string;
+    width?: number;
+    height?: number;
+    aspect_ratio?: number;
+  }): Promise<Texture | Item> => {
+    if (!isReady || !effectiveProjectId) {
+      throw new Error('Storage not ready');
     }
 
-    try {
-      if (isTexture) {
-        const newTexture = await addTextureFirestore(user.uid, projectId, assetData);
-        dispatch(addCustomTextureAction({ projectId, texture: newTexture }));
-        return newTexture;
-      } else {
-        const newItem = await addItemFirestore(user.uid, projectId, assetData);
-        dispatch(addCustomItemAction({ projectId, item: newItem }));
-        return newItem;
+    // For guests, check if upload should be gated
+    if (isGuestMode) {
+      const allowed = gateUpload(assetType, assetData);
+      if (!allowed) {
+        throw new Error('LOGIN_REQUIRED');
       }
-    } catch (error) {
-      console.error(`Failed to add ${assetType}:`, error);
-      throw error;
-    }
-  };
-
-  const deleteAsset = async (assetId: string) => {
-    if (!user?.uid || !projectId) {
-      throw new Error('User or project not available');
     }
 
-    try {
-      if (isTexture) {
-        await deleteTextureFirestore(user.uid, projectId, assetId);
-        dispatch(removeCustomTextureAction({ projectId, textureId: assetId }));
-      } else {
-        await deleteItemFirestore(user.uid, projectId, assetId);
-        dispatch(removeCustomItemAction({ projectId, itemId: assetId }));
-      }
-    } catch (error) {
-      console.error(`Failed to delete ${assetType}:`, error);
-      throw error;
+    if (isTexture) {
+      const newTexture = await adapter.addTexture(assetData);
+      dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture }));
+      return newTexture;
+    } else {
+      const newItem = await adapter.addItem(assetData);
+      dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem }));
+      return newItem;
     }
-  };
+  }, [isReady, effectiveProjectId, isGuestMode, gateUpload, assetType, isTexture, adapter, dispatch]);
+
+  const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
+    if (!isReady || !effectiveProjectId) {
+      throw new Error('Storage not ready');
+    }
+
+    if (isTexture) {
+      await adapter.deleteTexture(assetId);
+      dispatch(removeCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId }));
+    } else {
+      await adapter.deleteItem(assetId);
+      dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
+    }
+  }, [isReady, effectiveProjectId, isTexture, adapter, dispatch]);
 
   return {
     customAssets,
