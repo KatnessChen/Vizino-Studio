@@ -4,7 +4,7 @@ import { Modal, Button } from 'antd';
 interface CopyImageModalProps {
   isOpen: boolean;
   numberOfImages: number;
-  imageType: 'original' | 'updated';
+  imageType: 'original' | 'generated';
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;

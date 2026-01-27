@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 import { message, Tag } from 'antd';
 import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
@@ -25,12 +26,14 @@ import {
   updateImageName,
   duplicateImage,
   moveImageToSpace,
+  copyImageAsOriginal,
   createSpace,
 } from '@/services/firestoreService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
 import { formatImageOperationData, downloadFile, buildDownloadFilename } from '@/utils';
+import { generateRoute } from '@/constants/routes';
 import { checkImageLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
   selectOriginalImages,
@@ -45,6 +48,8 @@ import {
   selectProjects,
   selectActiveProjectId,
   selectActiveSpaceId,
+  setActiveProjectId,
+  setActiveSpaceId,
   selectIsAppInitiated,
   selectInitError,
   selectIsFetchingSpaceImages,
@@ -83,6 +88,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const { user, adminSettings } = useAuth();
   const { isGuestMode } = useGuest();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   // Ref for GenerateMoreModal to trigger generation from Tour
   const generateModalRef = useRef<GenerateMoreModalRef>(null);
@@ -194,12 +200,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   // State for copy modal
   const [showCopyModal, setShowCopyModal] = useState<boolean>(false);
-  const [imageTypeToCopy, setImageTypeToCopy] = useState<'original' | 'updated' | null>(null);
+  const [imageTypeToCopy, setImageTypeToCopy] = useState<'original' | 'generated' | null>(null);
   const [isCopyingImages, setIsCopyingImages] = useState<boolean>(false);
 
   // State for move modal
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
-  const [imageTypeToMove, setImageTypeToMove] = useState<'original' | 'updated' | null>(null);
+  const [imageTypeToMove, setImageTypeToMove] = useState<'original' | 'generated' | null>(null);
   const [imagesToMove, setImagesToMove] = useState<ImageData[]>([]);
   const [isMovingImage, setIsMovingImage] = useState<boolean>(false);
 
@@ -635,7 +641,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleBulkDelete = useCallback(
-    async (imageType: 'original' | 'updated') => {
+    async (imageType: 'original' | 'generated') => {
       const selectedImageIds =
         imageType === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
       const setSelectedImageIds =
@@ -750,7 +756,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   }, [updatedImages, dispatch]);
 
   const handleBulkDownload = useCallback(
-    (imageType: 'original' | 'updated') => {
+    (imageType: 'original' | 'generated') => {
       const selectedImageIds =
         imageType === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
       const imagesToDownload = imageType === 'original' ? originalImages : updatedImages;
@@ -778,7 +784,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleBulkCopy = useCallback(
-    (imageType: 'original' | 'updated') => {
+    (imageType: 'original' | 'generated') => {
       const selectedImageIds =
         imageType === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
 
@@ -921,7 +927,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
       // Select this image and trigger bulk copy
       const isOriginal = originalImages.some((img) => img.id === imageId);
-      const imageType = isOriginal ? 'original' : 'updated';
+      const imageType = isOriginal ? 'original' : 'generated';
 
       // Temporarily set selection to this single image
       if (isOriginal) {
@@ -938,7 +944,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleBulkMove = useCallback(
-    (imageType: 'original' | 'updated') => {
+    (imageType: 'original' | 'generated') => {
       const selectedIds =
         imageType === 'original' ? selectedOriginalImageIds : selectedUpdatedImageIds;
       const images = imageType === 'original' ? originalImages : updatedImages;
@@ -964,7 +970,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleMoveConfirm = useCallback(
-    async (targetSpaceId: string, newSpaceName?: string) => {
+    async (targetSpaceId: string, newSpaceName?: string, copyAsOriginal?: boolean) => {
       if (!user || !activeProjectId || !activeSpaceId || imagesToMove.length === 0) return;
 
       try {
@@ -986,28 +992,75 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           );
         }
 
-        // Move all selected images
-        const movePromises = imagesToMove.map((image) =>
-          moveImageToSpace(
-            user.uid,
-            activeProjectId,
-            activeSpaceId,
-            image.id,
-            activeProjectId,
-            finalTargetSpaceId
-          )
-        );
+        // If copying as originals is requested, perform that flow
+        if (copyAsOriginal) {
+          const copyPromises = imagesToMove.map((image) =>
+            copyImageAsOriginal(
+              user.uid,
+              activeProjectId,
+              activeSpaceId,
+              image.id,
+              activeProjectId,
+              finalTargetSpaceId
+            )
+          );
+          await Promise.all(copyPromises);
 
-        await Promise.all(movePromises);
+          // Optimistic remove from current space
+          dispatch(
+            removeImagesOptimistic({
+              projectId: activeProjectId,
+              spaceId: activeSpaceId,
+              imageIds: imagesToMove.map((img) => img.id),
+            })
+          );
 
-        // Update Redux state - remove images from current space
-        dispatch(
-          removeImagesOptimistic({
-            projectId: activeProjectId,
-            spaceId: activeSpaceId,
-            imageIds: imagesToMove.map((img) => img.id),
-          })
-        );
+          // Refresh both source and target spaces
+          const [sourceImages, targetImages] = await Promise.all([
+            fetchSpaceImages(user.uid, activeProjectId, activeSpaceId),
+            fetchSpaceImages(user.uid, activeProjectId, finalTargetSpaceId),
+          ]);
+
+          dispatch(
+            setSpaceImages({
+              projectId: activeProjectId,
+              spaceId: activeSpaceId,
+              images: sourceImages,
+            })
+          );
+          dispatch(
+            setSpaceImages({
+              projectId: activeProjectId,
+              spaceId: finalTargetSpaceId,
+              images: targetImages,
+            })
+          );
+        } else {
+          // Move all selected images
+          const movePromises = imagesToMove.map((image) =>
+            moveImageToSpace(
+              user.uid,
+              activeProjectId,
+              activeSpaceId,
+              image.id,
+              activeProjectId,
+              finalTargetSpaceId
+            )
+          );
+
+          await Promise.all(movePromises);
+        }
+
+        // Update Redux state - remove images from current space (skip if copyAsOriginal already handled it)
+        if (!copyAsOriginal) {
+          dispatch(
+            removeImagesOptimistic({
+              projectId: activeProjectId,
+              spaceId: activeSpaceId,
+              imageIds: imagesToMove.map((img) => img.id),
+            })
+          );
+        }
 
         // Clear selection
         if (imageTypeToMove === 'original') {
@@ -1020,8 +1073,42 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         setImagesToMove([]);
         setImageTypeToMove(null);
 
+        const actionLabel = copyAsOriginal ? 'copied as originals to ' : 'moved to ';
+
         message.success(
-          `${imagesToMove.length} image${imagesToMove.length > 1 ? 's' : ''} moved to ${newSpaceName || projects.find((p) => p.id === activeProjectId)?.spaces.find((s) => s.id === finalTargetSpaceId)?.name || 'target space'} successfully`
+          <span>
+            {`${imagesToMove.length} image${imagesToMove.length > 1 ? 's' : ''} ${actionLabel}`}
+            <a
+              onClick={() => {
+                const project = projects.find((p) => p.id === activeProjectId);
+                const space = project?.spaces.find((s) => s.id === finalTargetSpaceId);
+                // Use newly created space name as fallback when project state hasn't updated yet
+                const spaceNameToUse = newSpaceName || space?.name;
+                if (project && spaceNameToUse) {
+                  // Update Redux state so LandingPage reacts (same as MyBreadcrumb)
+                  dispatch(setActiveProjectId(activeProjectId));
+                  dispatch(setActiveSpaceId(finalTargetSpaceId));
+
+                  navigate(
+                    generateRoute.space(
+                      project.name,
+                      activeProjectId,
+                      spaceNameToUse,
+                      finalTargetSpaceId
+                    )
+                  );
+                }
+              }}
+              style={{ color: '#1890ff', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              {newSpaceName ||
+                projects
+                  .find((p) => p.id === activeProjectId)
+                  ?.spaces.find((s) => s.id === finalTargetSpaceId)?.name ||
+                'target space'}
+            </a>
+            {' successfully'}
+          </span>
         );
       } catch (error) {
         console.error('Failed to move image:', error);
@@ -1032,7 +1119,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         setIsMovingImage(false);
       }
     },
-    [user, activeProjectId, activeSpaceId, imagesToMove, imageTypeToMove, dispatch, projects]
+    [
+      user,
+      activeProjectId,
+      activeSpaceId,
+      imagesToMove,
+      imageTypeToMove,
+      dispatch,
+      projects,
+      navigate,
+    ]
   );
 
   const getEmptyStateComponent = useMemo(() => {
@@ -1077,7 +1173,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             <MyBreadcrumb onStartTour={() => tourRef.current?.openTour()} />
             {imageLimitInfo && (
               <Tag variant="outlined" color="purple">
-                {imageLimitInfo.current} / {imageLimitInfo.max} images in total
+                {imageLimitInfo.current} / {imageLimitInfo.max} images in space
               </Tag>
             )}
           </div>
@@ -1154,12 +1250,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         onSelectMultiple={handleSelectUpdatedImage}
                         onRenameImage={handleRenameImage}
                         emptyMessage="No generated images yet."
-                        onBulkDelete={() => handleBulkDelete('updated')}
-                        onBulkCopy={() => handleBulkCopy('updated')}
-                        onBulkMove={() => handleBulkMove('updated')}
+                        onBulkDelete={() => handleBulkDelete('generated')}
+                        onBulkCopy={() => handleBulkCopy('generated')}
+                        onBulkMove={() => handleBulkMove('generated')}
                         onClearSelection={handleClearUpdatedSelection}
                         onSelectAll={handleSelectAllUpdated}
-                        onBulkDownload={() => handleBulkDownload('updated')}
+                        onBulkDownload={() => handleBulkDownload('generated')}
                         onGenerateMoreSuccess={handleGenerateMoreSuccess}
                         userId={user?.uid}
                         isImageLimitReached={!imageLimitCheck.canAdd}
@@ -1239,6 +1335,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             setImageTypeToMove(null);
           }}
           isLoading={isMovingImage}
+          allowCopyAsOriginal={
+            imagesToMove.length > 0 && imagesToMove.every((img) => !!img.parentImageId) && !!user
+          }
         />
       )}
 

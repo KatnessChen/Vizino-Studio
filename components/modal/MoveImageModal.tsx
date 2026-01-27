@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Modal, Button, Dropdown, Input, Alert } from 'antd';
+import { Modal, Button, Dropdown, Input, Alert, Checkbox } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import { Category as CategoryIcon } from '@mui/icons-material';
 import type { MenuProps } from 'antd';
-import { selectActiveProject, selectProjects, selectActiveProjectId } from '@/stores/projectStore';
+import {
+  selectActiveProject,
+  selectProjects,
+  selectActiveProjectId,
+  selectActiveSpaceId,
+} from '@/stores/projectStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectSpaceMenuItems } from '@/hooks/useProjectSpaceMenuItems';
 
 interface MoveImageModalProps {
   isOpen: boolean;
   numberOfImages: number;
-  onConfirm: (targetSpaceId: string, newSpaceName?: string) => void;
+  onConfirm: (targetSpaceId: string, newSpaceName?: string, copyAsOriginal?: boolean) => void;
   onCancel: () => void;
   isLoading?: boolean;
+  allowCopyAsOriginal?: boolean;
 }
 
 const MoveImageModal: React.FC<MoveImageModalProps> = ({
@@ -22,6 +28,7 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
   onConfirm,
   onCancel,
   isLoading = false,
+  allowCopyAsOriginal = false,
 }) => {
   const { adminSettings } = useAuth();
   const projects = useSelector(selectProjects);
@@ -32,12 +39,17 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
   const [isCreatingNewSpace, setIsCreatingNewSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [nameError, setNameError] = useState<string>('');
+  const [copyAsOriginal, setCopyAsOriginal] = useState<boolean>(false);
+
+  const activeSpaceId = useSelector(selectActiveSpaceId);
 
   const { spaceMenuItems } = useProjectSpaceMenuItems({
     projects,
     activeProject: activeProject || null,
     activeProjectId,
     adminSettings,
+    // Allow selecting current space when copying generated images as original
+    isDisableCurrentSpace: !(allowCopyAsOriginal && copyAsOriginal),
     onSelectSpace: (spaceId: string) => {
       setSelectedSpaceId(spaceId);
       setIsCreatingNewSpace(false);
@@ -55,12 +67,28 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedSpaceId(''); // Don't pre-select current space
+      setSelectedSpaceId('');
       setIsCreatingNewSpace(false);
       setNewSpaceName('');
       setNameError('');
+      setCopyAsOriginal(false);
     }
   }, [isOpen]);
+
+  // Handle checkbox change deterministically: only set/clear selection on user action
+  const handleCopyAsOriginalChange = (checked: boolean) => {
+    setCopyAsOriginal(checked);
+
+    // if (checked && allowCopyAsOriginal && activeSpaceId) {
+    //   // When enabling, pre-select current space
+    //   setSelectedSpaceId(activeSpaceId);
+    // }
+
+    if (!checked && selectedSpaceId && activeSpaceId && selectedSpaceId === activeSpaceId) {
+      // When disabling and the selected destination equals current space, clear selection
+      setSelectedSpaceId('');
+    }
+  };
 
   const handleNewSpaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -85,9 +113,9 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
       if (nameError) {
         return;
       }
-      onConfirm('', newSpaceName.trim());
+      onConfirm('', newSpaceName.trim(), copyAsOriginal);
     } else {
-      onConfirm(selectedSpaceId);
+      onConfirm(selectedSpaceId, undefined, copyAsOriginal);
     }
   };
 
@@ -210,6 +238,23 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
               style={{ marginTop: 8, fontSize: '13px' }}
             />
           )}
+        </div>
+      )}
+
+      {/* Option: Convert generated images to originals when moving */}
+      {allowCopyAsOriginal && (
+        <div style={{ marginBottom: 16 }}>
+          <Checkbox
+            checked={copyAsOriginal}
+            onChange={(e) => handleCopyAsOriginalChange(e.target.checked)}
+            disabled={isLoading}
+          >
+            Convert to Original
+          </Checkbox>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+            If selected, generated images will be copied as originals in the destination space
+            (generation history will be removed).
+          </div>
         </div>
       )}
     </Modal>
