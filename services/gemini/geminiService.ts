@@ -21,7 +21,10 @@ const getBase64FromImageData = async (userId: string | undefined, imageData: Ima
   // If no storage path, try to fetch directly from imageDownloadUrl (for demo images or external URLs)
   if (!storageFilePath) {
     if (imageData.imageDownloadUrl) {
-      console.log('[Gemini] Fetching image from URL (no storage path):', imageData.imageDownloadUrl);
+      console.log(
+        '[Gemini] Fetching image from URL (no storage path):',
+        imageData.imageDownloadUrl
+      );
       return await fetchImageAsBase64(imageData.imageDownloadUrl);
     }
     throw new Error(GEMINI_ERRORS.IMAGE_STORAGE_PATH_MISSING(imageData.id));

@@ -273,7 +273,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       }
     }, [selectedColor]);
 
-    const handleGenerate = async () => {
+    const handleGenerate = useCallback(async () => {
       // If guest has already generated, show login modal
       if (guestHasUsedGeneration) {
         dispatch(setShowLoginRequiredModal(true));
@@ -356,10 +356,49 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           base64Length: result.base64?.length || 0,
         });
 
+        // Save custom prompt immediately after a successful generation for authenticated users
+        const promptToSave = customPrompt.trim() || undefined;
+        if (isAuthenticated && userId && activeProjectId && activeTaskName && promptToSave) {
+          (async () => {
+            try {
+              await saveCustomPrompt(userId, activeProjectId, activeTaskName, promptToSave);
+              // Refresh prompts list so it appears in the Saved Prompts panel
+              try {
+                await fetchPrompts();
+              } catch (fetchErr) {
+                console.warn('Failed to refresh prompts after saving:', fetchErr);
+              }
+              message.success('Prompt saved');
+            } catch (saveErr) {
+              console.warn('Failed to save custom prompt on generate:', saveErr);
+            }
+          })();
+        }
+
         setGeneratedImage(result);
         setShowConfirmationModal(true);
       }
-    };
+    }, [
+      guestHasUsedGeneration,
+      dispatch,
+      sourceImage,
+      adminSettings.mock_limit_reached,
+      customPrompt,
+      activeTaskName,
+      selectedColor,
+      selectedTexture,
+      selectedItem,
+      disableReason,
+      isCustomPromptRequired,
+      userId,
+      guestSessionId,
+      onGenerateClick,
+      processImage,
+      isAuthenticated,
+      activeProjectId,
+      fetchPrompts,
+      setErrorMessage,
+    ]);
 
     // Expose handleGenerate to parent via ref
     useImperativeHandle(
@@ -542,20 +581,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             dispatch(
               setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
             );
-
-            // Save custom prompt to Firestore if provided
-            if (customPrompt.trim()) {
-              try {
-                await saveCustomPrompt(
-                  userId,
-                  activeProjectId,
-                  activeTaskName,
-                  customPrompt.trim()
-                );
-              } catch (error) {
-                console.warn('Failed to save custom prompt to Firestore:', error);
-              }
-            }
           } catch (saveError) {
             console.error('Failed to save processed image:', saveError);
             // Rollback optimistic update on error
@@ -792,7 +817,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                       className="m-0 mb-1 px-3 pt-3 flex items-center gap-1.5"
                     >
                       Saved Prompts
-                      <InfoIconWithTooltip title="Historical custom prompts of all saved images" />
+                      <InfoIconWithTooltip title="Used custom prompts from previous image operations in this project" />
                     </Typography.Title>
 
                     {/* Search Input */}
@@ -882,7 +907,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     </Typography.Title>
 
                     {/* Custom Prompt Input */}
-                    <div className="flex-1 flex flex-col px-3 pb-3 pt-2 min-h-0">
+                    <div className="flex-1 flex flex-col px-3 pb-6 pt-2 min-h-0">
                       <Input.TextArea
                         placeholder={getPromptPlaceholder()}
                         value={customPrompt}
