@@ -41,24 +41,28 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       label: GEMINI_TASKS.RECOLOR_WALL.label_name,
       icon: '🎨',
       guestAllowed: true,
+      description: 'Instantly transform your walls with a fresh coat of color from our curated palette.',
     },
     {
       value: GEMINI_TASKS.ADD_TEXTURE.task_name,
       label: GEMINI_TASKS.ADD_TEXTURE.label_name,
       icon: '🧱',
       guestAllowed: false,
+      description: 'Elevate your surfaces with realistic textures like natural wood, elegant stone, or designer wallpaper.',
     },
     {
       value: GEMINI_TASKS.ADD_HOME_ITEM.task_name,
       label: GEMINI_TASKS.ADD_HOME_ITEM.label_name,
       icon: '🛋️',
       guestAllowed: false,
+      description: 'Seamlessly integrate new furniture and décor into your space for a complete vision.',
     },
     {
       value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
       label: GEMINI_TASKS.CUSTOM_PROMPT.label_name,
       icon: '💬',
       guestAllowed: false,
+      description: 'Describe your dream space and let AI bring your unique vision to life with precision.',
     },
   ];
 
@@ -112,7 +116,6 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
           const taskContent = (
             <div
-              key={task.value}
               className={`
                 relative flex items-center gap-2 px-4 py-1 rounded-xl border-2 transition-all duration-200
                 ${isDisabled ? 'cursor-pointer opacity-60' : 'cursor-pointer'}
@@ -156,11 +159,21 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
             </div>
           );
 
-          return taskContent;
+          return (
+            <Tooltip
+              key={task.value}
+              title={task.description}
+              placement="right"
+              mouseEnterDelay={0.5}
+            >
+              {taskContent}
+            </Tooltip>
+          );
         })}
       </div>
     </div>
   );
+
 };
 
 export default TaskSelect;

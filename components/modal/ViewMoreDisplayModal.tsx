@@ -237,7 +237,9 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                       {/* 1. Custom Prompt */}
                       {operation.customPrompt && (
                         <div className="space-y-1">
-                          <span className="text-xs font-medium text-gray-600">Custom Prompt:</span>
+                          <div className="text-xs font-medium text-gray-600 mb-2">
+                            Custom Prompt:
+                          </div>
                           <div className="text-sm text-gray-800 italic bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-400">
                             "{operation.customPrompt}"
                           </div>
@@ -245,9 +247,11 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                       )}
 
                       {/* 2. Options */}
-                      {operation.options && (
+                      {(operation.options.colorSnapshot ||
+                        operation.options.textureSnapshot ||
+                        operation.options.itemSnapshot) && (
                         <div className="space-y-2">
-                          <span className="text-xs font-medium text-gray-600">Options:</span>
+                          <div className="text-xs font-medium text-gray-600 mb-2">Options:</div>
                           <div className="bg-white rounded p-3 space-y-2 border border-gray-200">
                             {/* Color Option */}
                             {operation.options.colorSnapshot && (
@@ -275,10 +279,36 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                             {/* Texture Option */}
                             {operation.options.textureSnapshot && (
                               <div className="space-y-1">
-                                <span className="text-xs text-gray-600">Texture:</span>
-                                <div className="flex flex-col">
+                                <span className="text-xs text-gray-600">Add Texture:</span>
+                                <div className="flex items-center gap-2">
+                                  {operation.options.textureSnapshot.url && (
+                                    <img
+                                      src={operation.options.textureSnapshot.url}
+                                      alt={operation.options.textureSnapshot.name}
+                                      className="w-8 h-8 object-cover rounded border border-gray-200"
+                                    />
+                                  )}
                                   <span className="text-sm font-medium text-gray-800">
                                     {operation.options.textureSnapshot.name}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Item Option */}
+                            {operation.options.itemSnapshot && (
+                              <div className="space-y-1">
+                                <div className="text-xs text-gray-600 mb-2">Add Object:</div>
+                                <div className="flex items-center gap-2">
+                                  {operation.options.itemSnapshot.url && (
+                                    <img
+                                      src={operation.options.itemSnapshot.url}
+                                      alt={operation.options.itemSnapshot.name}
+                                      className="w-8 h-8 object-cover rounded border border-gray-200"
+                                    />
+                                  )}
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {operation.options.itemSnapshot.name}
                                   </span>
                                 </div>
                               </div>

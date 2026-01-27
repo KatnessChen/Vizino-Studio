@@ -84,14 +84,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onRename();
       },
     },
-    onCopy && {
-      key: 'copy',
-      label: 'Copy',
-      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
-        domEvent.stopPropagation();
-        onCopy();
-      },
-    },
     onViewDetails && {
       key: 'details',
       label: 'Details',

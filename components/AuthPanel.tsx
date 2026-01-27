@@ -103,13 +103,6 @@ const AuthPanel: React.FC = () => {
       ) : (
         // Authenticated View
         <Box>
-          <Typography variant="h6" component="h2" gutterBottom sx={{ fontWeight: 700 }}>
-            Hi {firstName || ''}, ready to design?
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary', lineHeight: 1.6 }}>
-            Continue creating precise designs with the power of AI.
-          </Typography>
-
           <Stack spacing={2} sx={{ mb: 3 }}>
             <Box>
               <Typography variant="subtitle2" color="textSecondary">
