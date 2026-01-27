@@ -35,12 +35,14 @@ const MainLayout: React.FC = () => {
       <div className="h-screen flex flex-col overflow-scroll">
         <Header />
         <div className="flex-1 overflow-scroll">
-          <Routes>
-            <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
-            <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
-            <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+          <div className="app-viewport">
+            <Routes>
+              <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
+              <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
+              <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </div>
         </div>
         {/* Global Login Required Modal */}
         <LoginRequiredModal />

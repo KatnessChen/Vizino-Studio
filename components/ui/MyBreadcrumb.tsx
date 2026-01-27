@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Breadcrumb, Dropdown, Button, Modal, Alert } from 'antd';
+import { Typography, Breadcrumb, Dropdown, Button, Modal, Alert, Input } from 'antd';
 import { PlusOutlined, DownOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
@@ -71,12 +71,12 @@ interface BreadcrumbProps {
   onStartTour?: () => void;
 }
 
-const MyBreadcrumb: React.FC<BreadcrumbProps> = ({ 
-  onProjectSelected, 
+const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
+  onProjectSelected,
   onSpaceSelected,
-  onStartTour 
+  onStartTour,
 }) => {
-  const { user, adminSettings, isAuthenticated } = useAuth();
+  const { user, adminSettings } = useAuth();
   const { isGuestMode } = useGuest();
   const hasGeneratedImage = useSelector(selectHasGeneratedImage);
   const dispatch = useDispatch<AppDispatch>();
@@ -133,6 +133,9 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
 
       dispatch(setSelectedColor(null));
       dispatch(setSelectedTexture(null));
+
+      // Reset task-related state when switching projects
+      dispatch(resetTaskState());
 
       // Navigate to the new project/space URL
       if (selectedProject && firstSpace) {
@@ -381,7 +384,12 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
   const getModalTitle = useMemo(() => {
     switch (modalMode) {
       case ModalMode.ADD_PROJECT:
-        return 'Add New Project';
+        return (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <HomeIcon />
+            Add New Project
+          </span>
+        );
       case ModalMode.ADD_SPACE:
         return 'Add New Space';
       case ModalMode.EDIT_PROJECT:
@@ -531,8 +539,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
   if (!isAppInitiated) {
     return (
       <Box display="flex" alignItems="center" gap={2} p={2}>
-        <Skeleton variant="rounded" width={200} height={40} />
-        <Skeleton variant="rounded" width={200} height={40} />
+        <Skeleton variant="rounded" width={200} height={25} />
+        <Skeleton variant="rounded" width={200} height={25} />
       </Box>
     );
   }
@@ -559,9 +567,11 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             {/* Guest Mode Badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
               <span className="text-sm">💫</span>
-              <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">Guest Mode</span>
+              <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">
+                Guest Mode
+              </span>
             </div>
-            
+
             {/* Take a Tour Button - Only show if guest hasn't generated any images yet */}
             {onStartTour && !hasGeneratedImage && (
               <Button
@@ -576,7 +586,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
                   height: '32px',
                   fontWeight: 600,
                   fontSize: '12px',
-                  boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)'
+                  boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)',
                 }}
               >
                 Take a Tour
@@ -615,14 +625,61 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
               style={{ marginBottom: 16 }}
             />
           )}
-          <input
+          <Input
             value={modalInput}
-            type="text"
-            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
             placeholder={modalMode === ModalMode.ADD_PROJECT ? 'Project Name' : 'Space Name'}
+            maxLength={50}
+            showCount={{ formatter: ({ count }) => `${50 - count} characters remaining` }}
             onChange={(e) => setModalInput(e.target.value)}
             autoFocus
           />
+          {modalMode === ModalMode.ADD_PROJECT && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 12,
+                backgroundColor: '#f0f8ff',
+                borderRadius: 6,
+                border: '1px solid #d9d9d9',
+              }}
+            >
+              <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                Examples:
+              </Typography.Text>
+              <Typography.Text style={{ marginBottom: 12, display: 'block' }}>
+                House Renovation, Downtown Loft, Grandma's Home Upgrade
+              </Typography.Text>
+              <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                Note:
+              </Typography.Text>
+              <Typography.Text>
+                You can add up to 10 projects. Custom colors, textures, and objects are shared among
+                projects.
+              </Typography.Text>
+            </div>
+          )}
+          {modalMode === ModalMode.ADD_SPACE && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 12,
+                backgroundColor: '#f0f8ff',
+                borderRadius: 6,
+                border: '1px solid #d9d9d9',
+              }}
+            >
+              <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                Examples:
+              </Typography.Text>
+              <Typography.Text style={{ marginBottom: 12, display: 'block' }}>
+                Living Room, Master Bedroom, Kitchen
+              </Typography.Text>
+              <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                Note:
+              </Typography.Text>
+              <Typography.Text>You can add up to 10 spaces per project.</Typography.Text>
+            </div>
+          )}
         </Modal>
 
         <GenericConfirmModal

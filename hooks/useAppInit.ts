@@ -46,7 +46,7 @@ export const useAppInit = () => {
       dispatch(setActiveSpaceId(null));
       dispatch(setIsAppInitiated(true)); // Mark as initiated so guests can use the app
       hasInitialized.current = false;
-      
+
       // Clear URL path for guest mode - navigate to root if there's a path
       if (projectSlugId || spaceSlugId) {
         navigate('/', { replace: true });
