@@ -1,12 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Button, Card, Radio, Tooltip } from 'antd';
+import { Button, Card, Radio, Tooltip, message } from 'antd';
 import { CheckCircle as CheckmarkBadgeIcon } from '@mui/icons-material';
 import { Alert as AntAlert } from 'antd';
 import { PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { Color } from '@/types';
 import { PRESET_COLOR } from '@/constants/constants';
-import { Snackbar, Alert } from '@mui/material';
 import AddColorModal from '../modal/AddColorModal';
 import { useCustomColors } from '@/hooks/useCustomColors';
 import { RootState } from '@/stores/store';
@@ -33,11 +32,7 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
   const { customColors, isLoadingColors, addColor } = useCustomColors(activeProjectId);
   const [isAddColorModalOpen, setIsAddColorModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({ open: false, message: '', severity: 'success' });
+
 
   const availableColors = useMemo(() => [...customColors, ...PRESET_COLOR], [customColors]);
 
@@ -55,21 +50,13 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
 
       dispatch(setSelectedColor(color));
       setIsAddColorModalOpen(false);
-      setToast({
-        open: true,
-        message: `Color "${newColor.name}" added successfully!`,
-        severity: 'success',
-      });
+      message.success(`Color "${newColor.name}" added successfully!`);
     } catch (error) {
       console.error('Failed to save custom color:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to save custom color. Please try again.';
       setError(errorMessage);
-      setToast({
-        open: true,
-        message: errorMessage,
-        severity: 'error',
-      });
+      message.error(errorMessage);
     }
   };
 
@@ -281,22 +268,6 @@ const ColorSelect: React.FC<ColorSelectProps> = ({
           )}
         </>
       )}
-
-      {/* Toast Notification */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast({ ...toast, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToast({ ...toast, open: false })}
-          severity={toast.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-          title={toast.message}
-        />
-      </Snackbar>
     </Card>
   );
 };

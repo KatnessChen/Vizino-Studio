@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Radio, Modal, Input, Card, Button } from 'antd';
+import { Radio, Modal, Input, Card, Button, message } from 'antd';
 import { Alert } from '@mui/material';
-import { Snackbar } from '@mui/material';
 import { PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { Texture, Item } from '@/types';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
@@ -66,11 +65,6 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
   const [assetName, setAssetName] = useState<string>('');
   const [assetDescription, setAssetDescription] = useState<string>('');
   const [showNameModal, setShowNameModal] = useState(false);
-  const [toast, setToast] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({ open: false, message: '', severity: 'success' });
   const [base64Map, setBase64Map] = useState<Map<string, string>>(new Map());
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedAssetForView, setSelectedAssetForView] = useState<Asset | null>(null);
@@ -132,11 +126,7 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
         });
 
         setUploadError(null);
-        setToast({
-          open: true,
-          message: `${isTexture ? 'Texture' : 'Home item'} "${name}" added successfully!`,
-          severity: 'success',
-        });
+        message.success(`${isTexture ? 'Texture' : 'Home item'} "${name}" added successfully!`);
 
         // Select the newly uploaded asset
         if (newAsset) {
@@ -147,17 +137,13 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
           }
         }
       } catch (error) {
-        const message =
+        const errorMessage =
           error instanceof Error
             ? error.message
             : `Failed to save ${isTexture ? 'texture' : 'home item'}`;
-        setUploadError(message);
-        onError?.(message);
-        setToast({
-          open: true,
-          message,
-          severity: 'error',
-        });
+        setUploadError(errorMessage);
+        onError?.(errorMessage);
+        message.error(errorMessage);
       }
     },
     [dispatch, addAsset, onError, isTexture]
@@ -401,22 +387,7 @@ const TextureOrItemSelect: React.FC<TextureOrItemSelectProps> = ({
         </>
       )}
 
-      {/* Toast Notification */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast({ ...toast, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToast({ ...toast, open: false })}
-          severity={toast.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
+
 
       {/* Image Display Modal */}
       {selectedAssetForView && (
