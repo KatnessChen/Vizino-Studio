@@ -26,9 +26,9 @@ export interface ImageData {
   description?: string;
 
   // Dimensions
-  width?: number;
-  height?: number;
-  aspect_ratio?: number; // width / height
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null; // width / height
 
   // Soft delete
   isDeleted: boolean;
@@ -207,9 +207,9 @@ export interface Texture {
   description?: string;
   base64?: string;
   mimeType?: string;
-  width?: number;
-  height?: number;
-  aspect_ratio?: number;
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -221,9 +221,9 @@ export interface Item {
   description?: string;
   base64?: string;
   mimeType?: string;
-  width?: number;
-  height?: number;
-  aspect_ratio?: number;
+  width?: number | null;
+  height?: number | null;
+  aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

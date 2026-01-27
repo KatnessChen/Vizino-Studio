@@ -567,9 +567,9 @@ export async function createImage(
       updatedAt: now,
       description: imageMetadata.description || '',
       // Persist dimensions if provided
-      width: imageMetadata.width ?? undefined,
-      height: imageMetadata.height ?? undefined,
-      aspect_ratio: imageMetadata.aspect_ratio ?? undefined,
+      width: imageMetadata.width ?? null,
+      height: imageMetadata.height ?? null,
+      aspect_ratio: imageMetadata.aspect_ratio ?? null,
     };
 
     console.log({ newImageData });
@@ -822,9 +822,9 @@ export async function duplicateImage(
       createdAt: now,
       updatedAt: now,
       // Preserve dimensions from source
-      width: sourceImageData.width ?? undefined,
-      height: sourceImageData.height ?? undefined,
-      aspect_ratio: sourceImageData.aspect_ratio ?? undefined,
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
     };
 
     // Write to Firestore
@@ -936,9 +936,9 @@ export async function moveImageToSpace(
       createdAt: now,
       updatedAt: now,
       // Preserve dimensions from source
-      width: sourceImageData.width ?? undefined,
-      height: sourceImageData.height ?? undefined,
-      aspect_ratio: sourceImageData.aspect_ratio ?? undefined,
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
     };
 
     // Write to Firestore in target space
@@ -974,6 +974,115 @@ export async function moveImageToSpace(
       throw new Error(`Failed to move image: ${error.message}`);
     }
     throw new Error('Failed to move image in Firebase.');
+  }
+}
+
+/**
+ * Copy a generated image into the target space as a new original image.
+ * This clears the evolution chain and parentImageId so it acts as an original image.
+ */
+export async function copyImageAsOriginal(
+  userId: string,
+  sourceProjectId: string,
+  sourceSpaceId: string,
+  sourceImageId: string,
+  targetProjectId: string,
+  targetSpaceId: string
+): Promise<ImageData> {
+  if (
+    !userId ||
+    !sourceProjectId ||
+    !sourceSpaceId ||
+    !sourceImageId ||
+    !targetProjectId ||
+    !targetSpaceId
+  ) {
+    throw new Error('All parameters are required for copying an image as original.');
+  }
+
+  try {
+    // Fetch the source image
+    const sourceDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      sourceProjectId,
+      'spaces',
+      sourceSpaceId,
+      'images',
+      sourceImageId
+    );
+
+    const sourceImageDoc = await getDoc(sourceDocRef);
+    if (!sourceImageDoc.exists()) {
+      throw new Error(`Source image not found: ${sourceImageId}`);
+    }
+
+    const sourceImageData = sourceImageDoc.data() as ImageData;
+
+    // Generate new image ID
+    const newImageId = crypto.randomUUID();
+    const now = Timestamp.fromDate(new Date());
+
+    // Get the maximum order for the target space
+    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
+    // Create the new image document WITHOUT generation history (original)
+    const newImageData: ImageData = {
+      id: newImageId,
+      name: sourceImageData.name,
+      spaceId: targetSpaceId,
+      evolutionChain: [], // Clear evolution chain
+      parentImageId: null, // No parent
+      imageDownloadUrl: sourceImageData.imageDownloadUrl,
+      storageFilePath: sourceImageData.storageFilePath,
+      mimeType: sourceImageData.mimeType,
+      order: newImageOrder,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      // Preserve dimensions from source
+      width: sourceImageData.width ?? null,
+      height: sourceImageData.height ?? null,
+      aspect_ratio: sourceImageData.aspect_ratio ?? null,
+    };
+
+    // Write to Firestore in target space
+    const newDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      targetProjectId,
+      'spaces',
+      targetSpaceId,
+      'images',
+      newImageId
+    );
+
+    const batch = writeBatch(db);
+    const { parentImageId, ...firestoreData } = newImageData;
+    batch.set(newDocRef, {
+      ...firestoreData,
+      parentImageId,
+    });
+
+    await batch.commit();
+    console.log(`Image copied as original successfully: ${newImageId}`);
+
+    // Soft delete the original image in the source space
+    await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
+
+    return newImageData;
+  } catch (error) {
+    console.error('Failed to copy image as original:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to copy image as original: ${error.message}`);
+    }
+    throw new Error('Failed to copy image as original in Firebase.');
   }
 }
 
@@ -1194,9 +1303,9 @@ export async function addTexture(
       name: textureData.name.trim(),
       textureImageDownloadUrl,
       description: textureData.description?.trim() || '',
-      width: textureData.width,
-      height: textureData.height,
-      aspect_ratio: textureData.aspect_ratio,
+      width: textureData.width ?? null,
+      height: textureData.height ?? null,
+      aspect_ratio: textureData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1446,9 +1555,9 @@ export async function addItem(
       name: itemData.name.trim(),
       itemImageDownloadUrl,
       description: itemData.description?.trim() || '',
-      width: itemData.width,
-      height: itemData.height,
-      aspect_ratio: itemData.aspect_ratio,
+      width: itemData.width ?? null,
+      height: itemData.height ?? null,
+      aspect_ratio: itemData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
     };
