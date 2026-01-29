@@ -2,6 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ImageData } from '@/types';
 import { ChevronLeft as PrevIcon, ChevronRight as NextIcon } from '@mui/icons-material';
 import { imageCache } from '@/utils/imageCache';
+import { formatTimestamp } from '@/utils';
+import { getMetadata, ref as storageRef } from 'firebase/storage';
+import { storage } from '@/services/firestoreService';
+import { Button } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 
 interface ImageDisplayModalProps {
   isOpen: boolean;
@@ -11,6 +16,9 @@ interface ImageDisplayModalProps {
   totalImages?: number;
   onPrevious?: () => void;
   onNext?: () => void;
+  renderPreview?: () => React.ReactNode;
+  detailModalTitle?: string;
+  onEdit?: () => void;
 }
 
 const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
@@ -21,11 +29,26 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
   totalImages = 0,
   onPrevious,
   onNext,
+  renderPreview,
+  detailModalTitle,
+  onEdit,
 }) => {
-  // Cached image state: imageDownloadUrl -> base64 data URL
-  const [cachedImageSrc, setCachedImageSrc] = useState<string>('');
+  const hasEvolutionChain = image.evolutionChain && image.evolutionChain.length > 0;
+  const isColor = image.mimeType === 'color/hex';
+  const colorHex = isColor ? (image as any).hex : null;
 
-  // Load cached base64 on mount
+  // State for technical details
+  const [cachedImageSrc, setCachedImageSrc] = useState<string>('');
+  const [fileSizeMB, setFileSizeMB] = useState<string | null>(null);
+
+  // Helpers
+  const bytesToMBString = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  const base64ToBytes = (b64: string) => {
+    const padding = (b64.match(/=+$/) || [''])[0].length;
+    return Math.round((b64.length * 3) / 4 - padding);
+  };
+
+  // Load cached base64 and determine file size on mount
   useEffect(() => {
     const loadCachedImage = async () => {
       try {
@@ -35,12 +58,63 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
           setCachedImageSrc(`data:${image.mimeType};base64,${base64}`);
         }
       } catch (error) {
-        console.warn('[AssetCard] Failed to load cached image:', error);
+        console.warn('[ImageDisplayModal] Failed to load cached image:', error);
+      }
+    };
+
+    const determineFileSize = async () => {
+      try {
+        if (!isOpen) return;
+
+        // Colors don't have file size
+        if (isColor) {
+          setFileSizeMB(null);
+          return;
+        }
+
+        // 1) Estimate size from dimensions
+        if (typeof image.width === 'number' && typeof image.height === 'number') {
+          const estimatedBytes = image.width * image.height * 3;
+          setFileSizeMB(bytesToMBString(estimatedBytes));
+          return;
+        }
+
+        // 2) Actual size from storage metadata
+        if (image.storageFilePath) {
+          const metadata = await getMetadata(storageRef(storage, image.storageFilePath));
+          if (metadata && typeof metadata.size === 'number') {
+            setFileSizeMB(bytesToMBString(metadata.size));
+            return;
+          }
+        }
+
+        // 3) Fallback from data URI
+        if (image.imageDownloadUrl && image.imageDownloadUrl.startsWith('data:')) {
+          const parts = image.imageDownloadUrl.split('base64,');
+          if (parts.length === 2) {
+            setFileSizeMB(bytesToMBString(base64ToBytes(parts[1])));
+            return;
+          }
+        }
+
+        setFileSizeMB(null);
+      } catch (err) {
+        console.warn('[ImageDisplayModal] Failed to determine file size:', err);
+        setFileSizeMB(null);
       }
     };
 
     loadCachedImage();
-  }, [image.imageDownloadUrl, image.mimeType]);
+    determineFileSize();
+  }, [
+    image.imageDownloadUrl,
+    image.mimeType,
+    isColor,
+    isOpen,
+    image.width,
+    image.height,
+    image.storageFilePath,
+  ]);
 
   const hasPrevious = currentImageIndex > 0;
   const hasNext = currentImageIndex >= 0 && currentImageIndex < totalImages - 1;
@@ -92,42 +166,17 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
     <>
       <style>{`
         @keyframes floatLeft {
-          0% {
-            transform: translateX(0);
-            opacity: 0.5;
-          }
-          50% {
-            transform: translateX(-12px);
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(0);
-            opacity: 0.5;
-          }
+          0% { transform: translateX(0); opacity: 0.5; }
+          50% { transform: translateX(-12px); opacity: 1; }
+          100% { transform: translateX(0); opacity: 0.5; }
         }
-
         @keyframes floatRight {
-          0% {
-            transform: translateX(0);
-            opacity: 0.5;
-          }
-          50% {
-            transform: translateX(12px);
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(0);
-            opacity: 0.5;
-          }
+          0% { transform: translateX(0); opacity: 0.5; }
+          50% { transform: translateX(12px); opacity: 1; }
+          100% { transform: translateX(0); opacity: 0.5; }
         }
-
-        .prev-icon-animated {
-          animation: floatLeft 2s infinite;
-        }
-
-        .next-icon-animated {
-          animation: floatRight 2s infinite;
-        }
+        .prev-icon-animated { animation: floatLeft 2s infinite; }
+        .next-icon-animated { animation: floatRight 2s infinite; }
       `}</style>
 
       <div
@@ -139,78 +188,201 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
         style={{ zIndex: 1300 }}
       >
         <div
-          className="relative bg-white rounded-lg shadow-xl sm:p-3 lg:p-2 max-w-4xl w-full max-h-[95vh] flex flex-col bg-gray-100"
-          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal content
+          className="relative bg-white rounded-lg shadow-xl sm:p-6 max-w-[80vw] w-full max-h-[96vh] flex flex-col bg-gray-50 transition-all duration-300"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="relative">
-            {/* Image Container */}
-            <div
-              className="flex-1 flex items-center justify-center min-h-0 overflow-hidden"
-              style={{ height: 'calc(95vh - 80px)' }}
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 pb-3">
+            <h3 className="text-lg font-bold text-gray-900">
+              {detailModalTitle || 'Image Information'}
+            </h3>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {/* Previous Button */}
-              <button
-                onClick={handlePrevious}
-                className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10"
-                aria-label="Previous image"
-                title="Previous image (← arrow key)"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  opacity: hasPrevious ? 1 : 0,
-                }}
-              >
-                <PrevIcon
-                  sx={{
-                    fontSize: 48,
-                    color: 'white',
-                  }}
-                  className="prev-icon-animated"
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
                 />
-              </button>
+              </svg>
+            </button>
+          </div>
 
-              <img
-                src={cachedImageSrc || image.imageDownloadUrl}
-                alt={image.name}
-                className="max-w-full max-h-full object-contain"
-              />
-
-              {/* Next Button */}
-              <button
-                onClick={handleNext}
-                className="absolute -right-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10"
-                aria-label="Next image"
-                title="Next image (→ arrow key)"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  opacity: hasNext ? 1 : 0,
-                }}
+          <div className="relative flex flex-col md:flex-row gap-6 overflow-y-auto pr-2 custom-scrollbar">
+            {/* Left: Preview Area */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              <div
+                className="relative bg-gray-950 rounded-lg overflow-visible flex items-center justify-center border border-gray-200 shadow-inner group"
+                style={{ height: renderPreview ? '450px' : '75vh' }}
               >
-                <NextIcon
-                  sx={{
-                    fontSize: 48,
-                    color: 'white',
+                {/* Previous Button (Moved outside image or made more subtle) */}
+                <button
+                  onClick={handlePrevious}
+                  className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10 p-2 rounded-full hover:bg-white/10 transition-all"
+                  aria-label="Previous image"
+                  style={{
+                    opacity: hasPrevious ? 1 : 0,
+                    pointerEvents: hasPrevious ? 'auto' : 'none',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
                   }}
-                  className="next-icon-animated"
-                />
-              </button>
+                >
+                  <PrevIcon
+                    sx={{ fontSize: 56, color: 'white' }}
+                    className="prev-icon-animated drop-shadow-lg"
+                  />
+                </button>
+
+                {renderPreview ? (
+                  <div className="w-full h-full flex items-center justify-center bg-[#f8fafc] rounded-lg">
+                    {renderPreview()}
+                  </div>
+                ) : (
+                  <img
+                    src={cachedImageSrc || image.imageDownloadUrl}
+                    alt={image.name}
+                    className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-500"
+                  />
+                )}
+
+                {/* Next Button (Moved outside image or made more subtle) */}
+                <button
+                  onClick={handleNext}
+                  className="absolute -right-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10 p-2 rounded-full hover:bg-white/10 transition-all"
+                  aria-label="Next image"
+                  style={{
+                    opacity: hasNext ? 1 : 0,
+                    pointerEvents: hasNext ? 'auto' : 'none',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <NextIcon
+                    sx={{ fontSize: 56, color: 'white' }}
+                    className="next-icon-animated drop-shadow-lg"
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Metadata Area */}
+            <div className="md:w-80 flex-shrink-0">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                  <h4 className="text-base font-bold text-gray-900 m-0">Details</h4>
+                  {onEdit && (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={onEdit}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {/* Name */}
+                  <div className="flex justify-between pb-1">
+                    <span className="text-sm font-medium text-gray-500">
+                      {isColor ? 'Color Name' : 'Name'}
+                    </span>
+                    <span
+                      className="text-sm text-gray-700 max-w-[180px] text-right"
+                      title={image.name}
+                    >
+                      {image.name}
+                    </span>
+                  </div>
+
+                  {/* Hex Value (for colors) */}
+                  {isColor && colorHex && (
+                    <div className="flex justify-between items-center pb-1">
+                      <span className="text-sm font-medium text-gray-500">Hex Value</span>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-sm border border-gray-300 shadow-sm"
+                          style={{ backgroundColor: colorHex }}
+                        />
+                        <span className="text-xs font-bold text-gray-700 font-mono">
+                          {colorHex.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File Type */}
+                  {!isColor && (
+                    <div className="flex justify-between items-center pb-1">
+                      <span className="text-sm font-medium text-gray-500">File Type</span>
+                      <span className="text-sm text-gray-700">{image.mimeType || '-'}</span>
+                    </div>
+                  )}
+
+                  {/* Dimensions */}
+                  {!isColor && (
+                    <div className="flex justify-between items-center pb-1">
+                      <span className="text-sm font-medium text-gray-500">Dimensions</span>
+                      <span className="text-sm text-gray-700">
+                        {image.width && image.height ? `${image.width} × ${image.height} px` : '-'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* File Size */}
+                  {!isColor && (
+                    <div className="flex justify-between items-center pb-1">
+                      <span className="text-sm font-medium text-gray-500">File Size</span>
+                      <span className="text-sm text-gray-700">{fileSizeMB ?? '-'}</span>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {image.description && (
+                    <div className="flex justify-between items-start pb-1">
+                      <span className="text-sm font-medium text-gray-500">Description</span>
+                      <span className="text-sm text-gray-700 text-right max-w-[180px] break-words italic">
+                        {image.description}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Timestamps */}
+                  <div className="flex justify-between items-center pb-1">
+                    <span className="text-sm font-medium text-gray-500">
+                      {hasEvolutionChain ? 'Generated Time' : 'Created Time'}
+                    </span>
+                    <span className="text-sm text-gray-700">
+                      {image.createdAt ? formatTimestamp(image.createdAt) : '-'}
+                    </span>
+                  </div>
+                  {image.updatedAt && image.updatedAt !== image.createdAt && (
+                    <div className="flex justify-between items-center pb-1">
+                      <span className="text-sm font-medium text-gray-500">Last Updated</span>
+                      <span className="text-sm text-gray-700">
+                        {formatTimestamp(image.updatedAt)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Image Name Footer */}
-          <div className="border-t border-gray-200 pt-1 text-center">
-            <p className="text-sm font-medium text-gray-700 truncate">{image.name}</p>
-          </div>
-
-          {/* Shortcut tooltip */}
-          <div className="absolute left-0 -bottom-8 w-full text-center px-3 py-2 text-xs text-gray-200">
-            <p>Press ⬅️ to view the Previous • ➡️ to view the Next • Esc to Close the modal</p>
-          </div>
+          {totalImages > 1 && (
+            <div className="absolute left-1/2 -bottom-8 -translate-x-1/2 flex items-center justify-center z-20 pointer-events-none">
+                <p className="text-sm font-medium text-white tracking-wide">
+                  Press <span className="text-indigo-300">⬅️</span> to view Previous •{' '}
+                  <span className="text-indigo-300">➡️</span> for Next •{' '}
+                  <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">Esc</span> to Close
+                </p>
+            </div>
+          )}
         </div>
       </div>
     </>
