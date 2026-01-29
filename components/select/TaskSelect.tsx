@@ -31,8 +31,8 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
   // Reset related state when tasks change
   const resetRelatedState = useCallback(() => {
-    onModalStateChange?.(false); // Close any open confirmation modal
-    onError?.(null); // Clear any error messages
+    onModalStateChange?.(false);
+    onError?.(null);
   }, [onModalStateChange, onError]);
 
   const tasks = [
@@ -41,28 +41,32 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       label: GEMINI_TASKS.RECOLOR_WALL.label_name,
       icon: '🎨',
       guestAllowed: true,
-      description: 'Instantly transform your walls with a fresh coat of color from our curated palette.',
+      description:
+        'Instantly transform your walls with a fresh coat of color from our curated palette.',
     },
     {
       value: GEMINI_TASKS.ADD_TEXTURE.task_name,
       label: GEMINI_TASKS.ADD_TEXTURE.label_name,
       icon: '🧱',
       guestAllowed: false,
-      description: 'Elevate your surfaces with realistic textures like natural wood, elegant stone, or designer wallpaper.',
+      description:
+        'Elevate your surfaces with realistic textures like natural wood, elegant stone, or designer wallpaper.',
     },
     {
       value: GEMINI_TASKS.ADD_HOME_ITEM.task_name,
       label: GEMINI_TASKS.ADD_HOME_ITEM.label_name,
       icon: '🛋️',
       guestAllowed: false,
-      description: 'Seamlessly integrate new furniture and décor into your space for a complete vision.',
+      description:
+        'Seamlessly integrate new furniture and décor into your space for a complete vision.',
     },
     {
       value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
       label: GEMINI_TASKS.CUSTOM_PROMPT.label_name,
       icon: '💬',
       guestAllowed: false,
-      description: 'Describe your dream space and let AI bring your unique vision to life with precision.',
+      description:
+        'Describe your dream space and let AI bring your unique vision to life with precision.',
     },
   ];
 
@@ -105,7 +109,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
   return (
     <div className="space-y-2 px-6 pt-6">
-      <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
+      <Typography.Title level={5} className="!m-0 !mb-2">
         Design Goal
       </Typography.Title>
 
@@ -173,7 +177,6 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       </div>
     </div>
   );
-
 };
 
 export default TaskSelect;

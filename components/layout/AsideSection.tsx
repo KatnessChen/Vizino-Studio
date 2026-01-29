@@ -175,19 +175,19 @@ const AsideSection: React.FC = () => {
         </Typography.Title>
         {selectionMessage ? (
           <div
-            className={`flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm`}
-            style={{ height: cardHeight }}
+            className="flex justify-center items-center p-3 bg-gray-100 rounded border border-dashed border-gray-200 text-gray-500 text-sm h-[120px]"
           >
             {selectionMessage}
           </div>
+
         ) : selectedImage ? (
           <div>
             <img
               src={cachedImageSrc || selectedImage.imageDownloadUrl}
               alt={selectedImage.name}
-              className={`w-full rounded border border-gray-200 object-cover`}
-              style={{ height: cardHeight }}
+              className="w-full rounded border border-gray-200 object-cover h-[120px]"
             />
+
           </div>
         ) : null}
       </div>

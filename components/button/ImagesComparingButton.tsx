@@ -38,7 +38,7 @@ const ImagesComparingButton: React.FC<ImagesComparingButtonProps> = ({
             type="text"
             size="small"
             icon={
-              <CompareIcon style={{ fontSize: '18px', color: isEnabled ? '#ffffff' : '#9ca3af' }} />
+              <CompareIcon style={{ fontSize: '18px', color: isEnabled ? 'gray' : 'lightgray' }} />
             }
             onClick={handleClick}
             disabled={!isEnabled}

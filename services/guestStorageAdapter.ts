@@ -117,6 +117,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests use preset colors only
   }
 
+  async updateColor(_colorId: string, _updates: { name?: string; description?: string }): Promise<void> {
+    throw new Error('Guests cannot update colors');
+  }
+
   async deleteColor(_colorId: string): Promise<void> {
     throw new Error('Guests cannot delete colors');
   }
@@ -130,6 +134,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests cannot add textures
   }
 
+  async updateTexture(_textureId: string, _updates: { name?: string; description?: string }): Promise<void> {
+    throw new Error('Guests cannot update textures');
+  }
+
   async deleteTexture(_textureId: string): Promise<void> {
     throw new Error('Guests cannot delete textures');
   }
@@ -141,6 +149,10 @@ export class GuestStorageAdapter implements StorageAdapter {
 
   async fetchItems(): Promise<Item[]> {
     return []; // Guests cannot add items
+  }
+
+  async updateItem(_itemId: string, _updates: { name?: string; description?: string }): Promise<void> {
+    throw new Error('Guests cannot update items');
   }
 
   async deleteItem(_itemId: string): Promise<void> {

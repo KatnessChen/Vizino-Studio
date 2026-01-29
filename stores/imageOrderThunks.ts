@@ -3,7 +3,8 @@ import { AppDispatch } from './store';
 import { reorderImagesOptimistic, rollbackReorderImages } from './projectStore';
 import { batchUpdateImagesOrder } from '@/services/firestoreService';
 import { ImageData } from '@/types';
-import { message } from 'antd';
+import { message } from '@/utils/antd';
+
 
 /**
  * Calculate new order values for reordered images

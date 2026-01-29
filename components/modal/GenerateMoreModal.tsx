@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, message, Skeleton } from 'antd';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Skeleton } from 'antd';
+import { message } from '@/utils/antd';
+
 import { BulbOutlined, CloseOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';

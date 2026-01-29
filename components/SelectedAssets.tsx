@@ -207,9 +207,10 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({ customCardHeight }) => 
 
   return (
     <div>
-      <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
+      <Typography.Title level={5} className="!m-0 !mb-2">
         {activeTask && 'Design Material'}
       </Typography.Title>
+
       {renderContent}
     </div>
   );

@@ -17,25 +17,18 @@ const MyButton: React.FC<MyButtonProps> = ({
   style = {},
   className = '',
 }) => {
-  const defaultStyle: React.CSSProperties = {
-    background: 'rgba(99, 102, 241, 0.9)',
-    border: 'none',
-    color: 'white',
-    borderRadius: '4px',
-    padding: '4px 8px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-    transition: 'all 0.3s ease',
-    ...style,
-  };
-
   return (
-    <Button onClick={onClick} style={defaultStyle} className={className}>
-      {icon && <span style={{ display: 'flex', alignItems: 'center' }}>{icon}</span>}
+    <Button
+      onClick={onClick}
+      style={style}
+      className={`
+        bg-indigo-600/90 border-none text-white rounded px-2 py-1 
+        cursor-pointer flex items-center gap-1 text-xs font-medium 
+        transition-all duration-300 ease-in-out
+        ${className}
+      `}
+    >
+      {icon && <span className="flex items-center">{icon}</span>}
       {children}
     </Button>
   );

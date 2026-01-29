@@ -1,4 +1,6 @@
 import React, { useRef } from 'react';
+import { App as AntdApp } from 'antd';
+
 import { Provider } from 'react-redux';
 import '@/styles/main.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -15,6 +17,8 @@ import NotFoundPage from './pages/NotFoundPage';
 import LoginRequiredModal from './components/modal/LoginRequiredModal';
 import { GuestOnboardingTourRef } from './components/GuestOnboardingTour';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AntdStaticHelper } from './utils/antd';
+
 
 // Main Layout Component - allows both authenticated and guest users
 const MainLayout: React.FC = () => {
@@ -32,9 +36,11 @@ const MainLayout: React.FC = () => {
   // Allow both authenticated and guest users to access the main app
   return (
     <ErrorBoundary level="page">
-      <div className="h-screen flex flex-col overflow-scroll">
+      <div className="h-screen flex flex-col overflow-hidden">
+
         <Header />
-        <div className="flex-1 overflow-scroll">
+        <div className="flex-1 overflow-hidden">
+
           <div className="app-viewport">
             <Routes>
               <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
@@ -69,9 +75,11 @@ const ProtectedAdminLayout: React.FC = () => {
 
   return (
     <ErrorBoundary level="page">
-      <div className="h-screen flex flex-col overflow-scroll">
+      <div className="h-screen flex flex-col overflow-hidden">
+
         <Header />
-        <div className="flex-1 overflow-scroll">
+        <div className="flex-1 overflow-auto">
+
           <AdminSettingPage />
         </div>
       </div>
@@ -99,14 +107,18 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary level="app">
-      <Provider store={store}>
-        <AuthProvider>
-          <GuestProvider>
-            <AppContent />
-          </GuestProvider>
-        </AuthProvider>
-      </Provider>
+      <AntdApp>
+        <AntdStaticHelper />
+        <Provider store={store}>
+          <AuthProvider>
+            <GuestProvider>
+              <AppContent />
+            </GuestProvider>
+          </AuthProvider>
+        </Provider>
+      </AntdApp>
     </ErrorBoundary>
+
   );
 };
 

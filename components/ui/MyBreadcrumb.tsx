@@ -567,7 +567,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             {/* Guest Mode Badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
               <span className="text-sm">💫</span>
-              <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">
+              <span className="text-indigo-700 font-bold text-xs uppercase">
+
                 Guest Mode
               </span>
             </div>

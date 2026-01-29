@@ -15,7 +15,6 @@ import { useSortable } from '@dnd-kit/sortable';
 import { ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import { CloseOutlined as CloseIcon } from '@ant-design/icons';
-import { Button } from 'antd';
 
 interface ComparePhotosModalProps {
   isOpen: boolean;

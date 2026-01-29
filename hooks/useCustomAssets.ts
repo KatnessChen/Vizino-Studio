@@ -15,6 +15,8 @@ import {
   addCustomItem as addCustomItemAction,
   removeCustomTexture as removeCustomTextureAction,
   removeCustomItem as removeCustomItemAction,
+  updateCustomTexture as updateCustomTextureAction,
+  updateCustomItem as updateCustomItemAction,
   setLoadingTextures,
   setLoadingItems,
   setLoadTexturesError,
@@ -165,12 +167,28 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
       dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
     }
   }, [isReady, effectiveProjectId, isTexture, adapter, dispatch]);
-
-  return {
-    customAssets,
-    isLoadingAssets,
-    loadAssetsError,
-    addAsset,
-    deleteAsset,
-  };
-};
+ 
+   const updateAsset = useCallback(async (assetId: string, updates: { name?: string; description?: string }): Promise<void> => {
+     if (!isReady || !effectiveProjectId) {
+       throw new Error('Storage not ready');
+     }
+ 
+     if (isTexture) {
+       await adapter.updateTexture(assetId, updates);
+       dispatch(updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates }));
+     } else {
+       await adapter.updateItem(assetId, updates);
+       dispatch(updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates }));
+     }
+   }, [isReady, effectiveProjectId, isTexture, adapter, dispatch]);
+ 
+   return {
+     customAssets,
+     isLoadingAssets,
+     loadAssetsError,
+     addAsset,
+     deleteAsset,
+     updateAsset,
+   };
+ 
+ };

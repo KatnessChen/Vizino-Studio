@@ -21,7 +21,7 @@ export const GEMINI_TASKS = {
   },
   CUSTOM_PROMPT: {
     task_name: 'custom_prompt',
-    label_name: 'Prompt',
+    label_name: 'Prompt Only',
     customPromptRequired: true,
   },
 } as const;

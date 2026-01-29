@@ -609,28 +609,37 @@ export async function createImage(
 }
 
 /**
- * Updates an image's name in Firestore.
+ * Updates an image's metadata (name and description) in Firestore.
  *
  * @param userId The ID of the user.
  * @param projectId The ID of the project.
  * @param spaceId The ID of the space.
  * @param imageId The ID of the image to update.
- * @param newName The new name for the image.
+ * @param updates The updates to apply: { name?: string; description?: string }.
  */
-export async function updateImageName(
+export async function updateImageMetadata(
   userId: string,
   projectId: string,
   spaceId: string,
   imageId: string,
-  newName: string
+  updates: { name?: string; description?: string }
 ): Promise<void> {
   if (!userId || !projectId || !spaceId || !imageId) {
     throw new Error('User ID, Project ID, Space ID, and Image ID are required to update image.');
   }
 
-  if (!newName.trim()) {
-    throw new Error('Image name cannot be empty.');
+  const sanitizedUpdates: any = {};
+  if (updates.name !== undefined) {
+    if (!updates.name.trim()) {
+      throw new Error('Image name cannot be empty.');
+    }
+    sanitizedUpdates.name = updates.name.trim();
   }
+  if (updates.description !== undefined) {
+    sanitizedUpdates.description = updates.description.trim();
+  }
+
+  if (Object.keys(sanitizedUpdates).length === 0) return;
 
   try {
     const docRef = doc(
@@ -646,19 +655,38 @@ export async function updateImageName(
     );
 
     const now = new Date();
-    await updateDoc(docRef, {
-      name: newName.trim(),
-      updatedAt: Timestamp.fromDate(now),
-    });
+    sanitizedUpdates.updatedAt = Timestamp.fromDate(now);
 
-    console.log('Image name updated in Firestore:', imageId);
+    await updateDoc(docRef, sanitizedUpdates);
+
+    console.log('Image metadata updated in Firestore:', imageId);
   } catch (error) {
-    console.error('Failed to update image name:', error);
+    console.error('Failed to update image metadata:', error);
     if (error instanceof Error) {
-      throw new Error(`Failed to update image name: ${error.message}`);
+      throw new Error(`Failed to update image metadata: ${error.message}`);
     }
-    throw new Error('Failed to update image name in Firebase.');
+    throw new Error('Failed to update image metadata in Firebase.');
   }
+}
+
+/**
+ * Updates an image's name in Firestore.
+ *
+ * @param userId The ID of the user.
+ * @param projectId The ID of the project.
+ * @param spaceId The ID of the space.
+ * @param imageId The ID of the image to update.
+ * @param newName The new name for the image.
+ * @deprecated Use updateImageMetadata instead.
+ */
+export async function updateImageName(
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  imageId: string,
+  newName: string
+): Promise<void> {
+  return updateImageMetadata(userId, projectId, spaceId, imageId, { name: newName });
 }
 
 /**

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { EyeFilled, SettingOutlined } from '@ant-design/icons';
+import { EyeFilled, SettingOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { Texture, Item, ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import MyButton from '../button/MyButton';
-import './AssetCard.css';
 
 type Asset = Texture | Item | ImageData;
 
@@ -18,7 +17,11 @@ interface AssetCardProps {
   onViewDetails?: () => void;
   onSelect?: (event?: React.MouseEvent) => void;
   onRename?: () => void;
+  onDelete?: () => void;
   onCopy?: () => void;
+  renderPreview?: () => React.ReactNode;
+  showViewButton?: boolean;
+  editLabel?: string;
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -30,7 +33,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
   onViewDetails,
   onSelect,
   onRename,
+  onDelete,
   onCopy,
+  renderPreview,
+  showViewButton = true,
+  editLabel = 'Edit',
 }) => {
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
   const [isLoadingCache, setIsLoadingCache] = useState(false);
@@ -77,42 +84,62 @@ const AssetCard: React.FC<AssetCardProps> = ({
   // Menu items for gear dropdown
   const menuItems = [
     onRename && {
-      key: 'rename',
-      label: 'Rename',
+      key: 'edit',
+      label: editLabel,
       onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
         domEvent.stopPropagation();
         onRename();
       },
     },
-    onViewDetails && {
-      key: 'details',
-      label: 'Details',
+    onViewDetails &&
+      (!isImageData || (asset as ImageData).evolutionChain?.length > 0) && {
+        key: 'details',
+        label: 'History',
+        onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+          domEvent.stopPropagation();
+          onViewDetails();
+        },
+      },
+    onDelete && {
+      key: 'delete',
+      label: 'Delete',
+      danger: true,
       onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
         domEvent.stopPropagation();
-        onViewDetails();
+        onDelete();
       },
     },
   ].filter(Boolean) as Exclude<MenuProps['items'], undefined>;
 
   // Show gear icon if any operation is available
-  const hasOperations = onRename || onCopy;
+  const hasOperations = onRename || onCopy || onDelete;
   return (
     <div
       onClick={(e) => onSelect?.(e)}
       onMouseEnter={() => setShowButtons(true)}
       onMouseLeave={() => setShowButtons(false)}
-      className={`w-full min-w-[160px] ${isList ? 'min-h-[120px]' : 'min-h-[200px]'} relative border-2 ${isSelected ? 'border-[#bd6dff]' : 'border-[#d1d5db]'} rounded-md cursor-pointer ${isList ? 'flex-row' : 'flex-col'} flex bg-[#f9fafb] overflow-hidden ${isSelected ? 'shadow-[0_8px_24px_rgba(99,102,241,0.5)]' : 'shadow-[0_2px_8px_rgba(0,0,0,0.08)]'}`}
+      className={`w-full min-w-[160px] ${isList ? 'min-h-[120px]' : 'min-h-[200px]'} relative border-2 ${isSelected ? 'border-[#bd6dff] asset-card-selected' : 'border-[#d1d5db]'} rounded-md cursor-pointer ${isList ? 'flex-row' : 'flex-col'} flex bg-[#f9fafb] overflow-hidden ${isSelected ? 'shadow-[0_8px_24px_rgba(99, 102, 241, 0.5)]' : 'shadow-[0_2px_8px_rgba(0,0,0,0.08)]'}`}
     >
       {/* Image container */}
       <div
         className={
           isList
             ? 'relative overflow-hidden w-[140px] min-h-[120px] flex-none'
-            : 'flex-1 relative overflow-hidden min-h-[140px]'
+            : `flex-1 relative overflow-hidden ${renderPreview ? 'h-full' : 'min-h-[140px]'}`
         }
+        style={renderPreview ? { padding: 0 } : undefined}
       >
+        {/* Selection Badge */}
+        {isSelected && (
+          <div className="absolute top-2 left-2 z-10 text-indigo-500 bg-white rounded-full shadow-md leading-[0]">
+            <CheckCircleFilled className="text-xl" />
+          </div>
+        )}
+
         {/* Asset preview */}
-        {imageSrc ? (
+        {renderPreview ? (
+          <div className="absolute inset-0 w-full h-full">{renderPreview()}</div>
+        ) : imageSrc ? (
           <img
             src={imageSrc}
             alt={asset.name}
@@ -128,29 +155,26 @@ const AssetCard: React.FC<AssetCardProps> = ({
       {/* Toolbar - top-right of the card (keeps same buttons) */}
       {(onViewExpand || onViewDetails || hasOperations) && (
         <div
-          className={`absolute top-2 right-2 z-10 flex gap-1.5 items-center p-1 rounded-md bg-[rgba(255,255,255,0.05)] backdrop-blur-sm transition-opacity duration-300 ${showButtons ? 'opacity-100 visible pointer-events-auto' : 'opacity-0 invisible pointer-events-none'}`}
+          className={`absolute top-2 right-2 z-10 flex gap-1.5 items-center p-1 rounded-md bg-gray-100 backdrop-blur-sm transition-opacity duration-200 ${showButtons ? 'opacity-100 visible pointer-events-auto' : 'opacity-0 invisible pointer-events-none'}`}
         >
-          {onViewExpand && (
+          {onViewExpand && showViewButton && (
             <MyButton
               onClick={(e) => {
                 e.stopPropagation();
                 onViewExpand();
               }}
               icon={<EyeFilled className="text-[16px]" />}
+              className="view-button !bg-white !text-slate-700 opacity-90 shadow-sm !border-none transition-all duration-200 ease-in-out hover:!bg-white hover:scale-105 hover:opacity-100"
             >
               View
             </MyButton>
-          )}
-
-          {onViewExpand && (onViewDetails || hasOperations) && (
-            <div className="w-px h-6 bg-white/20 mx-0.5" />
           )}
 
           {(onViewDetails || hasOperations) && (
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="gear-button w-8 h-8 rounded-md bg-white opacity-90 flex items-center justify-center cursor-pointer shadow-sm"
+                className="gear-button w-8 h-8 rounded-md bg-white opacity-90 flex items-center justify-center cursor-pointer shadow-sm transition-all duration-200 ease-in-out hover:opacity-100 hover:scale-105"
               >
                 <SettingOutlined className="text-[16px] text-slate-700" />
               </div>

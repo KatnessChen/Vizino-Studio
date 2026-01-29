@@ -11,6 +11,7 @@ import { RootState } from '@/stores/store';
 import {
   setCustomColors,
   addCustomColor as addCustomColorAction,
+  updateCustomColor,
   removeCustomColor as removeCustomColorAction,
   setLoadingColors,
   setLoadColorsError,
@@ -102,20 +103,36 @@ export const useCustomColors = (projectId: string | null) => {
     return newColor;
   }, [isReady, effectiveProjectId, isGuestMode, gateUpload, adapter, dispatch]);
 
-  const deleteColor = useCallback(async (colorId: string): Promise<void> => {
-    if (!isReady || !effectiveProjectId) {
-      throw new Error('Storage not ready');
-    }
+  const updateColor = useCallback(
+    async (colorId: string, updates: { name?: string; description?: string }): Promise<void> => {
+      if (!isReady || !effectiveProjectId) {
+        throw new Error('Storage not ready');
+      }
 
-    await adapter.deleteColor(colorId);
-    dispatch(removeCustomColorAction({ projectId: effectiveProjectId, colorId }));
-  }, [isReady, effectiveProjectId, adapter, dispatch]);
+      await adapter.updateColor(colorId, updates);
+      dispatch(updateCustomColor({ projectId: effectiveProjectId, colorId, updates }));
+    },
+    [isReady, effectiveProjectId, adapter, dispatch]
+  );
+
+  const deleteColor = useCallback(
+    async (colorId: string): Promise<void> => {
+      if (!isReady || !effectiveProjectId) {
+        throw new Error('Storage not ready');
+      }
+
+      await adapter.deleteColor(colorId);
+      dispatch(removeCustomColorAction({ projectId: effectiveProjectId, colorId }));
+    },
+    [isReady, effectiveProjectId, adapter, dispatch]
+  );
 
   return {
     customColors,
     isLoadingColors,
     loadColorsError,
     addColor,
+    updateColor,
     deleteColor,
   };
 };
