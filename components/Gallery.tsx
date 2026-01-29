@@ -22,7 +22,7 @@ import { RootState } from '@/stores/store';
 import AssetCard from './ui/AssetCard';
 import SortableAssetCard from './ui/SortableAssetCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
-import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
+import GenerationHistoryModal from './modal/GenerationHistoryModal';
 import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
 import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
@@ -46,7 +46,7 @@ interface GalleryProps {
   selectedImageIds?: Set<string>;
   onSelectImage?: (imageId: string) => void;
   onSelectMultiple?: (imageId: string) => void;
-  onRenameImage?: (imageId: string, newName: string) => void;
+  onRenameImage?: (imageId: string, newName: string, description: string) => void;
   showDownloadButtons?: boolean;
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
@@ -74,7 +74,18 @@ interface GalleryProps {
   onReorder?: (newOrderedImageIds: string[]) => void;
   isLoading?: boolean;
   onSingleRename?: (imageId: string) => void;
+  onSingleDelete?: (imageId: string) => void;
   onSingleCopy?: (imageId: string) => void;
+  uploadButtonText?: string;
+  uploadModalTitle?: string;
+  batchUploadMode?: 'image' | 'asset';
+  assetType?: 'texture' | 'item';
+  existingNames?: Set<string>;
+  renderItemPreview?: (image: ImageData) => React.ReactNode;
+  showViewButton?: boolean;
+  detailModalTitle?: string;
+  editLabel?: string;
+  viewMoreModalTitle?: string;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
@@ -92,9 +103,20 @@ const Gallery: React.FC<GalleryProps> = ({
   onBulkCopy,
   onBulkMove,
   onReorder,
+  onSelectImage,
   onSelectMultiple,
   onSingleRename,
+  onSingleDelete,
   onSingleCopy,
+  uploadButtonText = 'Images',
+  uploadModalTitle = 'Upload Images',
+  batchUploadMode = 'image',
+  assetType,
+  existingNames,
+  renderItemPreview,
+  showViewButton = true,
+  detailModalTitle,
+  editLabel = 'Edit',
 }) => {
   const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
@@ -102,9 +124,11 @@ const Gallery: React.FC<GalleryProps> = ({
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
   const [imageToDisplayInModal, setImageToDisplayInModal] = useState<ImageData | null>(null);
 
-  // State for ViewMoreDisplayModal
-  const [showViewMoreModal, setShowViewMoreModal] = useState<boolean>(false);
-  const [imageForViewMore, setImageForViewMore] = useState<ImageData | null>(null);
+  // State for GenerationHistoryModal
+  const [showGenerationHistoryModal, setShowGenerationHistoryModal] = useState<boolean>(false);
+  const [imageForGenerationHistory, setImageForGenerationHistory] = useState<ImageData | null>(
+    null
+  );
 
   // State for BatchUploadModal
   const [showBatchUploadModal, setShowBatchUploadModal] = useState<boolean>(false);
@@ -147,14 +171,14 @@ const Gallery: React.FC<GalleryProps> = ({
     setImageToDisplayInModal(null);
   }, []);
 
-  const onViewMoreButtonClick = useCallback((imageData: ImageData) => {
-    setImageForViewMore(imageData);
-    setShowViewMoreModal(true);
+  const onViewGenerationHistoryClick = useCallback((imageData: ImageData) => {
+    setImageForGenerationHistory(imageData);
+    setShowGenerationHistoryModal(true);
   }, []);
 
-  const handleCloseViewMoreModal = useCallback(() => {
-    setShowViewMoreModal(false);
-    setImageForViewMore(null);
+  const handleCloseGenerationHistoryModal = useCallback(() => {
+    setShowGenerationHistoryModal(false);
+    setImageForGenerationHistory(null);
   }, []);
 
   // Calculate current image index
@@ -225,10 +249,11 @@ const Gallery: React.FC<GalleryProps> = ({
       } else {
         // Normal click
         onSelectMultiple?.(imageId);
+        onSelectImage?.(imageId);
         setLastSelectedIndex(currentIndex);
       }
     },
-    [images, lastSelectedIndex, onSelectMultiple, selectedImageIds]
+    [images, lastSelectedIndex, onSelectMultiple, onSelectImage, selectedImageIds]
   );
 
   // Drag selection handlers
@@ -377,6 +402,9 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const iconStyle = {
     fontSize: '18px',
+    color: 'gray',
+    marginTop: '2px',
+    marginLeft: '2px',
   };
 
   // Handle batch file upload
@@ -413,27 +441,25 @@ const Gallery: React.FC<GalleryProps> = ({
   };
 
   const cardTitle = (
-    <div
-      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20 }}
-    >
-      <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
+    <div className="flex justify-between items-center gap-5">
+      <h2 className="m-0 text-lg font-semibold">{title}</h2>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="flex items-center gap-3">
         {hasSelection && (
           <div
             style={{
               display: 'flex',
+              backgroundColor: '#f3f4f6',
               alignItems: 'center',
-              gap: '6px',
+              gap: 6,
               padding: '4px 8px 4px 16px',
-              backgroundColor: 'indigo',
-              borderRadius: '8px',
-              height: '32px',
-              color: '#ffffff',
+              borderRadius: 8,
+              height: 32,
+              color: 'black',
             }}
           >
             {/* Selection count */}
-            <span style={{ fontSize: '13px', fontWeight: 500 }}>
+            <span style={{ fontSize: 13, color: '#4b5563', fontWeight: 500, marginRight: 4 }}>
               {selectedImageIds.size} selected
             </span>
 
@@ -451,14 +477,7 @@ const Gallery: React.FC<GalleryProps> = ({
             )}
 
             {/* Divider */}
-            <div
-              style={{
-                width: '1px',
-                height: '18px',
-                backgroundColor: '#d0d0d0',
-                margin: '0 2px',
-              }}
-            />
+            <div style={{ width: 1, height: 18, backgroundColor: '#d1d5db', margin: '0 4px' }} />
 
             {/* Compare button */}
             <ImagesComparingButton
@@ -481,7 +500,7 @@ const Gallery: React.FC<GalleryProps> = ({
             )}
 
             {onBulkCopy && (
-              <Tooltip title="Copy">
+              <Tooltip title="Duplicate">
                 <Button
                   type="text"
                   size="small"
@@ -529,9 +548,9 @@ const Gallery: React.FC<GalleryProps> = ({
               }
             }}
             disabled={isImageLimitReached && !isGuestMode}
-            style={isGuestMode ? { opacity: 0.6 } : undefined}
+            className={`!flex items-center gap-1.5 ${isGuestMode ? 'opacity-60' : ''}`}
           >
-            Images
+            {uploadButtonText}
             {isGuestMode && <LockOutlined />}
           </Button>
         )}
@@ -603,9 +622,13 @@ const Gallery: React.FC<GalleryProps> = ({
                   layout={layoutMode === 'List' ? 'list' : 'grid'}
                   onSelect={(e?: React.MouseEvent) => handleCardClick(image.id, e)}
                   onViewExpand={() => handleExpandPhotoImage(image)}
-                  onViewDetails={() => onViewMoreButtonClick(image)}
+                  onViewDetails={() => onViewGenerationHistoryClick(image)}
                   onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
+                  onDelete={onSingleDelete ? () => onSingleDelete(image.id) : undefined}
                   onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
+                  renderPreview={renderItemPreview ? () => renderItemPreview(image) : undefined}
+                  showViewButton={showViewButton}
+                  editLabel={editLabel}
                 />
               </div>
             ))}
@@ -653,6 +676,12 @@ const Gallery: React.FC<GalleryProps> = ({
                 onViewExpand={() => {}}
                 onViewDetails={() => {}}
                 layout={layoutMode === 'List' ? 'list' : 'grid'}
+                renderPreview={
+                  activeImage && renderItemPreview
+                    ? () => renderItemPreview(activeImage)
+                    : undefined
+                }
+                showViewButton={showViewButton}
               />
             </div>
           ) : null}
@@ -669,15 +698,20 @@ const Gallery: React.FC<GalleryProps> = ({
           totalImages={images.length}
           onPrevious={handlePrevious}
           onNext={handleNext}
+          renderPreview={
+            renderItemPreview ? () => renderItemPreview(imageToDisplayInModal) : undefined
+          }
+          detailModalTitle={detailModalTitle}
+          onEdit={onSingleRename ? () => onSingleRename(imageToDisplayInModal.id) : undefined}
         />
       )}
 
       {/* View More Display Modal */}
-      {imageForViewMore && (
-        <ViewMoreDisplayModal
-          isOpen={showViewMoreModal}
-          image={imageForViewMore}
-          onClose={handleCloseViewMoreModal}
+      {imageForGenerationHistory && (
+        <GenerationHistoryModal
+          isOpen={showGenerationHistoryModal}
+          image={imageForGenerationHistory}
+          onClose={handleCloseGenerationHistoryModal}
         />
       )}
 
@@ -688,7 +722,10 @@ const Gallery: React.FC<GalleryProps> = ({
           onClose={() => setShowBatchUploadModal(false)}
           onUpload={handleBatchUpload}
           currentCount={totalImageCount}
-          title="Upload Images"
+          title={uploadModalTitle}
+          mode={batchUploadMode}
+          assetType={assetType}
+          existingNames={existingNames}
         />
       )}
     </Card>

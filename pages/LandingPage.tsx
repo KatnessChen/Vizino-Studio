@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
-import { message, Tag } from 'antd';
+import { Tag } from 'antd';
+import { message } from '@/utils/antd';
+
 import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
 import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
@@ -15,14 +17,19 @@ import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
 import GreetingModal from '@/components/modal/GreetingModal';
 import Footer from '@/components/layout/Footer';
 import AsideSection from '@/components/layout/AsideSection';
-import ColorSelect from '@/components/select/ColorSelect';
-import TextureOrItemSelect from '@/components/select/TextureOrItemSelect';
+import ColorGallery from '@/components/select/ColorGallery';
+import AssetRenameModal from '@/components/modal/AssetRenameModal';
+import { useCustomAssets } from '@/hooks/useCustomAssets';
+import { setSelectedTexture, setSelectedItem } from '@/stores/taskStore';
+import { Texture, Item } from '@/types';
+import { Modal } from 'antd';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, ImageOperation } from '@/types';
 import {
   createImage,
   deleteImages,
   fetchSpaceImages,
+  updateImageMetadata,
   updateImageName,
   duplicateImage,
   moveImageToSpace,
@@ -139,6 +146,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     null
   );
 
+  // Asset states
+  const {
+    customAssets: textures,
+    isLoadingAssets: isLoadingTextures,
+    addAsset: addTexture,
+    deleteAsset: deleteTexture,
+    updateAsset: updateTexture,
+  } = useCustomAssets('texture', activeProjectId);
+
+  const {
+    customAssets: items,
+    isLoadingAssets: isLoadingItems,
+    addAsset: addItem,
+    deleteAsset: deleteItem,
+    updateAsset: updateItem,
+  } = useCustomAssets('item', activeProjectId);
+
+  const [textureSelectedIds, setTextureSelectedIds] = useState<Set<string>>(new Set());
+  const [itemSelectedIds, setItemSelectedIds] = useState<Set<string>>(new Set());
+  const [assetToRename, setAssetToRename] = useState<{
+    id: string;
+    name: string;
+    description?: string;
+  } | null>(null);
+  const [assetTypeToRename, setAssetTypeToRename] = useState<'texture' | 'item' | null>(null);
+  const [showAssetRenameModal, setShowAssetRenameModal] = useState(false);
+
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   // State for processing context (to track source image and custom prompt)
@@ -212,6 +246,208 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // State for rename modal
   const [showRenameModal, setShowRenameModal] = useState<boolean>(false);
   const [imageToRename, setImageToRename] = useState<ImageData | null>(null);
+
+  // Mapped assets for Galleries
+  const mappedTextures = useMemo(() => {
+    return (textures as Texture[]).map(
+      (t) =>
+        ({
+          ...t,
+          imageDownloadUrl: t.textureImageDownloadUrl,
+          mimeType: t.mimeType || 'image/jpeg',
+          spaceId: '',
+          evolutionChain: [],
+          parentImageId: null,
+          storageFilePath: '',
+          order: null,
+          isDeleted: false,
+          deletedAt: null,
+          createdAt: t.createdAt || Timestamp.now(),
+          updatedAt: t.updatedAt || Timestamp.now(),
+        }) as unknown as ImageData
+    );
+  }, [textures]);
+
+  const mappedItems = useMemo(() => {
+    return (items as Item[]).map(
+      (i) =>
+        ({
+          ...i,
+          imageDownloadUrl: i.itemImageDownloadUrl,
+          mimeType: i.mimeType || 'image/jpeg',
+          spaceId: '',
+          evolutionChain: [],
+          parentImageId: null,
+          storageFilePath: '',
+          order: null,
+          isDeleted: false,
+          deletedAt: null,
+          createdAt: i.createdAt || Timestamp.now(),
+          updatedAt: i.updatedAt || Timestamp.now(),
+        }) as unknown as ImageData
+    );
+  }, [items]);
+
+  // Asset Handlers
+  const handleSelectTexture = useCallback(
+    (id: string) => {
+      const texture = textures.find((t) => t.id === id);
+      if (!texture) return;
+
+      // narrow type at runtime to ensure we only dispatch Texture
+      const isTexture = (a: unknown): a is Texture =>
+        typeof a === 'object' &&
+        a !== null &&
+        'textureImageDownloadUrl' in (a as Record<string, unknown>);
+
+      if (selectedTexture?.id === texture.id) {
+        dispatch(setSelectedTexture(null));
+        if (textureSelectedIds.has(texture.id) && textureSelectedIds.size === 1) {
+          setTextureSelectedIds(new Set());
+        }
+      } else {
+        if (!isTexture(texture)) return;
+        dispatch(setSelectedTexture(texture));
+        setTextureSelectedIds(new Set([texture.id]));
+      }
+    },
+    [textures, selectedTexture, textureSelectedIds, dispatch]
+  );
+
+  const handleSelectItem = useCallback(
+    (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+
+      // narrow type at runtime to ensure we only dispatch Item
+      const isItem = (a: unknown): a is Item =>
+        typeof a === 'object' &&
+        a !== null &&
+        'itemImageDownloadUrl' in (a as Record<string, unknown>);
+
+      if (selectedItem?.id === item.id) {
+        dispatch(setSelectedItem(null));
+        if (itemSelectedIds.has(item.id) && itemSelectedIds.size === 1) {
+          setItemSelectedIds(new Set());
+        }
+      } else {
+        if (!isItem(item)) return;
+        dispatch(setSelectedItem(item));
+        setItemSelectedIds(new Set([item.id]));
+      }
+    },
+    [items, selectedItem, itemSelectedIds, dispatch]
+  );
+
+  const handleTextureUpload = async (file: File, metadata?: any) => {
+    if (!metadata) return;
+    try {
+      const newTexture = await addTexture({
+        name: metadata.name || file.name,
+        file,
+        description: metadata.description || '',
+        width: metadata.width,
+        height: metadata.height,
+        aspect_ratio: metadata.aspect_ratio,
+      });
+      message.success(`Texture "${newTexture.name}" added successfully!`);
+      dispatch(setSelectedTexture(newTexture as Texture));
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Failed to upload texture');
+    }
+  };
+
+  const handleItemUpload = async (file: File, metadata?: any) => {
+    if (!metadata) return;
+    try {
+      const newItem = await addItem({
+        name: metadata.name || file.name,
+        file,
+        description: metadata.description || '',
+        width: metadata.width,
+        height: metadata.height,
+        aspect_ratio: metadata.aspect_ratio,
+      });
+      message.success(`Item "${newItem.name}" added successfully!`);
+      dispatch(setSelectedItem(newItem as Item));
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Failed to upload item');
+    }
+  };
+
+  const handleAssetRenameConfirm = async (
+    id: string,
+    updates: { name: string; description: string }
+  ) => {
+    if (assetTypeToRename === 'texture') {
+      await updateTexture(id, updates);
+      message.success('Texture renamed successfully');
+    } else if (assetTypeToRename === 'item') {
+      await updateItem(id, updates);
+      message.success('Item renamed successfully');
+    }
+  };
+
+  const handleBulkDeleteAssets = (type: 'texture' | 'item') => {
+    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
+    if (ids.size === 0) return;
+
+    Modal.confirm({
+      title: `Delete ${ids.size} ${type === 'texture' ? 'Textures' : 'Items'}`,
+      content: 'Are you sure you want to delete these items? This action cannot be undone.',
+      okText: 'Delete All',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          if (type === 'texture') {
+            for (const id of Array.from(ids)) await deleteTexture(id);
+            setTextureSelectedIds(new Set());
+            if (selectedTexture && ids.has(selectedTexture.id)) dispatch(setSelectedTexture(null));
+          } else {
+            for (const id of Array.from(ids)) await deleteItem(id);
+            setItemSelectedIds(new Set());
+            if (selectedItem && ids.has(selectedItem.id)) dispatch(setSelectedItem(null));
+          }
+          message.success('Items deleted successfully');
+        } catch (err) {
+          message.error('Failed to delete some items');
+        }
+      },
+    });
+  };
+
+  const handleBulkCopyAssets = (type: 'texture' | 'item') => {
+    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
+    const assetList = type === 'texture' ? textures : items;
+    const urls = assetList
+      .filter((a) => ids.has(a.id))
+      .map((a) =>
+        type === 'texture'
+          ? (a as Texture).textureImageDownloadUrl
+          : (a as Item).itemImageDownloadUrl
+      )
+      .join('\n');
+
+    navigator.clipboard
+      .writeText(urls)
+      .then(() => message.success('URLs copied to clipboard!'))
+      .catch(() => message.error('Failed to copy to clipboard'));
+  };
+
+  const handleBulkDownloadAssets = async (type: 'texture' | 'item') => {
+    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
+    const assetList = type === 'texture' ? textures : items;
+    const selected = assetList.filter((a) => ids.has(a.id));
+
+    for (const asset of selected) {
+      const url =
+        type === 'texture'
+          ? (asset as Texture).textureImageDownloadUrl
+          : (asset as Item).itemImageDownloadUrl;
+      downloadFile(url, buildDownloadFilename(asset.name, 'image/jpeg'));
+    }
+    message.success(`Downloading ${selected.length} items...`);
+  };
 
   // Initialize app on mount
   useAppInit();
@@ -377,9 +613,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleRenameImage = useCallback(
-    async (imageId: string, newName: string) => {
+    async (imageId: string, newName: string, description: string) => {
       if (!user) {
-        setErrorMessage('Please log in to rename images.');
+        setErrorMessage('Please log in to update images.');
         return;
       }
 
@@ -404,23 +640,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       );
 
       try {
-        // Update image name in Firestore
-        await updateImageName(user.uid, activeProjectId, activeSpaceId, imageId, newName.trim());
+        // Update image name and description in Firestore
+        await updateImageMetadata(user.uid, activeProjectId, activeSpaceId, imageId, {
+          name: newName.trim(),
+          description: description.trim(),
+        });
 
         // Fetch updated space images to sync
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
-        message.success('Image renamed successfully');
+        message.success('Image updated successfully');
         setErrorMessage(null);
       } catch (error) {
-        console.error('Failed to rename image:', error);
+        console.error('Failed to update image:', error);
 
         // Rollback - refresh from server
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
-        setErrorMessage('Failed to save renamed image. Please try again.');
+        setErrorMessage('Failed to save updated image. Please try again.');
       }
     },
     [user, activeProjectId, activeSpaceId, dispatch, setErrorMessage]
@@ -452,10 +691,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleConfirmRename = useCallback(
-    (imageId: string, newName: string) => {
+    (imageId: string, newName: string, description: string) => {
       setShowRenameModal(false);
       setImageToRename(null);
-      handleRenameImage(imageId, newName);
+      handleRenameImage(imageId, newName, description);
     },
     [handleRenameImage]
   );
@@ -1162,7 +1401,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     <div className="flex bg-gray-50">
       <AsideSection />
       <main
-        className="flex-1 overflow-scroll"
+        className="flex-1 overflow-auto"
         style={{ height: 'calc(100vh - var(--header-height))' }}
       >
         <div
@@ -1232,14 +1471,123 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
                     {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
                       <div data-tour="color-select">
-                        <ColorSelect selectedColor={selectedColor} />
+                        <ColorGallery />
                       </div>
                     )}
                     {selectedTaskNames[0] === GEMINI_TASKS.ADD_TEXTURE.task_name && (
-                      <TextureOrItemSelect type="texture" onError={setErrorMessage} />
+                      <Gallery
+                        title="Textures"
+                        images={mappedTextures}
+                        selectedImageId={selectedTexture?.id}
+                        selectedImageIds={textureSelectedIds}
+                        onSelectImage={handleSelectTexture}
+                        onSelectMultiple={(id) => {
+                          const next = new Set(textureSelectedIds);
+                          if (next.has(id)) {
+                            next.delete(id);
+                          } else {
+                            next.add(id);
+                          }
+                          setTextureSelectedIds(next);
+                        }}
+                        onClearSelection={() => setTextureSelectedIds(new Set())}
+                        onUploadImage={handleTextureUpload}
+                        onUploadError={setErrorMessage}
+                        onBulkDelete={() => handleBulkDeleteAssets('texture')}
+                        onBulkCopy={() => handleBulkCopyAssets('texture')}
+                        onBulkDownload={() => handleBulkDownloadAssets('texture')}
+                        isLoading={isLoadingTextures}
+                        emptyMessage="No textures found"
+                        uploadButtonText="Textures"
+                        uploadModalTitle="Upload Textures"
+                        batchUploadMode="asset"
+                        assetType="texture"
+                        existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
+                        detailModalTitle="Texture Information"
+                        viewMoreModalTitle="Texture Information"
+                        onSingleRename={(id) => {
+                          const asset = textures.find((t) => t.id === id);
+                          if (asset) {
+                            setAssetToRename(asset);
+                            setAssetTypeToRename('texture');
+                            setShowAssetRenameModal(true);
+                          }
+                        }}
+                        onSingleDelete={(id) => {
+                          const asset = textures.find((t) => t.id === id);
+                          if (asset) {
+                            Modal.confirm({
+                              title: 'Delete Texture',
+                              content: `Are you sure you want to delete "${asset.name}"?`,
+                              okText: 'Delete',
+                              okType: 'danger',
+                              onOk: async () => {
+                                await deleteTexture(asset.id);
+                                if (selectedTexture?.id === asset.id)
+                                  dispatch(setSelectedTexture(null));
+                                message.success('Texture deleted');
+                              },
+                            });
+                          }
+                        }}
+                      />
                     )}
                     {selectedTaskNames[0] === GEMINI_TASKS.ADD_HOME_ITEM.task_name && (
-                      <TextureOrItemSelect type="item" onError={setErrorMessage} />
+                      <Gallery
+                        title="Objects"
+                        images={mappedItems}
+                        selectedImageId={selectedItem?.id}
+                        selectedImageIds={itemSelectedIds}
+                        onSelectImage={handleSelectItem}
+                        onSelectMultiple={(id) => {
+                          const next = new Set(itemSelectedIds);
+                          if (next.has(id)) {
+                            next.delete(id);
+                          } else {
+                            next.add(id);
+                          }
+                          setItemSelectedIds(next);
+                        }}
+                        onClearSelection={() => setItemSelectedIds(new Set())}
+                        onUploadImage={handleItemUpload}
+                        onUploadError={setErrorMessage}
+                        onBulkDelete={() => handleBulkDeleteAssets('item')}
+                        onBulkCopy={() => handleBulkCopyAssets('item')}
+                        onBulkDownload={() => handleBulkDownloadAssets('item')}
+                        isLoading={isLoadingItems}
+                        emptyMessage="No objects found"
+                        uploadButtonText="Objects"
+                        uploadModalTitle="Upload Objects"
+                        batchUploadMode="asset"
+                        assetType="item"
+                        existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
+                        detailModalTitle="Object Information"
+                        viewMoreModalTitle="Object Information"
+                        onSingleRename={(id) => {
+                          const asset = items.find((i) => i.id === id);
+                          if (asset) {
+                            setAssetToRename(asset);
+                            setAssetTypeToRename('item');
+                            setShowAssetRenameModal(true);
+                          }
+                        }}
+                        onSingleDelete={(id) => {
+                          const asset = items.find((i) => i.id === id);
+                          if (asset) {
+                            Modal.confirm({
+                              title: 'Delete Object',
+                              content: `Are you sure you want to delete "${asset.name}"?`,
+                              okText: 'Delete',
+                              okType: 'danger',
+                              onOk: async () => {
+                                await deleteItem(asset.id);
+                                if (selectedItem?.id === asset.id) dispatch(setSelectedItem(null));
+                                message.success('Item deleted');
+                              },
+                            });
+                          }
+                        }}
+                      />
                     )}
 
                     <div data-tour="generated-gallery">
@@ -1372,6 +1720,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           }}
         />
       )}
+
+      {/* Asset Rename Modal */}
+      <AssetRenameModal
+        isOpen={showAssetRenameModal}
+        asset={assetToRename}
+        onConfirm={handleAssetRenameConfirm}
+        onCancel={() => {
+          setShowAssetRenameModal(false);
+          setAssetToRename(null);
+          setAssetTypeToRename(null);
+        }}
+        type={assetTypeToRename || 'texture'}
+        existingNames={
+          new Set(
+            (assetTypeToRename === 'texture' ? textures : items).map((a) => a.name.toLowerCase())
+          )
+        }
+      />
 
       {/* Guest Onboarding Tour */}
       <GuestOnboardingTour ref={tourRef} generateModalRef={generateModalRef} />
