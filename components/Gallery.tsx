@@ -77,6 +77,7 @@ interface GalleryProps {
   detailModalTitle?: string;
   editLabel?: string;
   viewMoreModalTitle?: string;
+  showCompare?: boolean;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
@@ -108,6 +109,7 @@ const Gallery: React.FC<GalleryProps> = ({
   showViewButton = true,
   detailModalTitle,
   editLabel = 'Edit',
+  showCompare = true,
 }) => {
   const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
@@ -471,11 +473,13 @@ const Gallery: React.FC<GalleryProps> = ({
             <div style={{ width: 1, height: 18, backgroundColor: '#d1d5db', margin: '0 4px' }} />
 
             {/* Compare button */}
-            <ImagesComparingButton
-              totalSelectedPhotos={totalSelectedImages}
-              selectedPhotos={allSelectedImagesForComparison}
-              isToolbarMode={true}
-            />
+            {showCompare && (
+              <ImagesComparingButton
+                totalSelectedPhotos={totalSelectedImages}
+                selectedPhotos={allSelectedImagesForComparison}
+                isToolbarMode={true}
+              />
+            )}
 
             {/* Action icon buttons */}
             {onBulkDownload && (
@@ -540,11 +544,11 @@ const Gallery: React.FC<GalleryProps> = ({
               // If a caller provided an onUploadImage handler with zero arguments
               // we treat it as an intent to open a custom upload modal (e.g., Add Color)
               if (onUploadImage) {
-                const fn = onUploadImage as unknown as Function;
-                if (typeof fn === 'function' && fn.length === 0) {
+                const fn = onUploadImage as (...args: unknown[]) => unknown;
+                if (fn.length === 0) {
                   try {
                     // Call with no args - handler should open its own modal
-                    onUploadImage();
+                    fn();
                     return;
                   } catch (err) {
                     console.warn('onUploadImage handler threw when invoked without args:', err);
@@ -555,7 +559,7 @@ const Gallery: React.FC<GalleryProps> = ({
               if (!isImageLimitReached) {
                 setShowBatchUploadModal(true);
               }
-            } }
+            }}
             disabled={isImageLimitReached && !isGuestMode}
             className={`!flex items-center gap-1.5 ${isGuestMode ? 'opacity-60' : ''}`}
           >
@@ -591,10 +595,14 @@ const Gallery: React.FC<GalleryProps> = ({
               : 'flex flex-col gap-4 p-6'
           }
         >
-          {/* Display 8 skeleton cards */}
+          {/* Display 8 full-card color placeholders */}
           {Array.from({ length: 8 }).map((_, index) => (
             <div key={`skeleton-${index}`} className={layoutMode === 'List' ? 'w-full' : ''}>
-              <Skeleton.Image active style={{ width: '100%' }} />
+              <div
+                className={`w-full ${layoutMode === 'List' ? 'min-h-[120px]' : 'min-h-[200px]'} rounded-md border-2 border-[#e5e7eb] bg-[#e5e7eb] overflow-hidden animate-pulse flex items-center justify-center`}
+              >
+                <div className="text-sm text-[#9ca3af]">Loading...</div>
+              </div>
             </div>
           ))}
         </div>

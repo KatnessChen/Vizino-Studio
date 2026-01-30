@@ -224,6 +224,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         detailModalTitle="Color Information"
         viewMoreModalTitle="Color Information"
         editLabel="Edit"
+        showCompare={false}
         onSingleRename={(id) => {
           const color = customColors.find((c) => c.id === id);
           if (color) {

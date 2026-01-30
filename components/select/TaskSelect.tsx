@@ -42,7 +42,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       icon: '🎨',
       guestAllowed: true,
       description:
-        'Instantly transform your walls with a fresh coat of color from our curated palette.',
+        'Select an image and a color. Let AI generate a new image with the selected color.',
     },
     {
       value: GEMINI_TASKS.ADD_TEXTURE.task_name,
@@ -50,7 +50,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       icon: '🧱',
       guestAllowed: false,
       description:
-        'Elevate your surfaces with realistic textures like natural wood, elegant stone, or designer wallpaper.',
+        'Select an image and a texture. Let AI generate a new image with the selected texture.',
     },
     {
       value: GEMINI_TASKS.ADD_HOME_ITEM.task_name,
@@ -58,7 +58,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       icon: '🛋️',
       guestAllowed: false,
       description:
-        'Seamlessly integrate new furniture and décor into your space for a complete vision.',
+        'Select an image and an object. Let AI generate a new image with the selected object.',
     },
     {
       value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
@@ -66,7 +66,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       icon: '💬',
       guestAllowed: false,
       description:
-        'Describe your dream space and let AI bring your unique vision to life with precision.',
+        'Select an image or any design material. Describe your idea by custom prompt. Let AI bring your unique vision to life.',
     },
   ];
 
