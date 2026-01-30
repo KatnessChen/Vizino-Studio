@@ -51,16 +51,7 @@ interface GalleryProps {
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
   emptyMessage: string;
-  onUploadImage?: (
-    file: File,
-    metadata?: {
-      width: number;
-      height: number;
-      aspect_ratio: number;
-      name?: string;
-      description?: string;
-    }
-  ) => void;
+  onUploadImage?: (...args: any[]) => any;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -536,17 +527,35 @@ const Gallery: React.FC<GalleryProps> = ({
           </div>
         )}
 
-        {/* Upload button (only show if upload is enabled) */}
-        {onUploadImage && onUploadError && (
+        {/* Upload button (show if upload handler is provided) */}
+        {onUploadImage && (
           <Button
             icon={<PlusOutlined />}
             onClick={() => {
               if (isGuestMode) {
                 dispatch(setShowLoginRequiredModal(true));
-              } else if (!isImageLimitReached) {
+                return;
+              }
+
+              // If a caller provided an onUploadImage handler with zero arguments
+              // we treat it as an intent to open a custom upload modal (e.g., Add Color)
+              if (onUploadImage) {
+                const fn = onUploadImage as unknown as Function;
+                if (typeof fn === 'function' && fn.length === 0) {
+                  try {
+                    // Call with no args - handler should open its own modal
+                    onUploadImage();
+                    return;
+                  } catch (err) {
+                    console.warn('onUploadImage handler threw when invoked without args:', err);
+                  }
+                }
+              }
+
+              if (!isImageLimitReached) {
                 setShowBatchUploadModal(true);
               }
-            }}
+            } }
             disabled={isImageLimitReached && !isGuestMode}
             className={`!flex items-center gap-1.5 ${isGuestMode ? 'opacity-60' : ''}`}
           >

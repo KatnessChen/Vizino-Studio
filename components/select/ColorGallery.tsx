@@ -150,13 +150,35 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
     });
   };
 
-  const handleBatchCopy = () => {
+  const handleBulkDuplicate = () => {
     const colors = availableColors.filter((c) => selectedIds.has(c.id));
-    const hexCodes = colors.map((c) => c.hex).join(', ');
-    navigator.clipboard
-      .writeText(hexCodes)
-      .then(() => message.success('Hex codes copied to clipboard!'))
-      .catch(() => message.error('Failed to copy hex codes'));
+    if (colors.length === 0) return;
+
+    Modal.confirm({
+      title: `Duplicate ${colors.length} Color${colors.length > 1 ? 's' : ''}`,
+      content:
+        colors.length > 1
+          ? `${colors.length} colors will be duplicated.`
+          : `The selected color will be duplicated.`,
+      okText: 'Duplicate',
+      onOk: async () => {
+        try {
+          for (const color of colors) {
+            const newColor: Color = {
+              id: crypto.randomUUID(),
+              name: color.name,
+              hex: color.hex,
+              description: color.description || '',
+            };
+            await addColor(newColor);
+          }
+          message.success(`Duplicated ${colors.length} color${colors.length > 1 ? 's' : ''}`);
+          setSelectedIds(new Set());
+        } catch (err) {
+          message.error('Failed to duplicate colors');
+        }
+      },
+    });
   };
 
   return (
@@ -185,7 +207,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         }}
         onClearSelection={() => setSelectedIds(new Set())}
         onBulkDelete={handleBatchDelete}
-        onBulkCopy={handleBatchCopy}
+        onBulkCopy={handleBulkDuplicate}
         onUploadImage={() => {
           if (isGuestMode) {
             dispatch(setShowLoginRequiredModal(true));
@@ -226,6 +248,30 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           } else if (PRESET_COLOR.some((c) => c.id === id)) {
             message.info('Preset colors cannot be deleted');
           }
+        }}
+        onSingleCopy={(id) => {
+          const color = availableColors.find((c) => c.id === id);
+          if (!color) return;
+
+          Modal.confirm({
+            title: `Duplicate Color`,
+            content: `Are you sure you want to duplicate "${color.name}"?`,
+            okText: 'Duplicate',
+            onOk: async () => {
+              try {
+                const newColor: Color = {
+                  id: crypto.randomUUID(),
+                  name: color.name,
+                  hex: color.hex,
+                  description: color.description || '',
+                };
+                await addColor(newColor);
+                message.success('Color duplicated');
+              } catch (err) {
+                message.error('Failed to duplicate color');
+              }
+            },
+          });
         }}
       />
 

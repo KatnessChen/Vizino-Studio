@@ -9,7 +9,7 @@ import {
 interface AddColorModalProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (color: Color) => void;
+  onAdd: (color: Color) => Promise<void> | void;
   existingColors: Color[];
 }
 
@@ -64,6 +64,7 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
     hex?: string;
     description?: string;
   }>({});
+  const [isAdding, setIsAdding] = useState(false);
 
   const handleClose = () => {
     setColorName('');
@@ -88,10 +89,6 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
       newErrors.name = 'Color name is required';
     } else if (colorName.trim().length > MAX_CUSTOM_ASSET_NAME_LENGTH) {
       newErrors.name = `Color name must be ${MAX_CUSTOM_ASSET_NAME_LENGTH} characters or less`;
-    } else if (
-      existingColors.some((c) => c.name.toLowerCase() === colorName.trim().toLowerCase())
-    ) {
-      newErrors.name = 'A color with this name already exists';
     }
 
     // Validate HEX (required)
@@ -114,7 +111,7 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!validateForm()) {
       return;
     }
@@ -122,21 +119,23 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
     const normalizedHex = normalizeColorInput(colorHex.trim());
     if (!normalizedHex) return;
 
-    const newColor: Color = {
-      id: crypto.randomUUID(),
-      name: colorName.trim(),
-      hex: normalizedHex,
-      description: description.trim() || '',
-    };
+    setIsAdding(true);
+    try {
+      const newColor: Color = {
+        id: crypto.randomUUID(),
+        name: colorName.trim(),
+        hex: normalizedHex,
+        description: description.trim() || '',
+      };
 
-    // Check for duplicates by hex
-    if (existingColors.some((c) => c.hex.toLowerCase() === newColor.hex.toLowerCase())) {
-      setErrors({ hex: 'A color with this HEX value already exists' });
-      return;
+      await onAdd(newColor);
+      handleClose();
+    } catch (error) {
+      console.error('Failed to add color:', error);
+      // You might want to show an error message here using antd message or similar
+    } finally {
+      setIsAdding(false);
     }
-
-    onAdd(newColor);
-    handleClose();
   };
 
   return (
@@ -152,7 +151,7 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
         <Button key="cancel" onClick={handleClose}>
           Cancel
         </Button>,
-        <Button key="add" type="primary" onClick={handleAdd}>
+        <Button key="add" type="primary" onClick={handleAdd} loading={isAdding}>
           Add Color
         </Button>,
       ]}
