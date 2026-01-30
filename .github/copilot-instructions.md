@@ -53,7 +53,7 @@ If requested, also provide React + TypeScript component templates and Tailwind/C
 - **State Management**: Redux Toolkit with slices for `project`, `image`, `customAssets`, `task`
 - **Auth**: Google OAuth via `@react-oauth/google` + Firebase Authentication
 - **Backend Services**: Firebase Firestore (database), Storage (image hosting), Gemini API (image generation)
-- **UI**: Material-UI, Ant Design, Tailwind CSS v4 with `@tailwindcss/vite`
+- **UI**: **Ant Design (preferred)** and Tailwind CSS v4 with `@tailwindcss/vite`. **Material-UI (MUI) is deprecated for new components and should not be used**; the only acceptable exception is using MUI for icons when an equivalent icon is not available in Ant Design or other icon libraries. When touching MUI-based components, migrate them to Ant Design or to a Tailwind-based component and remove the MUI dependency where possible.
 - **Testing**: Vitest with UI runner (`npm run test:ui`)
 
 ### Key File Structure
@@ -108,6 +108,7 @@ Routes use slug-id format: `/project/{name-slug}-{shortId}/space/{name-slug}-{sh
 
 ### Component Organization
 
+- **Reuse over create**: Do not create a new component if a similar one exists. First search the `components/` directory and the UI patterns used across the app. If an existing component lacks the necessary flexibility, prefer refactoring (add props, variants, or composition) rather than adding a duplicate. Document any refactor and update unit tests and examples.
 - **Modal components**: Handle user input/confirmation; usually dispatch Redux actions on submit
 - **Select components**: Wrapper around Ant Design dropdowns; manage selection state
 - **Layout components**: Header, Footer, Aside panels; some consume auth context
@@ -133,7 +134,9 @@ Users can upload custom versions. These are stored in Firestore and pulled into 
 ## Styles & Formatting
 
 - **CSS**: Tailwind v4 (utility-first) in `main.css`, component-specific styles in `variables.css`
-- **Styling Priority**: Prioritize Tailwind CSS utility classes over inline styles for consistency and maintainability
+- **Styling Priority**: Prefer Tailwind utility classes over inline styles. Avoid inline style objects unless required (for computed values, complex transforms, or third-party integrations where Tailwind cannot express the style). When inline styles are necessary, add a short comment explaining why and consider extracting a reusable utility class or small CSS module if the pattern repeats.
+- **Enforcement**: PR reviewers should flag inline styles; consider adding an ESLint rule or plugin (e.g., `eslint-plugin-react/no-inline-styles`) in future PRs to help enforce this.
+- **Exceptions**: Inline styles are allowed for dynamic runtime values (animations, computed transforms) or third-party library constraints — document the reason in code and add a TODO to replace with a reusable solution if it becomes common.
 - **Component Props**: Use TypeScript interfaces; avoid `any` type
 - **Imports**: Alias `@` resolves to workspace root (set in `vite.config.ts`)
 
@@ -168,4 +171,5 @@ Users can upload custom versions. These are stored in Firestore and pulled into 
 4. Delete deprecated files in the same commit as the new feature
 5. Update this `copilot-instructions.md` and `IMAGE_REORDERING_FEATURE.md` to document deprecated files
 6. If migration required for existing data, create migration scripts in `utils/migrationScripts.ts` (for manual/admin use only)
-7. Do NOT expose migration UI in user-facing components; migrations should be manual/documented processes
+7. When deprecating or replacing a UI library (for example, migrating from Material-UI to Ant Design), identify all files that rely on the deprecated library, migrate them in the same change where practical, and remove the library dependency in the same commit as the replacement. Document the migration plan in the PR description and add migration steps or helper utilities if needed.
+8. Do NOT expose migration UI in user-facing components; migrations should be manual/documented processes

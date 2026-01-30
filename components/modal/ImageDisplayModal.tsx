@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ImageData } from '@/types';
-import { ChevronLeft as PrevIcon, ChevronRight as NextIcon } from '@mui/icons-material';
 import { imageCache } from '@/utils/imageCache';
 import { formatTimestamp } from '@/utils';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -218,25 +217,6 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                 className="relative bg-gray-950 rounded-lg overflow-visible flex items-center justify-center border border-gray-200 shadow-inner group"
                 style={{ height: renderPreview ? '450px' : '75vh' }}
               >
-                {/* Previous Button (Moved outside image or made more subtle) */}
-                <button
-                  onClick={handlePrevious}
-                  className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10 p-2 rounded-full hover:bg-white/10 transition-all"
-                  aria-label="Previous image"
-                  style={{
-                    opacity: hasPrevious ? 1 : 0,
-                    pointerEvents: hasPrevious ? 'auto' : 'none',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <PrevIcon
-                    sx={{ fontSize: 56, color: 'white' }}
-                    className="prev-icon-animated drop-shadow-lg"
-                  />
-                </button>
-
                 {renderPreview ? (
                   <div className="w-full h-full flex items-center justify-center bg-[#f8fafc] rounded-lg">
                     {renderPreview()}
@@ -248,25 +228,6 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                     className="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-500"
                   />
                 )}
-
-                {/* Next Button (Moved outside image or made more subtle) */}
-                <button
-                  onClick={handleNext}
-                  className="absolute -right-16 top-1/2 -translate-y-1/2 flex items-center justify-center focus:outline-none z-10 p-2 rounded-full hover:bg-white/10 transition-all"
-                  aria-label="Next image"
-                  style={{
-                    opacity: hasNext ? 1 : 0,
-                    pointerEvents: hasNext ? 'auto' : 'none',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <NextIcon
-                    sx={{ fontSize: 56, color: 'white' }}
-                    className="next-icon-animated drop-shadow-lg"
-                  />
-                </button>
               </div>
             </div>
 
