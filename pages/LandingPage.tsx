@@ -1549,9 +1549,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
                                 return {
                                   label: (
-                                    <div className="flex items-center gap-2 px-2">
-                                      <span className="text-lg text-indigo-600">{icon}</span>
-                                      <span className="font-medium text-sm">{label}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="asset-selector-icon text-indigo-600">{icon}</span>
+                                      <span className="asset-selector-label font-medium text-sm">{label}</span>
                                     </div>
                                   ),
                                   value: type,
