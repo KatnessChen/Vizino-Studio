@@ -2,8 +2,22 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
-import { Tag } from 'antd';
+import { Segmented, Tag, Modal } from 'antd';
 import { message } from '@/utils/antd';
+import {
+  CUSTOM_PROMPT_ASSET_TYPES,
+  CUSTOM_PROMPT_ASSET_IMAGE,
+  CUSTOM_PROMPT_ASSET_COLOR,
+  CUSTOM_PROMPT_ASSET_TEXTURE,
+  CUSTOM_PROMPT_ASSET_OBJECT,
+  CustomPromptAssetType,
+} from '@/constants/constants';
+import {
+  PictureOutlined,
+  BgColorsOutlined,
+  AppstoreOutlined,
+  ShoppingOutlined,
+} from '@ant-design/icons';
 
 import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
 import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
@@ -21,16 +35,13 @@ import ColorGallery from '@/components/select/ColorGallery';
 import AssetRenameModal from '@/components/modal/AssetRenameModal';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { setSelectedTexture, setSelectedItem } from '@/stores/taskStore';
-import { Texture, Item } from '@/types';
-import { Modal } from 'antd';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
-import { ImageData, ImageOperation } from '@/types';
+import { ImageData, ImageOperation, Texture, Item } from '@/types';
 import {
   createImage,
   deleteImages,
   fetchSpaceImages,
   updateImageMetadata,
-  updateImageName,
   duplicateImage,
   moveImageToSpace,
   copyImageAsOriginal,
@@ -76,6 +87,8 @@ import {
   selectSourceImage,
   setSourceImage,
   setSelectedColor,
+  selectIsGenerateModalOpen,
+  setIsGenerateModalOpen,
 } from '@/stores/taskStore';
 import GuestOnboardingTour, { GuestOnboardingTourRef } from '@/components/GuestOnboardingTour';
 import { getDemoImages, getDefaultGuestColor, getDefaultDemoImageId } from '@/constants/demoImages';
@@ -142,6 +155,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const selectedOriginalImageIds = useSelector(selectSelectedOriginalImageIds);
   const selectedUpdatedImageIds = useSelector(selectSelectedUpdatedImageIds);
 
+  const isGenerateModalOpen = useSelector(selectIsGenerateModalOpen);
+
   const [generatedImage, setGeneratedImage] = useState<{ base64: string; mimeType: string } | null>(
     null
   );
@@ -172,6 +187,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   } | null>(null);
   const [assetTypeToRename, setAssetTypeToRename] = useState<'texture' | 'item' | null>(null);
   const [showAssetRenameModal, setShowAssetRenameModal] = useState(false);
+
+  // Custom Prompt Asset Selector State
+  const [customPromptAssetType, setCustomPromptAssetType] = useState<CustomPromptAssetType>(
+    CUSTOM_PROMPT_ASSET_TYPES[0] as CustomPromptAssetType
+  );
 
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
@@ -217,11 +237,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       tourRef.current?.openTour();
     }, 400);
   };
-
-  // Derive modal visibility from Redux state
-  const showGenerateMoreModal = useCallback(() => {
-    return sourceImage !== null;
-  }, [sourceImage]);
 
   // State for generic confirm modal (for delete operations)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
@@ -846,10 +861,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     }
   }, [user, activeProjectId, activeSpaceId, dispatch, setErrorMessage]);
 
-  const handleGenerateMoreCancel = useCallback(() => {
-    dispatch(setSourceImage(null));
-  }, [dispatch]);
-
   const handleSelectOriginalImage = useCallback(
     (imageId: string) => {
       // Single-select mode: toggle selection, max 1 image
@@ -1397,6 +1408,81 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const selectedOriginalImage =
     originalImages.find((img) => img.id === selectedOriginalImageId) || null;
 
+  // Derive "effective" original image for Confirmation Modal
+  // If we have a real image, use it.
+  // If generating from Asset (Color/Texture/Item) via Custom Prompt, create a mock ImageData.
+  const effectiveOriginalImage = useMemo(() => {
+    if (selectedOriginalImage) return selectedOriginalImage;
+
+    // Only applicable if Custom Prompt task and an asset is selected
+    if (selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+      if (selectedColor) {
+        // Create SVG data URI for the color
+        const encodedHex = encodeURIComponent(selectedColor.hex);
+        const svgDataUri = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' fill='${encodedHex}' /%3E%3C/svg%3E`;
+
+        return {
+          id: selectedColor.id,
+          name: selectedColor.name, // Use color name as base
+          mimeType: 'image/svg+xml',
+          imageDownloadUrl: svgDataUri,
+          spaceId: activeSpaceId || '',
+          storageFilePath: '',
+          isDeleted: false,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          deletedAt: null,
+          evolutionChain: [], // Or selectedColor.evolutionChain if we implement strict mode
+          order: 0,
+          description: '',
+          parentImageId: null,
+        } as ImageData;
+      } else if (selectedTexture) {
+        return {
+          id: selectedTexture.id,
+          name: selectedTexture.name,
+          mimeType: selectedTexture.mimeType || 'image/png',
+          imageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+          spaceId: activeSpaceId || '',
+          storageFilePath: '',
+          isDeleted: false,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          deletedAt: null,
+          evolutionChain: [],
+          order: 0,
+          description: '',
+          parentImageId: null,
+        } as ImageData;
+      } else if (selectedItem) {
+        return {
+          id: selectedItem.id,
+          name: selectedItem.name,
+          mimeType: selectedItem.mimeType || 'image/png',
+          imageDownloadUrl: selectedItem.itemImageDownloadUrl,
+          spaceId: activeSpaceId || '',
+          storageFilePath: '',
+          isDeleted: false,
+          deletedAt: null,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          evolutionChain: [],
+          order: 0,
+          description: '',
+          parentImageId: null,
+        } as ImageData;
+      }
+    }
+    return null;
+  }, [
+    selectedOriginalImage,
+    selectedTaskNames,
+    selectedColor,
+    selectedTexture,
+    selectedItem,
+    activeSpaceId,
+  ]);
+
   return (
     <div className="flex bg-gray-50">
       <AsideSection />
@@ -1416,7 +1502,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
               </Tag>
             )}
           </div>
-          <div className="p-6">
+          <div className="p-6 flex flex-col gap-4">
             {!isAppInitiated ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -1440,154 +1526,352 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                 {getEmptyStateComponent}
 
                 {(activeSpaceId || isGuestMode) && (
-                  <div className="flex flex-col gap-6">
-                    <div data-tour="original-gallery">
-                      <Gallery
-                        title="Original Images"
-                        images={originalImages}
-                        selectedImageIds={selectedOriginalImageIds}
-                        onSelectImage={handleSelectOriginalImage}
-                        onSelectMultiple={handleSelectMultipleOriginal}
-                        onRenameImage={handleRenameImage}
-                        showRemoveButtons={selectedOriginalImageIds.size === 0}
-                        emptyMessage="No images uploaded yet."
-                        onUploadImage={handleImageUpload}
-                        onBulkDownload={() => handleBulkDownload('original')}
-                        onUploadError={setErrorMessage}
-                        onBulkDelete={() => handleBulkDelete('original')}
-                        onBulkCopy={() => handleBulkCopy('original')}
-                        onBulkMove={() => handleBulkMove('original')}
-                        onClearSelection={handleClearOriginalSelection}
-                        onSelectAll={handleSelectAllOriginal}
-                        onGenerateMoreSuccess={handleGenerateMoreSuccess}
-                        userId={user?.uid}
-                        isImageLimitReached={!imageLimitCheck.canAdd}
-                        onReorder={handleReorderOriginalImages}
-                        onSingleRename={handleSingleRename}
-                        onSingleCopy={handleSingleCopy}
-                        isLoading={isFetchingSpaceImages}
-                      />
-                    </div>
+                  <>
+                    {/* Custom Prompt Asset Selection Logic */}
+                    {selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
+                      <>
+                        {/* Asset Type Selector */}
+                        <div className="flex justify-center px-6">
+                          <Segmented
+                            options={CUSTOM_PROMPT_ASSET_TYPES.map(
+                              (type: CustomPromptAssetType) => {
+                                const label = type.charAt(0).toUpperCase() + type.slice(1);
+                                const icon =
+                                  type === CUSTOM_PROMPT_ASSET_IMAGE ? (
+                                    <PictureOutlined />
+                                  ) : type === CUSTOM_PROMPT_ASSET_COLOR ? (
+                                    <BgColorsOutlined />
+                                  ) : type === CUSTOM_PROMPT_ASSET_TEXTURE ? (
+                                    <AppstoreOutlined />
+                                  ) : (
+                                    <ShoppingOutlined />
+                                  );
 
-                    {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
-                      <div data-tour="color-select">
-                        <ColorGallery />
-                      </div>
+                                return {
+                                  label: (
+                                    <div className="flex items-center gap-2 px-2">
+                                      <span className="text-lg text-indigo-600">{icon}</span>
+                                      <span className="font-medium text-sm">{label}</span>
+                                    </div>
+                                  ),
+                                  value: type,
+                                };
+                              }
+                            )}
+                            value={customPromptAssetType}
+                            onChange={(val) =>
+                              setCustomPromptAssetType(val as CustomPromptAssetType)
+                            }
+                            className="bg-white rounded-lg p-1 shadow-sm max-w-md w-full custom-asset-segmented"
+                            size="large"
+                            block
+                          />
+                        </div>
+
+                        {/* Conditionally render galleries based on selector */}
+                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_IMAGE && (
+                          <Gallery
+                            title="Source Images"
+                            images={originalImages}
+                            selectedImageIds={selectedOriginalImageIds}
+                            onSelectImage={handleSelectOriginalImage}
+                            onSelectMultiple={handleSelectMultipleOriginal}
+                            onRenameImage={handleRenameImage}
+                            showRemoveButtons={selectedOriginalImageIds.size === 0}
+                            emptyMessage="No images uploaded yet."
+                            onUploadImage={handleImageUpload}
+                            onBulkDownload={() => handleBulkDownload('original')}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDelete('original')}
+                            onBulkCopy={() => handleBulkCopy('original')}
+                            onBulkMove={() => handleBulkMove('original')}
+                            onClearSelection={handleClearOriginalSelection}
+                            onSelectAll={handleSelectAllOriginal}
+                            onGenerateMoreSuccess={handleGenerateMoreSuccess}
+                            userId={user?.uid}
+                            isImageLimitReached={!imageLimitCheck.canAdd}
+                            onReorder={handleReorderOriginalImages}
+                            onSingleRename={handleSingleRename}
+                            onSingleCopy={handleSingleCopy}
+                            isLoading={isFetchingSpaceImages}
+                          />
+                        )}
+
+                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_COLOR && <ColorGallery />}
+
+                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_TEXTURE && (
+                          <Gallery
+                            title="Textures"
+                            images={mappedTextures}
+                            selectedImageId={selectedTexture?.id}
+                            selectedImageIds={textureSelectedIds}
+                            onSelectImage={handleSelectTexture}
+                            onSelectMultiple={(id) => {
+                              const next = new Set(textureSelectedIds);
+                              if (next.has(id)) {
+                                next.delete(id);
+                              } else {
+                                next.add(id);
+                              }
+                              setTextureSelectedIds(next);
+                            }}
+                            onClearSelection={() => setTextureSelectedIds(new Set())}
+                            onUploadImage={handleTextureUpload}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDeleteAssets('texture')}
+                            onBulkCopy={() => handleBulkCopyAssets('texture')}
+                            onBulkDownload={() => handleBulkDownloadAssets('texture')}
+                            isLoading={isLoadingTextures}
+                            emptyMessage="No textures found"
+                            uploadButtonText="Textures"
+                            uploadModalTitle="Upload Textures"
+                            batchUploadMode="asset"
+                            assetType="texture"
+                            existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
+                            detailModalTitle="Texture Information"
+                            viewMoreModalTitle="Texture Information"
+                            onSingleRename={(id) => {
+                              const asset = textures.find((t) => t.id === id);
+                              if (asset) {
+                                setAssetToRename(asset);
+                                setAssetTypeToRename('texture');
+                                setShowAssetRenameModal(true);
+                              }
+                            }}
+                            onSingleDelete={(id) => {
+                              const asset = textures.find((t) => t.id === id);
+                              if (asset) {
+                                Modal.confirm({
+                                  title: 'Delete Texture',
+                                  content: `Are you sure you want to delete "${asset.name}"?`,
+                                  okText: 'Delete',
+                                  okType: 'danger',
+                                  onOk: async () => {
+                                    await deleteTexture(asset.id);
+                                    if (selectedTexture?.id === asset.id)
+                                      dispatch(setSelectedTexture(null));
+                                    message.success('Texture deleted');
+                                  },
+                                });
+                              }
+                            }}
+                          />
+                        )}
+
+                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_OBJECT && (
+                          <Gallery
+                            title="Objects"
+                            images={mappedItems}
+                            selectedImageId={selectedItem?.id}
+                            selectedImageIds={itemSelectedIds}
+                            onSelectImage={handleSelectItem}
+                            onSelectMultiple={(id) => {
+                              const next = new Set(itemSelectedIds);
+                              if (next.has(id)) {
+                                next.delete(id);
+                              } else {
+                                next.add(id);
+                              }
+                              setItemSelectedIds(next);
+                            }}
+                            onClearSelection={() => setItemSelectedIds(new Set())}
+                            onUploadImage={handleItemUpload}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDeleteAssets('item')}
+                            onBulkCopy={() => handleBulkCopyAssets('item')}
+                            onBulkDownload={() => handleBulkDownloadAssets('item')}
+                            isLoading={isLoadingItems}
+                            emptyMessage="No objects uploaded yet."
+                            uploadButtonText="Objects"
+                            uploadModalTitle="Upload Objects"
+                            batchUploadMode="asset"
+                            assetType="item"
+                            existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
+                            detailModalTitle="Object Information"
+                            viewMoreModalTitle="Object Information"
+                            onSingleRename={(id) => {
+                              const asset = items.find((i) => i.id === id);
+                              if (asset) {
+                                setAssetToRename(asset);
+                                setAssetTypeToRename('item');
+                                setShowAssetRenameModal(true);
+                              }
+                            }}
+                            onSingleDelete={(id) => {
+                              const asset = items.find((i) => i.id === id);
+                              if (asset) {
+                                Modal.confirm({
+                                  title: 'Delete Object',
+                                  content: `Are you sure you want to delete "${asset.name}"?`,
+                                  okText: 'Delete',
+                                  okType: 'danger',
+                                  onOk: async () => {
+                                    await deleteItem(asset.id);
+                                    if (selectedItem?.id === asset.id)
+                                      dispatch(setSelectedItem(null));
+                                    message.success('Item deleted');
+                                  },
+                                });
+                              }
+                            }}
+                          />
+                        )}
+                      </>
                     )}
-                    {selectedTaskNames[0] === GEMINI_TASKS.ADD_TEXTURE.task_name && (
-                      <Gallery
-                        title="Textures"
-                        images={mappedTextures}
-                        selectedImageId={selectedTexture?.id}
-                        selectedImageIds={textureSelectedIds}
-                        onSelectImage={handleSelectTexture}
-                        onSelectMultiple={(id) => {
-                          const next = new Set(textureSelectedIds);
-                          if (next.has(id)) {
-                            next.delete(id);
-                          } else {
-                            next.add(id);
-                          }
-                          setTextureSelectedIds(next);
-                        }}
-                        onClearSelection={() => setTextureSelectedIds(new Set())}
-                        onUploadImage={handleTextureUpload}
-                        onUploadError={setErrorMessage}
-                        onBulkDelete={() => handleBulkDeleteAssets('texture')}
-                        onBulkCopy={() => handleBulkCopyAssets('texture')}
-                        onBulkDownload={() => handleBulkDownloadAssets('texture')}
-                        isLoading={isLoadingTextures}
-                        emptyMessage="No textures found"
-                        uploadButtonText="Textures"
-                        uploadModalTitle="Upload Textures"
-                        batchUploadMode="asset"
-                        assetType="texture"
-                        existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
-                        detailModalTitle="Texture Information"
-                        viewMoreModalTitle="Texture Information"
-                        onSingleRename={(id) => {
-                          const asset = textures.find((t) => t.id === id);
-                          if (asset) {
-                            setAssetToRename(asset);
-                            setAssetTypeToRename('texture');
-                            setShowAssetRenameModal(true);
-                          }
-                        }}
-                        onSingleDelete={(id) => {
-                          const asset = textures.find((t) => t.id === id);
-                          if (asset) {
-                            Modal.confirm({
-                              title: 'Delete Texture',
-                              content: `Are you sure you want to delete "${asset.name}"?`,
-                              okText: 'Delete',
-                              okType: 'danger',
-                              onOk: async () => {
-                                await deleteTexture(asset.id);
-                                if (selectedTexture?.id === asset.id)
-                                  dispatch(setSelectedTexture(null));
-                                message.success('Texture deleted');
-                              },
-                            });
-                          }
-                        }}
-                      />
-                    )}
-                    {selectedTaskNames[0] === GEMINI_TASKS.ADD_HOME_ITEM.task_name && (
-                      <Gallery
-                        title="Objects"
-                        images={mappedItems}
-                        selectedImageId={selectedItem?.id}
-                        selectedImageIds={itemSelectedIds}
-                        onSelectImage={handleSelectItem}
-                        onSelectMultiple={(id) => {
-                          const next = new Set(itemSelectedIds);
-                          if (next.has(id)) {
-                            next.delete(id);
-                          } else {
-                            next.add(id);
-                          }
-                          setItemSelectedIds(next);
-                        }}
-                        onClearSelection={() => setItemSelectedIds(new Set())}
-                        onUploadImage={handleItemUpload}
-                        onUploadError={setErrorMessage}
-                        onBulkDelete={() => handleBulkDeleteAssets('item')}
-                        onBulkCopy={() => handleBulkCopyAssets('item')}
-                        onBulkDownload={() => handleBulkDownloadAssets('item')}
-                        isLoading={isLoadingItems}
-                        emptyMessage="No objects found"
-                        uploadButtonText="Objects"
-                        uploadModalTitle="Upload Objects"
-                        batchUploadMode="asset"
-                        assetType="item"
-                        existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
-                        detailModalTitle="Object Information"
-                        viewMoreModalTitle="Object Information"
-                        onSingleRename={(id) => {
-                          const asset = items.find((i) => i.id === id);
-                          if (asset) {
-                            setAssetToRename(asset);
-                            setAssetTypeToRename('item');
-                            setShowAssetRenameModal(true);
-                          }
-                        }}
-                        onSingleDelete={(id) => {
-                          const asset = items.find((i) => i.id === id);
-                          if (asset) {
-                            Modal.confirm({
-                              title: 'Delete Object',
-                              content: `Are you sure you want to delete "${asset.name}"?`,
-                              okText: 'Delete',
-                              okType: 'danger',
-                              onOk: async () => {
-                                await deleteItem(asset.id);
-                                if (selectedItem?.id === asset.id) dispatch(setSelectedItem(null));
-                                message.success('Item deleted');
-                              },
-                            });
-                          }
-                        }}
-                      />
+
+                    {/* Original Rendering logic for NOT custom prompt */}
+                    {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
+                      <>
+                        <div data-tour="original-gallery">
+                          <Gallery
+                            title="Original Images"
+                            images={originalImages}
+                            selectedImageIds={selectedOriginalImageIds}
+                            onSelectImage={handleSelectOriginalImage}
+                            onSelectMultiple={handleSelectMultipleOriginal}
+                            onRenameImage={handleRenameImage}
+                            showRemoveButtons={selectedOriginalImageIds.size === 0}
+                            emptyMessage="No images uploaded yet."
+                            onUploadImage={handleImageUpload}
+                            onBulkDownload={() => handleBulkDownload('original')}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDelete('original')}
+                            onBulkCopy={() => handleBulkCopy('original')}
+                            onBulkMove={() => handleBulkMove('original')}
+                            onClearSelection={handleClearOriginalSelection}
+                            onSelectAll={handleSelectAllOriginal}
+                            onGenerateMoreSuccess={handleGenerateMoreSuccess}
+                            userId={user?.uid}
+                            isImageLimitReached={!imageLimitCheck.canAdd}
+                            onReorder={handleReorderOriginalImages}
+                            onSingleRename={handleSingleRename}
+                            onSingleCopy={handleSingleCopy}
+                            isLoading={isFetchingSpaceImages}
+                          />
+                        </div>
+
+                        {selectedTaskNames[0] === GEMINI_TASKS.RECOLOR_WALL.task_name && (
+                          <div data-tour="color-select">
+                            <ColorGallery />
+                          </div>
+                        )}
+                        {selectedTaskNames[0] === GEMINI_TASKS.ADD_TEXTURE.task_name && (
+                          <Gallery
+                            title="Textures"
+                            images={mappedTextures}
+                            selectedImageId={selectedTexture?.id}
+                            selectedImageIds={textureSelectedIds}
+                            onSelectImage={handleSelectTexture}
+                            onSelectMultiple={(id) => {
+                              const next = new Set(textureSelectedIds);
+                              if (next.has(id)) {
+                                next.delete(id);
+                              } else {
+                                next.add(id);
+                              }
+                              setTextureSelectedIds(next);
+                            }}
+                            onClearSelection={() => setTextureSelectedIds(new Set())}
+                            onUploadImage={handleTextureUpload}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDeleteAssets('texture')}
+                            onBulkCopy={() => handleBulkCopyAssets('texture')}
+                            onBulkDownload={() => handleBulkDownloadAssets('texture')}
+                            isLoading={isLoadingTextures}
+                            emptyMessage="No textures found"
+                            uploadButtonText="Textures"
+                            uploadModalTitle="Upload Textures"
+                            batchUploadMode="asset"
+                            assetType="texture"
+                            existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
+                            detailModalTitle="Texture Information"
+                            viewMoreModalTitle="Texture Information"
+                            onSingleRename={(id) => {
+                              const asset = textures.find((t) => t.id === id);
+                              if (asset) {
+                                setAssetToRename(asset);
+                                setAssetTypeToRename('texture');
+                                setShowAssetRenameModal(true);
+                              }
+                            }}
+                            onSingleDelete={(id) => {
+                              const asset = textures.find((t) => t.id === id);
+                              if (asset) {
+                                Modal.confirm({
+                                  title: 'Delete Texture',
+                                  content: `Are you sure you want to delete "${asset.name}"?`,
+                                  okText: 'Delete',
+                                  okType: 'danger',
+                                  onOk: async () => {
+                                    await deleteTexture(asset.id);
+                                    if (selectedTexture?.id === asset.id)
+                                      dispatch(setSelectedTexture(null));
+                                    message.success('Texture deleted');
+                                  },
+                                });
+                              }
+                            }}
+                          />
+                        )}
+                        {selectedTaskNames[0] === GEMINI_TASKS.ADD_HOME_ITEM.task_name && (
+                          <Gallery
+                            title="Objects"
+                            images={mappedItems}
+                            selectedImageId={selectedItem?.id}
+                            selectedImageIds={itemSelectedIds}
+                            onSelectImage={handleSelectItem}
+                            onSelectMultiple={(id) => {
+                              const next = new Set(itemSelectedIds);
+                              if (next.has(id)) {
+                                next.delete(id);
+                              } else {
+                                next.add(id);
+                              }
+                              setItemSelectedIds(next);
+                            }}
+                            onClearSelection={() => setItemSelectedIds(new Set())}
+                            onUploadImage={handleItemUpload}
+                            onUploadError={setErrorMessage}
+                            onBulkDelete={() => handleBulkDeleteAssets('item')}
+                            onBulkCopy={() => handleBulkCopyAssets('item')}
+                            onBulkDownload={() => handleBulkDownloadAssets('item')}
+                            isLoading={isLoadingItems}
+                            emptyMessage="No objects uploaded yet."
+                            uploadButtonText="Objects"
+                            uploadModalTitle="Upload Objects"
+                            batchUploadMode="asset"
+                            assetType="item"
+                            existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
+                            detailModalTitle="Object Information"
+                            viewMoreModalTitle="Object Information"
+                            onSingleRename={(id) => {
+                              const asset = items.find((i) => i.id === id);
+                              if (asset) {
+                                setAssetToRename(asset);
+                                setAssetTypeToRename('item');
+                                setShowAssetRenameModal(true);
+                              }
+                            }}
+                            onSingleDelete={(id) => {
+                              const asset = items.find((i) => i.id === id);
+                              if (asset) {
+                                Modal.confirm({
+                                  title: 'Delete Object',
+                                  content: `Are you sure you want to delete "${asset.name}"?`,
+                                  okText: 'Delete',
+                                  okType: 'danger',
+                                  onOk: async () => {
+                                    await deleteItem(asset.id);
+                                    if (selectedItem?.id === asset.id)
+                                      dispatch(setSelectedItem(null));
+                                    message.success('Item deleted');
+                                  },
+                                });
+                              }
+                            }}
+                          />
+                        )}
+                      </>
                     )}
 
                     <div data-tour="generated-gallery">
@@ -1613,7 +1897,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         isLoading={isFetchingSpaceImages}
                       />
                     </div>
-                  </div>
+                  </>
                 )}
               </>
             )}
@@ -1622,10 +1906,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         <Footer />
       </main>
 
-      {showConfirmationModal && selectedOriginalImage && (
+      {showConfirmationModal && effectiveOriginalImage && (
         <ConfirmImageUpdateModal
           isOpen={showConfirmationModal}
-          originalImage={selectedOriginalImage}
+          originalImage={effectiveOriginalImage}
           generatedImage={generatedImage}
           onConfirm={handleImageSatisfied}
           onCancel={handleCancelRecolor}
@@ -1690,17 +1974,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       )}
 
       {/* Generate More Modal */}
-      {showGenerateMoreModal && sourceImage && (
+      {/* Generate More Modal */}
+      {isGenerateModalOpen && (
         <GenerateMoreModal
           ref={generateModalRef}
-          isOpen={showGenerateMoreModal()}
+          isOpen={isGenerateModalOpen}
+          // logic: IF Custom Prompt AND no sourceImage, try to use asset.
           sourceImage={sourceImage}
+          sourceAsset={
+            selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name && !sourceImage
+              ? selectedColor || selectedTexture || selectedItem
+              : null
+          }
           userId={user?.uid}
           onSuccess={() => {
-            handleGenerateMoreCancel();
-            handleGenerateMoreSuccess();
+            // onSuccess usually closes the modal, so we just dispatch false
+            dispatch(setIsGenerateModalOpen(false));
+            // trigger refresh or other logic if needed?
+            // handleGenerateMoreSuccess(); // If this existed, call it. But simple close is likely enough based on current store logic that updates optimistic.
           }}
-          onCancel={handleGenerateMoreCancel}
+          onCancel={() => dispatch(setIsGenerateModalOpen(false))}
           onGenerateClick={() => {
             // Close the tour when generate button is clicked
             tourRef.current?.closeTour();
