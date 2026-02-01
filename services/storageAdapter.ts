@@ -42,6 +42,7 @@ export interface CreateAssetParams {
   width?: number;
   height?: number;
   aspect_ratio?: number;
+  evolutionChain?: ImageOperation[];
 }
 
 /**
@@ -51,6 +52,7 @@ export interface CreateColorParams {
   name: string;
   hex: string;
   description?: string;
+  evolutionChain?: ImageOperation[];
 }
 
 /**

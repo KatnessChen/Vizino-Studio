@@ -60,9 +60,9 @@ export const useImageProcessing = ({
 
   const processImage = useCallback(
     async (
-      imageData: ImageData,
+      source: ImageData | Color | Texture | Item, // Updated to accept unified source
       customPrompt: string | undefined
-    ): Promise<{ base64: string; mimeType: string } | null> => {
+    ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string } | null> => {
       // Create new AbortController for this request
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
@@ -77,7 +77,13 @@ export const useImageProcessing = ({
       }
 
       try {
-        let result: { base64: string; mimeType: string };
+        let result: { base64: string; mimeType: string; hex?: string; name?: string };
+
+        // Helper to ensure we have ImageData for older tasks that strictly require it
+        const ensureImageData = (src: any): ImageData => {
+           if ('imageDownloadUrl' in src) return src as ImageData;
+           throw new Error('This task requires an Image source.');
+        }
 
         if (selectedTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
           if (!selectedColor) {
@@ -88,7 +94,7 @@ export const useImageProcessing = ({
 
           result = await generateRecoloredImage(
             effectiveUserId,
-            imageData,
+            ensureImageData(source),
             selectedColor.name,
             selectedColor.hex,
             customPrompt,
@@ -102,7 +108,7 @@ export const useImageProcessing = ({
           }
           result = await generateRetexturedImage(
             effectiveUserId,
-            imageData,
+            ensureImageData(source),
             selectedTexture.textureImageDownloadUrl,
             selectedTexture.mimeType || 'image/jpeg',
             selectedTexture.name,
@@ -117,7 +123,7 @@ export const useImageProcessing = ({
           }
           result = await generateItemPlacedImage(
             effectiveUserId,
-            imageData,
+            ensureImageData(source),
             selectedItem.itemImageDownloadUrl,
             selectedItem.mimeType || 'image/jpeg',
             selectedItem.name,
@@ -130,7 +136,8 @@ export const useImageProcessing = ({
             setIsProcessingImage(false);
             return null;
           }
-          result = await generateCustomPromptImage(effectiveUserId, imageData, customPrompt, signal);
+          // source can be ImageData, Color, Texture, or Item. Service handles logic.
+          result = await generateCustomPromptImage(effectiveUserId, source, customPrompt, signal);
         } else {
           throw new Error('Unknown task type');
         }
