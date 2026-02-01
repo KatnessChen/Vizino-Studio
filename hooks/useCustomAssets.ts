@@ -24,7 +24,7 @@ import {
 } from '@/stores/customAssetsStore';
 import { useStorageAdapter } from '@/hooks/useStorageAdapter';
 import { useUploadGate } from '@/hooks/useUploadGate';
-import { Texture, Item } from '@/types';
+import { ImageOperation, Texture, Item } from '@/types';
 
 type AssetType = 'texture' | 'item';
 
@@ -73,9 +73,7 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
     }
 
     // Skip if already loading
-    const isLoading = isTexture
-      ? projectAssets?.isLoadingTextures
-      : projectAssets?.isLoadingItems;
+    const isLoading = isTexture ? projectAssets?.isLoadingTextures : projectAssets?.isLoadingItems;
     if (isLoading) {
       return;
     }
@@ -123,72 +121,85 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, effectiveProjectId, assetType]);
 
-  const addAsset = useCallback(async (assetData: {
-    name: string;
-    file: File;
-    description?: string;
-    width?: number;
-    height?: number;
-    aspect_ratio?: number;
-  }): Promise<Texture | Item> => {
-    if (!isReady || !effectiveProjectId) {
-      throw new Error('Storage not ready');
-    }
-
-    // For guests, check if upload should be gated
-    if (isGuestMode) {
-      const allowed = gateUpload(assetType, assetData);
-      if (!allowed) {
-        throw new Error('LOGIN_REQUIRED');
+  const addAsset = useCallback(
+    async (assetData: {
+      name: string;
+      file: File;
+      description?: string;
+      width?: number;
+      height?: number;
+      aspect_ratio?: number;
+      evolutionChain?: ImageOperation[];
+    }): Promise<Texture | Item> => {
+      if (!isReady || !effectiveProjectId) {
+        throw new Error('Storage not ready');
       }
-    }
 
-    if (isTexture) {
-      const newTexture = await adapter.addTexture(assetData);
-      dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture }));
-      return newTexture;
-    } else {
-      const newItem = await adapter.addItem(assetData);
-      dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem }));
-      return newItem;
-    }
-  }, [isReady, effectiveProjectId, isGuestMode, gateUpload, assetType, isTexture, adapter, dispatch]);
+      // For guests, check if upload should be gated
+      if (isGuestMode) {
+        const allowed = gateUpload(assetType, assetData);
+        if (!allowed) {
+          throw new Error('LOGIN_REQUIRED');
+        }
+      }
 
-  const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
-    if (!isReady || !effectiveProjectId) {
-      throw new Error('Storage not ready');
-    }
+      if (isTexture) {
+        const newTexture = await adapter.addTexture(assetData);
+        dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture }));
+        return newTexture;
+      } else {
+        const newItem = await adapter.addItem(assetData);
+        dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem }));
+        return newItem;
+      }
+    },
+    [isReady, effectiveProjectId, isGuestMode, gateUpload, assetType, isTexture, adapter, dispatch]
+  );
 
-    if (isTexture) {
-      await adapter.deleteTexture(assetId);
-      dispatch(removeCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId }));
-    } else {
-      await adapter.deleteItem(assetId);
-      dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
-    }
-  }, [isReady, effectiveProjectId, isTexture, adapter, dispatch]);
- 
-   const updateAsset = useCallback(async (assetId: string, updates: { name?: string; description?: string }): Promise<void> => {
-     if (!isReady || !effectiveProjectId) {
-       throw new Error('Storage not ready');
-     }
- 
-     if (isTexture) {
-       await adapter.updateTexture(assetId, updates);
-       dispatch(updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates }));
-     } else {
-       await adapter.updateItem(assetId, updates);
-       dispatch(updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates }));
-     }
-   }, [isReady, effectiveProjectId, isTexture, adapter, dispatch]);
- 
-   return {
-     customAssets,
-     isLoadingAssets,
-     loadAssetsError,
-     addAsset,
-     deleteAsset,
-     updateAsset,
-   };
- 
- };
+  const deleteAsset = useCallback(
+    async (assetId: string): Promise<void> => {
+      if (!isReady || !effectiveProjectId) {
+        throw new Error('Storage not ready');
+      }
+
+      if (isTexture) {
+        await adapter.deleteTexture(assetId);
+        dispatch(removeCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId }));
+      } else {
+        await adapter.deleteItem(assetId);
+        dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
+      }
+    },
+    [isReady, effectiveProjectId, isTexture, adapter, dispatch]
+  );
+
+  const updateAsset = useCallback(
+    async (assetId: string, updates: { name?: string; description?: string }): Promise<void> => {
+      if (!isReady || !effectiveProjectId) {
+        throw new Error('Storage not ready');
+      }
+
+      if (isTexture) {
+        await adapter.updateTexture(assetId, updates);
+        dispatch(
+          updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates })
+        );
+      } else {
+        await adapter.updateItem(assetId, updates);
+        dispatch(
+          updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates })
+        );
+      }
+    },
+    [isReady, effectiveProjectId, isTexture, adapter, dispatch]
+  );
+
+  return {
+    customAssets,
+    isLoadingAssets,
+    loadAssetsError,
+    addAsset,
+    deleteAsset,
+    updateAsset,
+  };
+};

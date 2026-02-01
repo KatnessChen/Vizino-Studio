@@ -198,6 +198,7 @@ export interface Color {
   description?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
 }
 
 export interface Texture {
@@ -212,6 +213,7 @@ export interface Texture {
   aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
 }
 
 export interface Item {
@@ -226,7 +228,10 @@ export interface Item {
   aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
 }
+
+export type Asset = Color | Texture | Item;
 
 /**
  * Custom Prompt document structure in Firestore.
