@@ -92,6 +92,7 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
       confirmLoading={isLoading}
       okText="Save"
       cancelText="Cancel"
+      zIndex={1001}
     >
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 8 }}>
