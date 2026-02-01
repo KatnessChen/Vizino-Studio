@@ -4,7 +4,8 @@ import { Checkbox, Typography, Tooltip } from 'antd';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { LockOutlined } from '@ant-design/icons';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
-import { selectSelectedTaskNames, setSelectedTaskNames } from '@/stores/taskStore';
+import { selectSelectedTaskNames, setSelectedTaskNames, setSelectedAssets } from '@/stores/taskStore';
+import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { useGuest } from '@/contexts/GuestContext';
 
@@ -31,9 +32,12 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
   // Reset related state when tasks change
   const resetRelatedState = useCallback(() => {
+    dispatch(setSelectedAssets([]));
+    dispatch(setSelectedOriginalImageIds(new Set()));
+    dispatch(setSelectedUpdatedImageIds(new Set()));
     onModalStateChange?.(false);
     onError?.(null);
-  }, [onModalStateChange, onError]);
+  }, [dispatch, onModalStateChange, onError]);
 
   const tasks = [
     {
