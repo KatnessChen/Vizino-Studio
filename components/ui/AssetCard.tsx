@@ -91,15 +91,14 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onRename();
       },
     },
-    onViewDetails &&
-      (!isImageData || (asset as ImageData).evolutionChain?.length > 0) && {
-        key: 'details',
-        label: 'History',
-        onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
-          domEvent.stopPropagation();
-          onViewDetails();
-        },
+    onViewDetails && {
+      key: 'details',
+      label: 'History',
+      onClick: ({ domEvent }: { domEvent: React.MouseEvent }) => {
+        domEvent.stopPropagation();
+        onViewDetails();
       },
+    },
     onDelete && {
       key: 'delete',
       label: 'Delete',

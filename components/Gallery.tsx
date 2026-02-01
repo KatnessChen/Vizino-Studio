@@ -25,7 +25,7 @@ import ImageDisplayModal from './modal/ImageDisplayModal';
 import GenerationHistoryModal from './modal/GenerationHistoryModal';
 import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
-import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
+import { Card, Button, Tooltip, Segmented } from 'antd';
 import { BarsOutlined, AppstoreOutlined, LockOutlined } from '@ant-design/icons';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
@@ -44,8 +44,8 @@ interface GalleryProps {
   images: ImageData[];
   selectedImageId?: string | null;
   selectedImageIds?: Set<string>;
-  onSelectImage?: (imageId: string) => void;
-  onSelectMultiple?: (imageId: string) => void;
+  onSelectImage?: (imageId: string, event?: React.MouseEvent) => void;
+  onSelectMultiple?: (imageId: string, event?: React.MouseEvent) => void;
   onRenameImage?: (imageId: string, newName: string, description: string) => void;
   showDownloadButtons?: boolean;
   onRemoveImage?: (imageId: string) => void;
@@ -223,30 +223,21 @@ const Gallery: React.FC<GalleryProps> = ({
     setActiveId(null);
   }, []);
 
-  // Handle shift-click for range selection
   const handleCardClick = useCallback(
     (imageId: string, event?: React.MouseEvent) => {
       const currentIndex = images.findIndex((img) => img.id === imageId);
 
-      if (event?.shiftKey && lastSelectedIndex !== null && onSelectMultiple) {
-        // Shift-click: select range
-        const start = Math.min(lastSelectedIndex, currentIndex);
-        const end = Math.max(lastSelectedIndex, currentIndex);
-
-        // Select all images in range
-        for (let i = start; i <= end; i++) {
-          if (!selectedImageIds.has(images[i].id)) {
-            onSelectMultiple(images[i].id);
-          }
-        }
+      if (event?.shiftKey) {
+        // Shift-click: multi-select toggle mode
+        onSelectMultiple?.(imageId, event);
+        setLastSelectedIndex(currentIndex);
       } else {
-        // Normal click
-        onSelectMultiple?.(imageId);
-        onSelectImage?.(imageId);
+        // Normal click: single-select mode
+        onSelectImage?.(imageId, event);
         setLastSelectedIndex(currentIndex);
       }
     },
-    [images, lastSelectedIndex, onSelectMultiple, onSelectImage, selectedImageIds]
+    [images, onSelectMultiple, onSelectImage]
   );
 
   // Drag selection handlers

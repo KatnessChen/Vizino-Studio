@@ -51,7 +51,7 @@ import {
   setLoadColorsError,
   setLoadTexturesError,
 } from '@/stores/customAssetsStore';
-import { setSelectedColor, setSelectedTexture } from '@/stores/taskStore';
+import { setSelectedAssets } from '@/stores/taskStore';
 import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { selectHasGeneratedImage } from '@/stores/guestStore';
 import { generateRoute } from '@/constants/routes';
@@ -131,8 +131,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
       dispatch(setActiveSpaceId(firstSpace ? firstSpace.id : null));
       onProjectSelected?.(projectId);
 
-      dispatch(setSelectedColor(null));
-      dispatch(setSelectedTexture(null));
+      dispatch(setSelectedAssets([]));
 
       // Reset task-related state when switching projects
       dispatch(resetTaskState());
