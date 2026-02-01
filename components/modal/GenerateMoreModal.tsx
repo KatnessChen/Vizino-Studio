@@ -9,8 +9,9 @@ import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
-import { ImageData, ImageOperation, CustomPrompt } from '@/types';
+import { ImageData, ImageOperation, CustomPrompt, Asset } from '@/types';
 import { imageCache } from '@/utils/imageCache';
+import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,
   getAddTextureDefaultPrompt,
@@ -19,7 +20,7 @@ import {
 } from '@/services/gemini/prompts';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
-import { formatImageOperationData } from '@/utils';
+import { formatImageOperationData, base64ToFile } from '@/utils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
   selectActiveProjectId,
@@ -31,14 +32,14 @@ import {
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';
 import {
-  selectSelectedColor,
-  selectSelectedTexture,
-  selectSelectedItem,
+  selectSelectedAssets,
   selectSelectedTaskNames,
   setCustomPrompt as setReduxCustomPrompt,
   setSourceImage,
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
+import { useCustomColors } from '@/hooks/useCustomColors';
+import { useCustomAssets } from '@/hooks/useCustomAssets';
 import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE } from '@/constants/constants';
@@ -54,14 +55,19 @@ export interface GenerateMoreModalRef {
 interface GenerateMoreModalProps {
   isOpen: boolean;
   sourceImage: ImageData | null;
+  sourceAsset?: ImageData | Color | Texture | Item | null; // Unified source
   userId: string | undefined;
   onSuccess: () => void; // Called after successful save to refresh images
   onCancel: () => void;
   onGenerateClick?: () => void; // Called when generate button is clicked
+  assetType?: string;
 }
 
 const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProps>(
-  ({ isOpen, sourceImage, userId, onSuccess, onCancel, onGenerateClick }, ref) => {
+  (
+    { isOpen, sourceImage, sourceAsset, userId, onSuccess, onCancel, onGenerateClick, assetType },
+    ref
+  ) => {
     // Get dispatch from Redux
     const dispatch = useDispatch();
     // Get adminSettings from Auth context
@@ -73,9 +79,16 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const activeSpaceId = useSelector(selectActiveSpaceId);
 
     const selectedTaskNames = useSelector(selectSelectedTaskNames);
-    const selectedColor = useSelector(selectSelectedColor);
-    const selectedTexture = useSelector(selectSelectedTexture);
-    const selectedItem = useSelector(selectSelectedItem);
+    const selectedAssets = useSelector(selectSelectedAssets);
+
+    const selectedAssetRaw = selectedAssets[0] || null;
+    const selectedColor = selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
+    const selectedTexture = selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Texture) : null;
+    const selectedItem = selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Item) : null;
+
+    const { addColor } = useCustomColors(activeProjectId);
+    const { addAsset: addTextureToStore } = useCustomAssets('texture', activeProjectId);
+    const { addAsset: addItemToStore } = useCustomAssets('item', activeProjectId);
 
     const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -83,6 +96,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const [generatedImage, setGeneratedImage] = useState<{
       base64: string;
       mimeType: string;
+      hex?: string;
+      name?: string;
     } | null>(null);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [isSavingImage, setIsSavingImage] = useState(false);
@@ -186,6 +201,42 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     // Check operation limit
     const operationLimitCheck = checkOperationLimit(sourceImage, adminSettings.mock_limit_reached);
 
+    // Compute effective original image once for modal usage AND saving logic
+    const effectiveOriginalImage = useMemo(() => {
+      if (sourceImage) return sourceImage;
+      if (sourceAsset) {
+        let downloadUrl = '';
+        if ('textureImageDownloadUrl' in sourceAsset) {
+          downloadUrl = (sourceAsset as any).textureImageDownloadUrl;
+        } else if ('itemImageDownloadUrl' in sourceAsset) {
+          downloadUrl = (sourceAsset as any).itemImageDownloadUrl;
+        } else if ('imageDownloadUrl' in sourceAsset) {
+          downloadUrl = (sourceAsset as any).imageDownloadUrl || '';
+        }
+
+        const baseAsset = {
+          id: 'id' in sourceAsset ? sourceAsset.id : 'unknown',
+          name: 'name' in sourceAsset ? sourceAsset.name : 'Asset',
+          mimeType:
+            'mimeType' in sourceAsset ? (sourceAsset as any).mimeType || 'image/png' : 'image/png',
+          spaceId: activeSpaceId || '',
+          imageDownloadUrl: downloadUrl,
+          storageFilePath: '',
+          isDeleted: false,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          evolutionChain:
+            'evolutionChain' in sourceAsset ? (sourceAsset as any).evolutionChain || [] : [],
+          parentImageId: null,
+          description: '',
+          order: 0,
+          deletedAt: null,
+        } as ImageData;
+        return baseAsset;
+      }
+      return null;
+    }, [sourceImage, sourceAsset, activeSpaceId]);
+
     // Helper function to get customPromptRequired for a task
     const getCustomPromptRequired = (taskName: string | null): boolean => {
       if (!taskName) return false;
@@ -250,12 +301,24 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     // Load cached image
     useEffect(() => {
       const loadCachedImage = async () => {
-        if (!sourceImage) return;
+        // If we have an override sourceAsset that is an ImageData, use it.
+        // Otherwise fallback to sourceImage if sourceAsset is not provided.
+        // If sourceAsset is provided and is NOT ImageData (e.g. Color), handled by SelectedAssets component preview.
+
+        const effectiveImage =
+          sourceAsset && 'imageDownloadUrl' in sourceAsset
+            ? (sourceAsset as ImageData)
+            : sourceImage;
+
+        if (!effectiveImage) {
+          setCachedImageSrc(null);
+          return;
+        }
 
         try {
-          const base64 = await imageCache.get(sourceImage.imageDownloadUrl);
+          const base64 = await imageCache.get(effectiveImage.imageDownloadUrl);
           if (base64) {
-            setCachedImageSrc(`data:${sourceImage.mimeType};base64,${base64}`);
+            setCachedImageSrc(`data:${effectiveImage.mimeType};base64,${base64}`);
           } else {
             setCachedImageSrc(null);
           }
@@ -266,7 +329,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       };
 
       loadCachedImage();
-    }, [sourceImage]);
+    }, [sourceImage, sourceAsset]);
 
     // Clear validation error when color changes
     useEffect(() => {
@@ -322,8 +385,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         return;
       }
 
-      if (!sourceImage) {
-        setValidationError('No source image available.');
+      if (!sourceImage && !sourceAsset) {
+        setValidationError('No source material available.');
         return;
       }
 
@@ -338,9 +401,16 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       // Notify external components (like Tour) that generation is starting
       onGenerateClick?.();
 
+      const effectiveSource = sourceImage || sourceAsset;
+      if (!effectiveSource) {
+        setErrorMessage('No source image or asset selected.');
+        return;
+      }
+
       console.log('[GenerateMoreModal] Starting image processing with:', {
         userId,
-        sourceImageId: sourceImage.id,
+        // Use optional chaining safely
+        sourceId: 'id' in effectiveSource ? effectiveSource.id : 'unknown',
         taskName: activeTaskName,
         colorName: selectedColor?.name,
         colorHex: selectedColor?.hex,
@@ -349,7 +419,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         hasCustomPrompt: !!customPrompt.trim(),
       });
 
-      const result = await processImage(sourceImage, customPrompt.trim() || undefined);
+      const result = await processImage(effectiveSource, customPrompt.trim() || undefined);
 
       if (result) {
         console.log('[GenerateMoreModal] Processing successful, result:', {
@@ -400,6 +470,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       activeProjectId,
       fetchPrompts,
       setErrorMessage,
+      onSuccess,
     ]);
 
     // Expose handleGenerate to parent via ref
@@ -440,210 +511,365 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       }
     };
 
-    const handleConfirmImage = async (
-      imageData: { base64: string; mimeType: string },
-      customName: string
-    ) => {
-      if (!sourceImage || !activeTaskName) {
-        setErrorMessage('Missing required data to save image.');
-        return;
-      }
+    const handleConfirmImage = useCallback(
+      async (
+        imageData: { base64: string; mimeType: string; hex?: string },
+        customName: string,
+        description?: string
+      ) => {
+        // Use edited description from modal, or fall back to current customPrompt
+        const finalDescription = description !== undefined ? description : customPrompt;
 
-      // For authenticated users, require project/space context
-      if (isAuthenticated && (!userId || !activeProjectId || !activeSpaceId)) {
-        setErrorMessage('Missing project/space context. Please select a space.');
-        return;
-      }
-
-      // For guests, require session ID
-      if (!isAuthenticated && !guestSessionId) {
-        setErrorMessage('Guest session not initialized.');
-        return;
-      }
-
-      // Validate based on task type
-      if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
-        setErrorMessage('Color information is required.');
-        return;
-      }
-
-      if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
-        setErrorMessage('Texture information is required.');
-        return;
-      }
-
-      if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
-        setErrorMessage('Home item information is required.');
-        return;
-      }
-
-      setIsSavingImage(true);
-      setShowConfirmationModal(false);
-
-      let tempImageId = '';
-
-      try {
-        // Check operation limit on source image
-        const operationLimitCheck = checkOperationLimit(
-          sourceImage,
-          adminSettings.mock_limit_reached
-        );
-        if (!operationLimitCheck.canAdd) {
-          setErrorMessage(getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE));
-          setIsSavingImage(false);
-          setShowConfirmationModal(true);
+        if ((!sourceImage && !sourceAsset) || !activeTaskName) {
+          setErrorMessage('Missing required data to save image.');
           return;
         }
 
-        tempImageId = crypto.randomUUID();
-        const imageName = customName;
-        const now = Timestamp.fromDate(new Date());
+        // For authenticated users, require project/space context
+        if (isAuthenticated && (!userId || !activeProjectId || !activeSpaceId)) {
+          setErrorMessage('Missing project/space context. Please select a space.');
+          return;
+        }
 
-        // Create ImageOperation for evolution chain
-        const operation: ImageOperation = formatImageOperationData(
-          sourceImage,
-          activeTaskName,
-          customPrompt.trim() || undefined,
-          selectedColor,
-          selectedTexture,
-          selectedItem
-        );
+        // For guests, require session ID
+        if (!isAuthenticated && !guestSessionId) {
+          setErrorMessage('Guest session not initialized.');
+          return;
+        }
 
-        // For authenticated users, use optimistic updates and save to users/
-        if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
-          // Create optimistic image object
-          const optimisticImage = {
-            id: tempImageId,
-            name: imageName,
-            mimeType: imageData.mimeType,
-            spaceId: activeSpaceId,
-            evolutionChain: [operation],
-            parentImageId: sourceImage.id,
-            imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
-            storageFilePath: '',
-            isDeleted: false,
-            deletedAt: null,
-            createdAt: now,
-            updatedAt: now,
-          };
+        // Validate based on task type
+        if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
+          setErrorMessage('Color information is required.');
+          return;
+        }
 
-          // Add optimistic image to Redux store immediately for better UX
-          dispatch(
-            addImageOptimistic({
-              projectId: activeProjectId,
-              spaceId: activeSpaceId,
-              image: optimisticImage,
-            })
+        if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
+          setErrorMessage('Texture information is required.');
+          return;
+        }
+
+        if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
+          setErrorMessage('Home item information is required.');
+          return;
+        }
+
+        setIsSavingImage(true);
+        setShowConfirmationModal(false);
+
+        // --- COLOR ADJUSTMENT SAVING FLOW ---
+        // --- CUSTOM ASSET SAVING FLOW ---
+        const isColor = !!imageData.hex;
+        const isTexture =
+          (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
+            (selectedTexture || assetType === 'texture')) ||
+          activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name;
+        const isItem =
+          (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
+            (selectedItem || assetType === 'object' || assetType === 'item')) ||
+          activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name;
+
+        if (isColor || isTexture || isItem) {
+          try {
+            const now = Timestamp.fromDate(new Date());
+
+            // Create Evolution Chain Entry
+            const operation: ImageOperation = formatImageOperationData(
+              effectiveOriginalImage!,
+              activeTaskName,
+              finalDescription.trim() || undefined,
+              selectedColor,
+              selectedTexture,
+              selectedItem
+            );
+
+            // Compute full evolution chain from parent
+            const parentChain = effectiveOriginalImage!.evolutionChain || [];
+            const fullEvolutionChain = [...parentChain, operation];
+
+            if (isColor) {
+              await addColor({
+                name: customName,
+                hex: imageData.hex!,
+                description: finalDescription.trim() || '',
+                evolutionChain: fullEvolutionChain,
+              });
+
+              // Refresh space images as requested
+              if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
+                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                dispatch(
+                  setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
+                );
+              }
+
+              message.success('Color saved successfully!');
+            } else if (isTexture) {
+              const extension = imageData.mimeType.split('/')[1] || 'png';
+              const filenameWithExt = customName.endsWith(`.${extension}`)
+                ? customName
+                : `${customName}.${extension}`;
+
+              const file = base64ToFile(imageData.base64, imageData.mimeType, filenameWithExt);
+
+              await addTextureToStore({
+                name: customName,
+                file,
+                description: finalDescription.trim() || '',
+                evolutionChain: fullEvolutionChain,
+              });
+
+              // Refresh space images as requested
+              if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
+                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                dispatch(
+                  setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
+                );
+              }
+
+              message.success('Texture saved successfully!');
+            } else if (isItem) {
+              const extension = imageData.mimeType.split('/')[1] || 'png';
+              const filenameWithExt = customName.endsWith(`.${extension}`)
+                ? customName
+                : `${customName}.${extension}`;
+
+              const file = base64ToFile(imageData.base64, imageData.mimeType, filenameWithExt);
+
+              await addItemToStore({
+                name: customName,
+                file,
+                description: finalDescription.trim() || '',
+                evolutionChain: fullEvolutionChain,
+              });
+
+              // Refresh space images as requested
+              if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
+                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                dispatch(
+                  setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
+                );
+              }
+
+              message.success('Object saved successfully!');
+            }
+
+            // Handle Success
+            setCustomPrompt('');
+            setGeneratedImage(null);
+            setErrorMessage(null);
+            setValidationError(null);
+            setIsSavingImage(false);
+            dispatch(setSourceImage(null));
+
+            onSuccess();
+            return;
+          } catch (error) {
+            console.error('Failed to save asset:', error);
+            setErrorMessage('Failed to save asset.');
+            setIsSavingImage(false);
+            setShowConfirmationModal(true);
+            return;
+          }
+        }
+
+        // --- IMAGE SAVING FLOW (Existing) ---
+
+        // We use effectiveOriginalImage which is already computed and mocks ImageData for assets if needed
+        if (!effectiveOriginalImage) {
+          setErrorMessage('Failed to process source image data.');
+          return;
+        }
+
+        try {
+          // Check operation limit (using effective wrapper)
+          const operationLimitCheck = checkOperationLimit(
+            effectiveOriginalImage as ImageData,
+            adminSettings.mock_limit_reached
           );
 
-          // Reset state and close modal immediately for better UX
-          setCustomPrompt('');
-          setGeneratedImage(null);
-          setErrorMessage(null);
-          setValidationError(null);
-          setIsSavingImage(false);
-
-          // Reset sourceImage in Redux
-          dispatch(setSourceImage(null));
-
-          // Save customPrompt to Redux for later use
-          const promptToSave = customPrompt.trim() || undefined;
-          if (promptToSave) {
-            dispatch(setReduxCustomPrompt(promptToSave));
+          if (!operationLimitCheck.canAdd) {
+            setErrorMessage(getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE));
+            setIsSavingImage(false);
+            setShowConfirmationModal(true);
+            return;
           }
 
-          // Show success message
-          message.success('Image saved successfully!');
-
-          // Close modal immediately
-          onSuccess();
-
-          // Save processed image to Firestore in background
-          try {
-            await createImage(
-              userId,
-              activeProjectId,
-              activeSpaceId,
-              null,
-              {
-                id: tempImageId,
-                name: imageName,
-                mimeType: imageData.mimeType,
-              },
-              {
-                base64: imageData.base64,
-                base64MimeType: imageData.mimeType,
-                parentImage: sourceImage,
-                operation,
-              }
-            );
-
-            // Fetch updated space images to get real Firebase Storage URL
-            const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
-            dispatch(
-              setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
-            );
-          } catch (saveError) {
-            console.error('Failed to save processed image:', saveError);
-            // Rollback optimistic update on error
-            dispatch(
-              removeImageOptimistic({
-                projectId: activeProjectId,
-                spaceId: activeSpaceId,
-                imageId: tempImageId,
-              })
-            );
-            message.error('Failed to save image. Please try again.');
-          }
-        } else if (guestSessionId) {
-          // Guests save their generated image to local IndexedDB storage
+          const tempImageId = crypto.randomUUID();
+          const imageName = customName;
           const now = Timestamp.fromDate(new Date());
 
-          // Create the image data
-          const guestImageData: ImageData = {
-            id: tempImageId,
-            name: imageName,
-            mimeType: imageData.mimeType,
-            spaceId: null,
-            evolutionChain: [operation],
-            parentImageId: sourceImage.id,
-            imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
-            storageFilePath: '',
-            order: null,
-            isDeleted: false,
-            deletedAt: null,
-            createdAt: now,
-            updatedAt: now,
-            description: '',
-          };
+          // Create ImageOperation for evolution chain
+          const operation: ImageOperation = formatImageOperationData(
+            effectiveOriginalImage!,
+            activeTaskName,
+            finalDescription.trim() || undefined,
+            selectedColor,
+            selectedTexture,
+            selectedItem
+          );
 
-          // Save to IndexedDB (local storage)
-          await guestIndexedDB.saveImage(guestImageData, imageData.base64);
+          // For authenticated users, use optimistic updates and save to users/
+          if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
+            // Create optimistic image object
+            const optimisticImage = {
+              id: tempImageId,
+              name: imageName,
+              mimeType: imageData.mimeType,
+              spaceId: activeSpaceId,
+              evolutionChain: [operation],
+              parentImageId: effectiveOriginalImage.id,
+              imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
+              storageFilePath: '',
+              isDeleted: false,
+              deletedAt: null,
+              createdAt: now,
+              updatedAt: now,
+            };
 
-          // Add to Redux store for immediate display in gallery
-          dispatch(addGuestImage(guestImageData));
+            // Add optimistic image to Redux store immediately for better UX
+            dispatch(
+              addImageOptimistic({
+                projectId: activeProjectId,
+                spaceId: activeSpaceId,
+                image: optimisticImage,
+              })
+            );
 
-          // Mark that guest has saved a generated image (triggers login requirement for future generations)
-          markImageGenerated();
+            // Reset state and close modal immediately for better UX
+            setCustomPrompt('');
+            setGeneratedImage(null);
+            setErrorMessage(null);
+            setValidationError(null);
+            setIsSavingImage(false);
 
-          // Reset state
-          setCustomPrompt('');
-          setGeneratedImage(null);
-          setErrorMessage(null);
-          setValidationError(null);
+            // Reset sourceImage in Redux
+            dispatch(setSourceImage(null));
+
+            // Save customPrompt to Redux for later use
+            const promptToSave = finalDescription.trim() || undefined;
+            if (promptToSave) {
+              dispatch(setReduxCustomPrompt(promptToSave));
+            }
+
+            // Show success message
+            message.success('Image saved successfully!');
+
+            // Close modal immediately
+            onSuccess();
+
+            // Save processed image to Firestore in background
+            try {
+              await createImage(
+                userId,
+                activeProjectId,
+                activeSpaceId,
+                null,
+                {
+                  id: tempImageId,
+                  name: imageName,
+                  mimeType: imageData.mimeType,
+                  description: finalDescription,
+                },
+                {
+                  base64: imageData.base64,
+                  base64MimeType: imageData.mimeType,
+                  parentImage: sourceImage,
+                  operation,
+                }
+              );
+
+              // Fetch updated space images to get real Firebase Storage URL
+              const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+              dispatch(
+                setSpaceImages({
+                  projectId: activeProjectId,
+                  spaceId: activeSpaceId,
+                  images,
+                })
+              );
+            } catch (saveError) {
+              console.error('Failed to save processed image:', saveError);
+              // Rollback optimistic update on error
+              dispatch(
+                removeImageOptimistic({
+                  projectId: activeProjectId,
+                  spaceId: activeSpaceId,
+                  imageId: tempImageId,
+                })
+              );
+              message.error('Failed to save image. Please try again.');
+            }
+          } else if (guestSessionId) {
+            // Guests save their generated image to local IndexedDB storage
+            const now = Timestamp.fromDate(new Date());
+
+            // Create the image data
+            const guestImageData: ImageData = {
+              id: tempImageId,
+              name: imageName,
+              mimeType: imageData.mimeType,
+              spaceId: null,
+              evolutionChain: [operation],
+              parentImageId: effectiveOriginalImage.id,
+              imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
+              storageFilePath: '',
+              order: null,
+              isDeleted: false,
+              deletedAt: null,
+              createdAt: now,
+              updatedAt: now,
+              description: '',
+            };
+
+            // Save to IndexedDB (local storage)
+            await guestIndexedDB.saveImage(guestImageData, imageData.base64);
+
+            // Add to Redux store for immediate display in gallery
+            dispatch(addGuestImage(guestImageData));
+
+            // Mark that guest has saved a generated image (triggers login requirement for future generations)
+            markImageGenerated();
+
+            // Reset state
+            setCustomPrompt('');
+            setGeneratedImage(null);
+            setErrorMessage(null);
+            setValidationError(null);
+            setIsSavingImage(false);
+            dispatch(setSourceImage(null));
+
+            message.success('Image saved successfully!');
+            onSuccess();
+          }
+        } catch (error) {
+          console.error('Failed to save processed image:', error);
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Failed to save processed image.'
+          );
           setIsSavingImage(false);
-          dispatch(setSourceImage(null));
-
-          message.success('Image saved successfully!');
-          onSuccess();
+          setShowConfirmationModal(true);
         }
-      } catch (error) {
-        console.error('Failed to save processed image:', error);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to save processed image.');
-        setIsSavingImage(false);
-        setShowConfirmationModal(true);
-      }
-    };
+      },
+      [
+        sourceImage,
+        sourceAsset,
+        activeTaskName,
+        isAuthenticated,
+        userId,
+        activeProjectId,
+        activeSpaceId,
+        guestSessionId,
+        selectedColor,
+        selectedTexture,
+        selectedItem,
+        setErrorMessage,
+        customPrompt,
+        dispatch,
+        onSuccess,
+        addColor,
+        adminSettings.mock_limit_reached,
+      ]
+    );
 
     const handleCancelConfirmation = () => {
       setShowConfirmationModal(false);
@@ -663,7 +889,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
         return 'Add new elements';
       } else if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-        return 'Transform image with custom prompts';
+        return 'Transform any assets with custom prompts';
       }
       return 'Generate more images';
     };
@@ -731,10 +957,14 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       return { tips: [] };
     };
 
-    if (!sourceImage) return null;
-
     // Check if operation limit has been reached for warning display
     const hasReachedOperationLimit = !operationLimitCheck.canAdd;
+
+    // (Moved effectiveOriginalImage to top of component, see line 192)
+
+    // If no valid source provided, don't render the modal. Keep this check after hooks so
+    // React hooks are called in the same order on every render.
+    if (!sourceImage && !sourceAsset) return null;
 
     return (
       <>
@@ -753,7 +983,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           maskClosable={!isSavingImage && !isProcessingImage}
           keyboard={!isSavingImage && !isProcessingImage}
           footer={[
-            <Button key="cancel" onClick={handleClose} disabled={isSavingImage} size="large">
+            <Button key="cancel" onClick={handleClose} disabled={isSavingImage}>
               Cancel
             </Button>,
             <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
@@ -762,7 +992,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 type="primary"
                 onClick={handleGenerate}
                 disabled={isGenerateDisabled}
-                size="large"
                 data-tour="modal-generate-button"
               >
                 Generate
@@ -783,24 +1012,27 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           )}
 
           <div className="flex gap-8 flex-wrap relative">
-            {/* Left Column: Target Image + Design Material */}
+            {/* Left Column: Target Source & Design Material */}
             <div className="min-w-0 flex-1 basis-[200px] flex flex-col gap-4 relative">
-              {/* Target Image */}
+              {/* Target Source */}
               <div className="relative">
-                <Typography.Title level={5}>Target Image</Typography.Title>
+                <Typography.Title level={5}>Target Source</Typography.Title>
 
-                {/* Source Image Preview */}
-                <div
-                  className="h-[240px] rounded overflow-hidden border border-gray-200 bg-cover bg-center bg-no-repeat relative"
-                  style={{
-                    backgroundImage: `url(${cachedImageSrc || sourceImage.imageDownloadUrl})`,
-                  }}
-                />
+                {/* Unified Asset Preview */}
+                <div className="h-[240px] rounded overflow-hidden border border-gray-200 relative">
+                  {/* If sourceAsset is provided (from SelectedAssets via props when Custom Prompt), use that.
+                         Otherwise fall back to sourceImage (normal flow) */}
+                  <SelectedAssets
+                    showTitle={false}
+                    customCardHeight={240}
+                    assets={sourceAsset ? [sourceAsset] : (sourceImage ? [sourceImage] : [])}
+                  />
+                </div>
               </div>
 
               {/* Design Material */}
               {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
-                <SelectedAssets customCardHeight={240} />
+                <SelectedAssets customCardHeight={240} assets={[]} />
               )}
             </div>
 
@@ -931,8 +1163,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
                   <div className="flex flex-col gap-0.5">
                     {getPromptWritingGuide().tips.map((tip, index) => (
-                      <div key={index} className="text-[0.85rem]">
-                        <h6>
+                      <div key={index} className="text-[0.85rem] leading-none">
+                        <h6 className="m-0 leading-none">
                           <BulbOutlined className="mr-2 text-[#1890ff]" />
                           {tip.text}.
                           <span>
@@ -1051,10 +1283,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       `}</style>
 
         {/* Confirmation Modal for Generated Image */}
-        {sourceImage && generatedImage && activeTaskName && (
+        {effectiveOriginalImage && generatedImage && activeTaskName && (
           <ConfirmImageUpdateModal
             isOpen={showConfirmationModal}
-            originalImage={sourceImage}
+            originalImage={effectiveOriginalImage}
             generatedImage={generatedImage}
             onConfirm={handleConfirmImage}
             onCancel={handleCancelConfirmation}
@@ -1062,6 +1294,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             colorName={selectedColor?.name}
             textureName={selectedTexture?.name}
             itemName={selectedItem?.name}
+            originalHex={selectedColor?.hex}
+            defaultDescription={customPrompt}
           />
         )}
 

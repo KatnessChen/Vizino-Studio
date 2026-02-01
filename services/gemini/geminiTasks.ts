@@ -8,21 +8,31 @@ export const GEMINI_TASKS = {
     task_name: 'recolor_wall',
     label_name: 'Recolor',
     customPromptRequired: false,
+    model_code: 'gemini-2.5-flash-image',
   },
   ADD_TEXTURE: {
     task_name: 'add_texture',
     label_name: 'Add Texture',
     customPromptRequired: false,
+    model_code: 'gemini-2.5-flash-image',
   },
   ADD_HOME_ITEM: {
     task_name: 'add_home_item',
     label_name: 'Add Object',
     customPromptRequired: false,
+    model_code: 'gemini-2.5-flash-image',
   },
   CUSTOM_PROMPT: {
     task_name: 'custom_prompt',
     label_name: 'Prompt Only',
     customPromptRequired: true,
+    model_code: 'gemini-2.5-flash-image',
+  },
+  COLOR_ADJUSTMENT: {
+    task_name: 'color_adjustment',
+    label_name: 'Color Adjustment',
+    customPromptRequired: true,
+    model_code: 'gemini-2.5-flash-lite',
   },
 } as const;
 

@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
-import { ImageData } from '@/types';
-import { getPromptByTask } from './prompts';
+import { ImageData, Color, Texture, Item } from '@/types';
+import { getPromptByTask, getNameSuggestionPrompt } from './prompts';
 import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
 import { GEMINI_ERRORS } from './geminiApiErrors';
 import { ref } from 'firebase/storage';
@@ -130,20 +130,99 @@ export const generateItemPlacedImage = async (
 
 export const generateCustomPromptImage = async (
   userId: string,
-  imageData: ImageData,
+  targetImageOrAsset: ImageData | Color | Texture | Item,
   customPrompt: string,
   signal?: AbortSignal
-): Promise<{ base64: string; mimeType: string }> => {
-  const image = {
-    base64String: await getBase64FromImageData(userId, imageData),
-    mimeType: imageData.mimeType,
+): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
+  let image: { base64String: string; mimeType: string };
+  const options: any = { // Use specific types if possible, but any allows flexibility for now
+      customPrompt,
+      userId,
+      signal
   };
 
-  return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, {
-    customPrompt,
-    userId,
-    signal,
-  });
+  // Handle Source Type
+  if ('colorId' in targetImageOrAsset || ('hex' in targetImageOrAsset && 'name' in targetImageOrAsset)) {
+      // It's a Color
+      const color = targetImageOrAsset as Color;
+      // Use efficient Text-to-Text generation for color adjustment
+      return await processColorAdjustment(userId, color, customPrompt, signal);
+  } else if ('textureImageDownloadUrl' in targetImageOrAsset) {
+      // It's a Texture
+      const texture = targetImageOrAsset as Texture;
+      const base64 = await fetchImageAsBase64(texture.textureImageDownloadUrl, signal);
+      image = {
+          base64String: base64,
+          mimeType: texture.mimeType || 'image/jpeg',
+      };
+      options.textureName = texture.name;
+  } else if ('itemImageDownloadUrl' in targetImageOrAsset) {
+      // It's an Item
+      const item = targetImageOrAsset as Item;
+      const base64 = await fetchImageAsBase64(item.itemImageDownloadUrl, signal);
+      image = {
+          base64String: base64,
+          mimeType: item.mimeType || 'image/jpeg',
+      };
+      options.itemName = item.name;
+  } else {
+      // It's ImageData
+      const imgData = targetImageOrAsset as ImageData;
+      image = {
+        base64String: await getBase64FromImageData(userId, imgData),
+        mimeType: imgData.mimeType,
+      };
+  }
+
+  // Determine asset type for name suggestion
+  let assetType = 'image';
+  if ('textureImageDownloadUrl' in targetImageOrAsset) {
+      assetType = 'texture';
+  } else if ('itemImageDownloadUrl' in targetImageOrAsset) {
+      assetType = 'object';
+  }
+
+  // Execute image generation with integrated name suggestion
+  // We append the name instruction to the prompt and ask for both Text and Image modalities
+  const promptSuffix = `
+    IMPORTANT: You must also suggest a creative, short name (max 5 words) for this ${assetType}.
+    Return the name in a JSON object structure like this: {"name": "Suggested Name"}.
+    The JSON should be in a text part of the response, separate from the image.
+  `;
+  
+  options.customPrompt = (customPrompt || '') + promptSuffix;
+  options.responseModalities = [Modality.TEXT, Modality.IMAGE];
+
+  return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, options);
+};
+
+/**
+ * Generate a suggested name using Text-only model
+ */
+export const generateNameSuggestion = async (
+  customPrompt: string,
+  assetType: string
+): Promise<string | undefined> => {
+  if (!process.env.API_KEY) return undefined;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-1.5-flash'; // Fast text model
+    const prompt = getNameSuggestionPrompt(customPrompt, assetType);
+    
+    const result = await ai.models.generateContent({
+      model,
+      contents: {
+        parts: [{ text: prompt }]
+      }
+    });
+    
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text?.trim();
+  } catch (e) {
+    console.warn('[Gemini] Failed to generate name suggestion:', e);
+    return undefined;
+  }
 };
 
 /**
@@ -188,8 +267,9 @@ export const processImageWithTask = async (
       mimeType: string;
     };
     signal?: AbortSignal;
+    responseModalities?: Modality[];
   } = {}
-): Promise<{ base64: string; mimeType: string }> => {
+): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   if (!process.env.API_KEY) {
     throw new Error(GEMINI_ERRORS.API_KEY_NOT_SET);
   }
@@ -197,7 +277,10 @@ export const processImageWithTask = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const prompt = getPromptByTask(task, options);
-  const model = options.model ?? defaultModel;
+  // Priority: options.model > task.model_code > defaultModel
+  // Note: task.model_code is typed as string literal or undefined if strict
+  const taskModelCode = 'model_code' in task ? (task as any).model_code : undefined;
+  const model = options.model ?? taskModelCode ?? defaultModel;
 
   try {
     // Build parts array
@@ -250,7 +333,7 @@ export const processImageWithTask = async (
         parts,
       },
       config: {
-        responseModalities: [Modality.IMAGE],
+        responseModalities: options.responseModalities || [Modality.IMAGE],
       },
     };
 
@@ -304,7 +387,28 @@ export const processImageWithTask = async (
       throw new Error(errorMessage);
     }
 
-    const generatedImagePart = response.candidates?.[0]?.content?.parts?.[0];
+    const candidates = response.candidates?.[0]?.content?.parts || [];
+    
+    // Find Image Part
+    const generatedImagePart = candidates.find(p => p.inlineData);
+    
+    // Find Text Part (for Name suggestion)
+    const generatedTextPart = candidates.find(p => p.text);
+    let suggestedName: string | undefined;
+
+    if (generatedTextPart && generatedTextPart.text) {
+        try {
+            const cleanJson = generatedTextPart.text.replace(/```json\n?|\n?```/g, '').trim();
+            // Try to find JSON object pattern
+            const match = cleanJson.match(/\{.*"name":\s*".*"\s*.*\}/s) || cleanJson.match(/\{.*\}/s);
+            if (match) {
+               const parsed = JSON.parse(match[0]);
+               suggestedName = parsed.name;
+            }
+        } catch (e) {
+            console.warn('[Gemini] Failed to parse JSON name from text part:', e);
+        }
+    }
 
     if (!generatedImagePart || !generatedImagePart.inlineData) {
       throw new Error(GEMINI_ERRORS.NO_IMAGE_DATA_RECEIVED);
@@ -320,6 +424,7 @@ export const processImageWithTask = async (
     return {
       base64: newImageBase64,
       mimeType: newImageMimeType,
+      name: suggestedName
     };
   } catch (error: any) {
     // Propagate aborts so callers can distinguish cancellation
@@ -338,6 +443,85 @@ export const processImageWithTask = async (
     }
 
     console.error('Error processing image with Gemini API:', error);
+    throw new Error(
+      GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
+    );
+  }
+};
+
+/**
+ * Special processing for Color Adjustment (Text-to-Text -> Image)
+ */
+export const processColorAdjustment = async (
+  userId: string,
+  color: Color,
+  customPrompt: string,
+  signal?: AbortSignal
+): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
+  if (!process.env.API_KEY) {
+    throw new Error(GEMINI_ERRORS.API_KEY_NOT_SET);
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const task = GEMINI_TASKS.COLOR_ADJUSTMENT;
+  const prompt = getPromptByTask(task, {
+    colorHex: color.hex,
+    customPrompt
+  });
+  const model = task.model_code || 'gemini-2.5-flash';
+
+  try {
+     const generateParams: any = {
+      model,
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      // No responseModalities needed for Text output, default is TEXT
+    };
+
+    if (signal) generateParams.signal = signal;
+
+    const result = await ai.models.generateContent(generateParams);
+    
+    // Extract text from response
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    console.log('[Gemini] Color Adjustment Response:', responseText);
+
+    // Parse JSON from response
+    let newHex = '';
+    let suggestedName: string | undefined;
+    try {
+      // Clean up markdown code blocks if present
+      const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
+      const data = JSON.parse(cleanJson);
+      newHex = data.hex;
+      suggestedName = data.name;
+    } catch (e) {
+      console.warn('[Gemini] Failed to parse JSON, trying regex match', e);
+      // Fallback regex for #RRGGBB
+      const match = responseText.match(/#[0-9A-Fa-f]{6}/);
+      if (match) newHex = match[0];
+    }
+
+    if (!newHex || !/^#[0-9A-Fa-f]{6}$/i.test(newHex)) {
+      throw new Error(`Invalid color code returned: ${responseText}`);
+    }
+
+    // Generate solid color image from new Hex using SVG (Text-to-Text friendly)
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="100%" height="100%" fill="${newHex}" /></svg>`;
+    // Simple btoa for browser environment
+    const base64 = btoa(svgString);
+
+    return {
+      base64,
+      mimeType: 'image/svg+xml',
+      hex: newHex,
+      name: suggestedName
+    };
+
+  } catch (error: any) {
+    console.error('Error processing color adjustment:', error);
     throw new Error(
       GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
     );

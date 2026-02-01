@@ -112,15 +112,17 @@ export const getAddObjectDefaultPrompt = (itemName: string, customPrompt: string
   Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.${DIMENSION_REQUIREMENT}
 `;
 
-export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
+export const getUseCustomPromptDefaultPrompt = (customPrompt: string, assetContext?: string) => `
   You are an expert interior designer and professional image editor with advanced capabilities in transforming interior spaces.
 
-  Your task is to modify the provided interior photo according to the user's custom instructions below.
+  Your task is to process the provided input image according to the user's custom instructions below.
+
+  ${assetContext ? `INPUT CONTEXT:\n  ${assetContext}` : 'The provided image is an interior photo to be modified.'}
 
   CRITICAL QUALITY STANDARDS:
   1. Maintain photorealistic quality and natural appearance
   2. Preserve proper lighting, shadows, and perspective
-  3. Ensure all modifications blend seamlessly with the original environment
+  3. Ensure all modifications blend seamlessly
   4. Keep architectural elements and proportions realistic
   5. Maintain image resolution and clarity
   6. Apply changes only as specified in the user instructions
@@ -130,7 +132,27 @@ export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
   ${customPrompt}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic modified image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.${DIMENSION_REQUIREMENT}
+  Deliver: A high-quality, photorealistic image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.${DIMENSION_REQUIREMENT}
+`;
+
+export const getColorAdjustmentDefaultPrompt = (
+  colorHex: string,
+  customPrompt: string
+) => `
+  You are a color theory expert and a digital design assistant.
+
+  Your task is to take a base color (HEX: ${colorHex}) and modify it according to the user's instructions.
+
+  INPUT COLOR: ${colorHex}
+  USER INSTRUCTION: "${customPrompt}"
+
+  CRITICAL OUTPUT REQUIREMENT:
+  1. Return ONLY a valid 6-digit HEX color code for the new color.
+  2. The output must be valid JSON in the following format:
+     { "hex": "#RRGGBB", "name": "Suggested Color Name" }
+  3. Include a creative name for the new color in the "name" field.
+  3. Do not include any explanation, markdown formatting, or text outside the JSON object.
+  4. Ensure the resulting color logically follows the user's request (e.g. "lighter", "darker", "more vibrant", "pastel version").
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -178,10 +200,40 @@ export const getPromptByTask = (
       if (!customPrompt) {
         throw new Error('customPrompt is required for CUSTOM_PROMPT task');
       }
-      return getUseCustomPromptDefaultPrompt(customPrompt);
+      
+      let assetContext = undefined;
+      if (colorName && colorHex) {
+        assetContext = `The provided image is a solid color reference: ${colorName} (${colorHex}). Use this color as the primary reference for the generation as requested.`;
+      } else if (textureName) {
+        assetContext = `The provided image is a texture reference: ${textureName}. Use this texture as the primary material reference.`;
+      } else if (itemName) {
+        assetContext = `The provided image is an object/item reference: ${itemName}. Use this object as the primary element reference.`;
+      }
+
+      return getUseCustomPromptDefaultPrompt(customPrompt, assetContext);
+
+    case GEMINI_TASKS.COLOR_ADJUSTMENT.task_name:
+      if (!colorHex) {
+        throw new Error('colorHex is required for COLOR_ADJUSTMENT task');
+      }
+      if (!customPrompt) {
+        throw new Error('customPrompt is required for COLOR_ADJUSTMENT task');
+      }
+      return getColorAdjustmentDefaultPrompt(colorHex, customPrompt);
 
     default:
       // Exhaustive check - all task types should be handled above
       return getUseCustomPromptDefaultPrompt('Unsupported task type');
   }
+};
+
+// Prompt for suggesting a name based on description
+export const getNameSuggestionPrompt = (customPrompt: string, assetType: string = 'image') => {
+  return `
+    Based on this user description for generating a new ${assetType}:
+    "${customPrompt}"
+    
+    Suggest a creative, short, and descriptive name (max 5 words) for the resulting ${assetType}.
+    Return ONLY the name as a plain string. No quotes, no markdown, no JSON.
+  `;
 };
