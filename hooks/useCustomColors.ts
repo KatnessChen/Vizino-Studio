@@ -85,7 +85,7 @@ export const useCustomColors = (projectId: string | null) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, effectiveProjectId]);
 
-  const addColor = useCallback(async (colorData: { name: string; hex: string; description?: string }): Promise<Color> => {
+  const addColor = useCallback(async (colorData: { name: string; hex: string; description?: string; evolutionChain?: import('@/types').ImageOperation[] }): Promise<Color> => {
     if (!isReady || !effectiveProjectId) {
       throw new Error('Storage not ready');
     }

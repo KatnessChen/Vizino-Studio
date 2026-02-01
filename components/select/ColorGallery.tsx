@@ -5,7 +5,8 @@ import { Color, ImageData } from '@/types';
 import { PRESET_COLOR } from '@/constants/constants';
 import { useCustomColors } from '@/hooks/useCustomColors';
 import { RootState } from '@/stores/store';
-import { setSelectedColor, selectSelectedColor } from '@/stores/taskStore';
+import { setSelectedAssets, selectSelectedAssets } from '@/stores/taskStore';
+import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { sortColorsBySpectrum, getTextColor } from '@/utils/colorUtils';
 import { useGuest } from '@/contexts/GuestContext';
 import { setShowLoginRequiredModal } from '@/stores/guestStore';
@@ -23,14 +24,19 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
   const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
   const activeProjectId = useSelector((state: RootState) => state.project.activeProjectId);
-  const selectedColor = useSelector(selectSelectedColor);
+  const selectedAssets = useSelector(selectSelectedAssets);
+  const selectedColor = selectedAssets[0] && 'hex' in selectedAssets[0] ? (selectedAssets[0] as Color) : null;
 
   const { customColors, isLoadingColors, addColor, updateColor, deleteColor } =
     useCustomColors(activeProjectId);
 
   const [isAddColorModalOpen, setIsAddColorModalOpen] = useState(false);
   const [colorToRename, setColorToRename] = useState<Color | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Derive selectedIds from selectedAssets for Gallery UI
+  const selectedIds = useMemo(() => {
+    return new Set(selectedAssets.filter(a => 'hex' in a).map(a => a.id));
+  }, [selectedAssets]);
 
   // Merge and sort colors
   const availableColors = useMemo(() => {
@@ -47,7 +53,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           imageDownloadUrl: '', // Colors don't have images
           mimeType: 'color/hex',
           spaceId: '',
-          evolutionChain: [],
+          evolutionChain: color.evolutionChain || [],
           parentImageId: null,
           storageFilePath: '',
           order: null,
@@ -60,12 +66,42 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
   }, [availableColors]);
 
   const handleSelectColor = useCallback(
-    (id: string | null) => {
-      const color = availableColors.find((c) => c.id === id) || null;
-      dispatch(setSelectedColor(color));
-      if (onSelect) onSelect(color);
+    (id: string | null, event?: React.MouseEvent) => {
+      if (!id) {
+        dispatch(setSelectedAssets([]));
+        if (onSelect) onSelect(null);
+        return;
+      }
+
+      const color = availableColors.find((c) => c.id === id);
+      if (!color) return;
+
+      const currentColors = selectedAssets.filter(a => 'hex' in a) as Color[];
+      const isSelected = currentColors.some(c => c.id === color.id);
+
+      // If no event (drag selection) or Shift key pressed: multi-select toggle mode
+      if (!event || event.shiftKey) {
+        if (isSelected) {
+          dispatch(setSelectedAssets(currentColors.filter(c => c.id !== color.id)));
+          if (onSelect) onSelect(null);
+        } else {
+          dispatch(setSelectedAssets([...currentColors, color]));
+          if (onSelect) onSelect(color);
+        }
+      } else {
+        // Single-select mode without Shift
+        if (isSelected && currentColors.length === 1) {
+          // If clicking the only selected item, deselect it
+          dispatch(setSelectedAssets([]));
+          if (onSelect) onSelect(null);
+        } else {
+          // Clear all and select only this one
+          dispatch(setSelectedAssets([color]));
+          if (onSelect) onSelect(color);
+        }
+      }
     },
-    [activeProjectId, availableColors, dispatch, onSelect]
+    [activeProjectId, availableColors, selectedAssets, dispatch, onSelect]
   );
 
   const existingNames = useMemo(
@@ -139,10 +175,9 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
             await deleteColor(color.id);
           }
           message.success(`Deleted ${customSelected.length} colors`);
-          setSelectedIds(new Set());
-          if (selectedColor && selectedIds.has(selectedColor.id)) {
-            handleSelectColor(null);
-          }
+          // Remove deleted colors from selectedAssets
+          const deletedIds = new Set(customSelected.map(c => c.id));
+          dispatch(setSelectedAssets(selectedAssets.filter(a => !deletedIds.has(a.id))));
         } catch (error) {
           message.error('Failed to delete some colors');
         }
@@ -173,7 +208,8 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
             await addColor(newColor);
           }
           message.success(`Duplicated ${colors.length} color${colors.length > 1 ? 's' : ''}`);
-          setSelectedIds(new Set());
+          // Clear selection after duplication
+          dispatch(setSelectedAssets([]));
         } catch (err) {
           message.error('Failed to duplicate colors');
         }
@@ -188,24 +224,13 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         images={mappedColors}
         selectedImageId={selectedColor?.id}
         selectedImageIds={selectedIds}
-        onSelectImage={(id) => {
-          if (selectedColor?.id === id) {
-            handleSelectColor(null);
-            if (selectedIds.has(id) && selectedIds.size === 1) {
-              setSelectedIds(new Set());
-            }
-          } else {
-            handleSelectColor(id);
-            setSelectedIds(new Set([id]));
-          }
+        onSelectImage={(id, event) => {
+          handleSelectColor(id, event);
         }}
-        onSelectMultiple={(id) => {
-          const next = new Set(selectedIds);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          setSelectedIds(next);
+        onSelectMultiple={(id, event) => {
+          handleSelectColor(id, event);
         }}
-        onClearSelection={() => setSelectedIds(new Set())}
+        onClearSelection={() => dispatch(setSelectedAssets([]))}
         onBulkDelete={handleBatchDelete}
         onBulkCopy={handleBulkDuplicate}
         onUploadImage={() => {
@@ -242,7 +267,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
               okType: 'danger',
               onOk: async () => {
                 await deleteColor(color.id);
-                if (selectedColor?.id === color.id) handleSelectColor(null);
+                if (selectedColor?.id === color.id) dispatch(setSelectedAssets([]));
                 message.success('Color deleted');
               },
             });
@@ -282,7 +307,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           onClose={() => setIsAddColorModalOpen(false)}
           onAdd={async (color) => {
             await addColor(color);
-            dispatch(setSelectedColor(color));
+            dispatch(setSelectedAssets([color]));
           }}
           existingColors={availableColors}
         />

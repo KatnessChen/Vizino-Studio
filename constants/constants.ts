@@ -66,3 +66,12 @@ export const MAX_PROJECTS_PER_USER = 10;
 export const MAX_SPACES_PER_PROJECT = 10;
 export const MAX_IMAGES_PER_SPACE = 50;
 export const MAX_OPERATIONS_PER_IMAGE = 20;
+
+// Asset types used in Custom Prompt asset picker
+export const CUSTOM_PROMPT_ASSET_TYPES = ['image', 'color', 'texture', 'object'] as const;
+export type CustomPromptAssetType = (typeof CUSTOM_PROMPT_ASSET_TYPES)[number];
+// Named constants for convenience
+export const CUSTOM_PROMPT_ASSET_IMAGE = 'image' as const;
+export const CUSTOM_PROMPT_ASSET_COLOR = 'color' as const;
+export const CUSTOM_PROMPT_ASSET_TEXTURE = 'texture' as const;
+export const CUSTOM_PROMPT_ASSET_OBJECT = 'object' as const;

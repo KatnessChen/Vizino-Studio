@@ -1129,7 +1129,12 @@ export async function copyImageAsOriginal(
 export async function addColor(
   userId: string,
   projectId: string,
-  colorData: { name: string; hex: string; description?: string }
+  colorData: {
+    name: string;
+    hex: string;
+    description?: string;
+    evolutionChain?: ImageOperation[];
+  }
 ): Promise<Color> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1146,6 +1151,7 @@ export async function addColor(
       description: colorData.description?.trim() || '',
       createdAt: now,
       updatedAt: now,
+      evolutionChain: colorData.evolutionChain || [],
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
@@ -1159,6 +1165,8 @@ export async function addColor(
       name: colorDoc.name,
       hex: colorDoc.hex,
       description: colorDoc.description,
+      evolutionChain: new FirestoreDataHandler(colorDoc.evolutionChain || []).serializeTimestamps()
+        .value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add color:', error);
@@ -1194,6 +1202,8 @@ export async function fetchColors(userId: string, projectId: string): Promise<Co
         name: data.name,
         hex: data.hex,
         description: data.description,
+        evolutionChain: new FirestoreDataHandler(data.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
   } catch (error) {
@@ -1300,6 +1310,7 @@ export async function addTexture(
     width?: number;
     height?: number;
     aspect_ratio?: number;
+    evolutionChain?: ImageOperation[];
   }
 ): Promise<Texture> {
   if (!userId || !projectId) {
@@ -1336,6 +1347,7 @@ export async function addTexture(
       aspect_ratio: textureData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
+      evolutionChain: textureData.evolutionChain || [],
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
@@ -1352,6 +1364,8 @@ export async function addTexture(
       width: textureDoc.width,
       height: textureDoc.height,
       aspect_ratio: textureDoc.aspect_ratio,
+      evolutionChain: new FirestoreDataHandler(textureDoc.evolutionChain || []).serializeTimestamps()
+        .value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add texture:', error);
@@ -1390,6 +1404,8 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
         width: data.width,
         height: data.height,
         aspect_ratio: data.aspect_ratio,
+        evolutionChain: new FirestoreDataHandler(data.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
 
@@ -1554,6 +1570,7 @@ export async function addItem(
     width?: number;
     height?: number;
     aspect_ratio?: number;
+    evolutionChain?: ImageOperation[];
   }
 ): Promise<Item> {
   if (!userId || !projectId) {
@@ -1588,6 +1605,7 @@ export async function addItem(
       aspect_ratio: itemData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
+      evolutionChain: itemData.evolutionChain || [],
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
@@ -1604,6 +1622,8 @@ export async function addItem(
       width: itemDoc.width,
       height: itemDoc.height,
       aspect_ratio: itemDoc.aspect_ratio,
+      evolutionChain: new FirestoreDataHandler(itemDoc.evolutionChain || []).serializeTimestamps()
+        .value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add item:', error);
@@ -1642,6 +1662,8 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
         width: data.width,
         height: data.height,
         aspect_ratio: data.aspect_ratio,
+        evolutionChain: new FirestoreDataHandler(data.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
 
