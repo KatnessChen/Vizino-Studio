@@ -184,6 +184,11 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                 <div className="w-full h-full flex items-center justify-center bg-[#f8fafc] rounded-lg">
                   {renderPreview()}
                 </div>
+              ) : isColor && colorHex ? (
+                <div 
+                  className="w-full h-full rounded-lg shadow-2xl" 
+                  style={{ backgroundColor: colorHex }}
+                />
               ) : (
                 <img
                   src={cachedImageSrc || image.imageDownloadUrl}

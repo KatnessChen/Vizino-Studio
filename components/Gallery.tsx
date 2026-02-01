@@ -342,33 +342,35 @@ const Gallery: React.FC<GalleryProps> = ({
   // In guest mode, use guestImages; otherwise use store images
   const allImages = isGuestMode ? guestImages : storeAllImages;
 
-  // Calculate total selected images across both original and generated
-  const totalSelectedImages = useMemo(() => {
+  // Calculate total selected items. 
+  // If selectedImageIds prop is provided (Assets flow), use it.
+  // Otherwise, use the global image selection (Images flow).
+  const totalSelectedItems = useMemo(() => {
+    if (selectedImageIds && selectedImageIds.size > 0) {
+      return selectedImageIds.size;
+    }
     return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
-  }, [selectedOriginalImageIds, selectedUpdatedImageIds]);
+  }, [selectedImageIds, selectedOriginalImageIds, selectedUpdatedImageIds]);
 
-  // Get all selected image objects (both original and generated) for comparison modal
-  const allSelectedImagesForComparison = useMemo(() => {
-    const allSelectedImages: ImageData[] = [];
+  // Get all selected objects for comparison modal
+  const allSelectedItemsForComparison = useMemo(() => {
+    // If the prop is provided, we use the local 'images' array (which contains the assets)
+    if (selectedImageIds && selectedImageIds.size > 0) {
+      return images.filter(img => selectedImageIds.has(img.id));
+    }
 
-    // Add selected original image IDs by finding them in all images
+    // Default Flow (Images): use global Redux IDs and allImages array
+    const selected: ImageData[] = [];
     selectedOriginalImageIds.forEach((id) => {
       const img = allImages.find((i) => i.id === id);
-      if (img) {
-        allSelectedImages.push(img);
-      }
+      if (img) selected.push(img);
     });
-
-    // Add selected generated image IDs by finding them in all images
     selectedUpdatedImageIds.forEach((id) => {
       const img = allImages.find((i) => i.id === id);
-      if (img) {
-        allSelectedImages.push(img);
-      }
+      if (img) selected.push(img);
     });
-
-    return allSelectedImages;
-  }, [selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
+    return selected;
+  }, [selectedImageIds, images, selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
 
   // Calculate total image count (original + generated) for upload limit
   const totalImageCount = useMemo(() => {
@@ -466,8 +468,8 @@ const Gallery: React.FC<GalleryProps> = ({
             {/* Compare button */}
             {showCompare && (
               <ImagesComparingButton
-                totalSelectedPhotos={totalSelectedImages}
-                selectedPhotos={allSelectedImagesForComparison}
+                totalSelectedPhotos={totalSelectedItems}
+                selectedPhotos={allSelectedItemsForComparison}
                 isToolbarMode={true}
               />
             )}

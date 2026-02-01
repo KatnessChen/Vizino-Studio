@@ -1547,6 +1547,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
                             detailModalTitle="Texture Information"
                             viewMoreModalTitle="Texture Information"
+                            showCompare={true}
                             onSingleRename={(id) => {
                               const asset = textures.find((t) => t.id === id);
                               if (asset) {
@@ -1607,6 +1608,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
                             detailModalTitle="Object Information"
                             viewMoreModalTitle="Object Information"
+                            showCompare={true}
                             onSingleRename={(id) => {
                               const asset = items.find((i) => i.id === id);
                               if (asset) {
@@ -1731,6 +1733,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
                             detailModalTitle="Texture Information"
                             viewMoreModalTitle="Texture Information"
+                            showCompare={true}
                             onSingleRename={(id) => {
                               const asset = textures.find((t) => t.id === id);
                               if (asset) {
@@ -1792,6 +1795,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
                             detailModalTitle="Object Information"
                             viewMoreModalTitle="Object Information"
+                            showCompare={true}
                             onSingleRename={(id) => {
                               const asset = items.find((i) => i.id === id);
                               if (asset) {

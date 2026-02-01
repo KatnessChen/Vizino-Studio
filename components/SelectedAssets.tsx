@@ -23,14 +23,12 @@ const isItem = (asset: any): asset is Item => 'itemImageDownloadUrl' in asset;
 const isImage = (asset: any): asset is ImageData => 'imageDownloadUrl' in asset && !('textureImageDownloadUrl' in asset) && !('itemImageDownloadUrl' in asset);
 
 interface SelectedAssetsProps {
-  showTitle?: boolean;
   title?: string;
   customCardHeight?: number;
   assets?: (Asset | ImageData)[];
 }
 
 const SelectedAssets: React.FC<SelectedAssetsProps> = ({
-  showTitle = true,
   title,
   customCardHeight,
   assets = [],
@@ -159,12 +157,12 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
 
     if (displayAsset.type === 'color') {
       return (
-        <div className="relative">
+        <div className="relative border border-gray-200 rounded overflow-hidden" style={{ height }}>
           <div
-            className="w-full rounded border border-dashed border-gray-200"
-            style={{ backgroundColor: displayAsset.hex, height }}
+            className="w-full h-full"
+            style={{ backgroundColor: displayAsset.hex }}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b">
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2">
             <div className="text-sm font-medium">{displayAsset.name}</div>
             <div className="text-xs opacity-90">{displayAsset.hex}</div>
           </div>
@@ -178,23 +176,21 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
       : displayAsset.url;
 
     return (
-      <div className="relative">
+      <div className="relative border border-gray-200 rounded overflow-hidden" style={{ height }}>
         {imgSrc ? (
           <img
             src={imgSrc}
             alt={displayAsset.name}
-            className="w-full rounded border border-gray-200 object-cover"
-            style={{ height }}
+            className="w-full h-full object-cover"
           />
         ) : (
           <div
-            className="w-full rounded border border-gray-200 bg-gray-100 flex items-center justify-center"
-            style={{ height }}
+            className="w-full h-full bg-gray-100 flex items-center justify-center"
           >
             <span className="text-xs text-gray-400">Loading...</span>
           </div>
         )}
-        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 rounded-b">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2">
           <div className="text-sm font-medium truncate">{displayAsset.name}</div>
           {displayAsset.description && (
             <div className="text-xs opacity-90 truncate">{displayAsset.description}</div>
@@ -206,11 +202,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
 
   return (
     <div>
-      {showTitle && (
-        <Typography.Title level={5} className="!m-0 !mb-2">
-          {title || 'Selected Asset'}
-        </Typography.Title>
-      )}
+      <Typography.Title level={5} className="!m-0 !mb-2">
+        {title || 'Selected Asset'}
+      </Typography.Title>
       {renderContent}
     </div>
   );

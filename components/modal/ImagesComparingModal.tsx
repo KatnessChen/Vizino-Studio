@@ -66,12 +66,19 @@ const DraggableImageCard: React.FC<DraggableImageCardProps> = ({
         >
           <CloseIcon className="text-white text-xs" />
         </button>
-        <img
-          src={cachedImageSrc || image.imageDownloadUrl}
-          alt={image.name}
-          className="w-full object-contain bg-white"
-          draggable="false"
-        />
+        {image.mimeType === 'color/hex' ? (
+          <div 
+            className="w-full h-full" 
+            style={{ backgroundColor: (image as any).hex }}
+          />
+        ) : (
+          <img
+            src={cachedImageSrc || image.imageDownloadUrl}
+            alt={image.name}
+            className="w-full object-contain bg-white"
+            draggable="false"
+          />
+        )}
       </div>
 
       {/* Image Info Footer */}
@@ -228,11 +235,18 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({
             <DragOverlay>
               {activeImage ? (
                 <div className="w-64 h-64 rounded-lg overflow-hidden border-2 border-blue-400 shadow-2xl bg-white">
-                  <img
-                    src={cachedImagesSrc[activeImage.id] || activeImage.imageDownloadUrl}
-                    alt={activeImage.name}
-                    className="w-full h-full object-contain"
-                  />
+                  {activeImage.mimeType === 'color/hex' ? (
+                    <div 
+                      className="w-full h-full" 
+                      style={{ backgroundColor: (activeImage as any).hex }}
+                    />
+                  ) : (
+                    <img
+                      src={cachedImagesSrc[activeImage.id] || activeImage.imageDownloadUrl}
+                      alt={activeImage.name}
+                      className="w-full h-full object-contain"
+                    />
+                  )}
                 </div>
               ) : null}
             </DragOverlay>

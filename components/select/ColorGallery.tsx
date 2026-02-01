@@ -25,7 +25,8 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
   const { isGuestMode } = useGuest();
   const activeProjectId = useSelector((state: RootState) => state.project.activeProjectId);
   const selectedAssets = useSelector(selectSelectedAssets);
-  const selectedColor = selectedAssets[0] && 'hex' in selectedAssets[0] ? (selectedAssets[0] as Color) : null;
+  const selectedColor =
+    selectedAssets[0] && 'hex' in selectedAssets[0] ? (selectedAssets[0] as Color) : null;
 
   const { customColors, isLoadingColors, addColor, updateColor, deleteColor } =
     useCustomColors(activeProjectId);
@@ -35,7 +36,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
 
   // Derive selectedIds from selectedAssets for Gallery UI
   const selectedIds = useMemo(() => {
-    return new Set(selectedAssets.filter(a => 'hex' in a).map(a => a.id));
+    return new Set(selectedAssets.filter((a) => 'hex' in a).map((a) => a.id));
   }, [selectedAssets]);
 
   // Merge and sort colors
@@ -76,13 +77,13 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
       const color = availableColors.find((c) => c.id === id);
       if (!color) return;
 
-      const currentColors = selectedAssets.filter(a => 'hex' in a) as Color[];
-      const isSelected = currentColors.some(c => c.id === color.id);
+      const currentColors = selectedAssets.filter((a) => 'hex' in a) as Color[];
+      const isSelected = currentColors.some((c) => c.id === color.id);
 
       // If no event (drag selection) or Shift key pressed: multi-select toggle mode
       if (!event || event.shiftKey) {
         if (isSelected) {
-          dispatch(setSelectedAssets(currentColors.filter(c => c.id !== color.id)));
+          dispatch(setSelectedAssets(currentColors.filter((c) => c.id !== color.id)));
           if (onSelect) onSelect(null);
         } else {
           dispatch(setSelectedAssets([...currentColors, color]));
@@ -176,8 +177,8 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           }
           message.success(`Deleted ${customSelected.length} colors`);
           // Remove deleted colors from selectedAssets
-          const deletedIds = new Set(customSelected.map(c => c.id));
-          dispatch(setSelectedAssets(selectedAssets.filter(a => !deletedIds.has(a.id))));
+          const deletedIds = new Set(customSelected.map((c) => c.id));
+          dispatch(setSelectedAssets(selectedAssets.filter((a) => !deletedIds.has(a.id))));
         } catch (error) {
           message.error('Failed to delete some colors');
         }
@@ -245,7 +246,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         isLoading={isLoadingColors}
         emptyMessage="No colors found"
         renderItemPreview={renderColorPreview}
-        showViewButton={false}
+        showViewButton={true}
         detailModalTitle="Color Information"
         viewMoreModalTitle="Color Information"
         editLabel="Edit"

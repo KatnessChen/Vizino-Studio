@@ -9,8 +9,7 @@ import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
-import { ImageData, ImageOperation, CustomPrompt, Asset } from '@/types';
-import { imageCache } from '@/utils/imageCache';
+import { ImageData, ImageOperation, CustomPrompt } from '@/types';
 import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,
@@ -82,15 +81,21 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const selectedAssets = useSelector(selectSelectedAssets);
 
     const selectedAssetRaw = selectedAssets[0] || null;
-    const selectedColor = selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
-    const selectedTexture = selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Texture) : null;
-    const selectedItem = selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Item) : null;
+    const selectedColor =
+      selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
+    const selectedTexture =
+      selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw
+        ? (selectedAssetRaw as Texture)
+        : null;
+    const selectedItem =
+      selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw
+        ? (selectedAssetRaw as Item)
+        : null;
 
     const { addColor } = useCustomColors(activeProjectId);
     const { addAsset: addTextureToStore } = useCustomAssets('texture', activeProjectId);
     const { addAsset: addItemToStore } = useCustomAssets('item', activeProjectId);
 
-    const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [customPrompt, setCustomPrompt] = useState<string>('');
     const [generatedImage, setGeneratedImage] = useState<{
@@ -298,39 +303,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       return '';
     }, [activeTaskName, selectedColor, selectedTexture, selectedItem]);
 
-    // Load cached image
-    useEffect(() => {
-      const loadCachedImage = async () => {
-        // If we have an override sourceAsset that is an ImageData, use it.
-        // Otherwise fallback to sourceImage if sourceAsset is not provided.
-        // If sourceAsset is provided and is NOT ImageData (e.g. Color), handled by SelectedAssets component preview.
-
-        const effectiveImage =
-          sourceAsset && 'imageDownloadUrl' in sourceAsset
-            ? (sourceAsset as ImageData)
-            : sourceImage;
-
-        if (!effectiveImage) {
-          setCachedImageSrc(null);
-          return;
-        }
-
-        try {
-          const base64 = await imageCache.get(effectiveImage.imageDownloadUrl);
-          if (base64) {
-            setCachedImageSrc(`data:${effectiveImage.mimeType};base64,${base64}`);
-          } else {
-            setCachedImageSrc(null);
-          }
-        } catch (error) {
-          console.warn('[GenerateMoreModal] Failed to load cached image:', error);
-          setCachedImageSrc(null);
-        }
-      };
-
-      loadCachedImage();
-    }, [sourceImage, sourceAsset]);
-
     // Clear validation error when color changes
     useEffect(() => {
       if (selectedColor) {
@@ -453,6 +425,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     }, [
       guestHasUsedGeneration,
       dispatch,
+      sourceAsset,
       sourceImage,
       adminSettings.mock_limit_reached,
       customPrompt,
@@ -470,7 +443,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       activeProjectId,
       fetchPrompts,
       setErrorMessage,
-      onSuccess,
     ]);
 
     // Expose handleGenerate to parent via ref
@@ -558,20 +530,27 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
         // --- COLOR ADJUSTMENT SAVING FLOW ---
         // --- CUSTOM ASSET SAVING FLOW ---
-        const isColor = !!imageData.hex;
+        // Determine if we should save as an asset (Color/Texture/Item) or a Space Image
+
+        // If we have a sourceImage, we are definitely updating an image, not creating a new template asset
+        const isImageUpdate = !!sourceImage;
+        const isSavingAsAsset = !isImageUpdate;
+
+        const isColor = isSavingAsAsset && !!imageData.hex;
+
         const isTexture =
-          (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
+          isSavingAsAsset &&
+          ((activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
             (selectedTexture || assetType === 'texture')) ||
-          activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name;
+            activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name);
         const isItem =
-          (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
+          isSavingAsAsset &&
+          ((activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
             (selectedItem || assetType === 'object' || assetType === 'item')) ||
-          activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name;
+            activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name);
 
         if (isColor || isTexture || isItem) {
           try {
-            const now = Timestamp.fromDate(new Date());
-
             // Create Evolution Chain Entry
             const operation: ImageOperation = formatImageOperationData(
               effectiveOriginalImage!,
@@ -851,14 +830,14 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         }
       },
       [
+        userId,
+        isAuthenticated,
+        guestSessionId,
         sourceImage,
         sourceAsset,
-        activeTaskName,
-        isAuthenticated,
-        userId,
         activeProjectId,
         activeSpaceId,
-        guestSessionId,
+        activeTaskName,
         selectedColor,
         selectedTexture,
         selectedItem,
@@ -867,6 +846,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         dispatch,
         onSuccess,
         addColor,
+        addItemToStore,
+        addTextureToStore,
+        assetType,
+        effectiveOriginalImage,
+        markImageGenerated,
         adminSettings.mock_limit_reached,
       ]
     );
@@ -1012,27 +996,39 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           )}
 
           <div className="flex gap-8 flex-wrap relative">
-            {/* Left Column: Target Source & Design Material */}
+            {/* Left Column: Target Image & Design Material */}
             <div className="min-w-0 flex-1 basis-[200px] flex flex-col gap-4 relative">
-              {/* Target Source */}
+              {/* Target Image */}
               <div className="relative">
-                <Typography.Title level={5}>Target Source</Typography.Title>
-
                 {/* Unified Asset Preview */}
-                <div className="h-[240px] rounded overflow-hidden border border-gray-200 relative">
-                  {/* If sourceAsset is provided (from SelectedAssets via props when Custom Prompt), use that.
-                         Otherwise fall back to sourceImage (normal flow) */}
-                  <SelectedAssets
-                    showTitle={false}
-                    customCardHeight={240}
-                    assets={sourceAsset ? [sourceAsset] : (sourceImage ? [sourceImage] : [])}
-                  />
-                </div>
+                <SelectedAssets
+                  title={
+                    selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name
+                      ? 'Target Asset'
+                      : 'Target Image'
+                  }
+                  customCardHeight={240}
+                  assets={
+                    selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name
+                      ? sourceImage
+                        ? [sourceImage, ...selectedAssets]
+                        : sourceAsset
+                          ? [sourceAsset]
+                          : selectedAssets
+                      : sourceImage
+                        ? [sourceImage]
+                        : []
+                  }
+                />
               </div>
 
               {/* Design Material */}
               {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
-                <SelectedAssets customCardHeight={240} assets={[]} />
+                <SelectedAssets
+                  title="Design Material"
+                  customCardHeight={240}
+                  assets={selectedAssets}
+                />
               )}
             </div>
 
@@ -1294,7 +1290,14 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             colorName={selectedColor?.name}
             textureName={selectedTexture?.name}
             itemName={selectedItem?.name}
-            originalHex={selectedColor?.hex}
+            originalHex={
+              (activeTaskName === GEMINI_TASKS.COLOR_ADJUSTMENT.task_name ||
+                activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) &&
+              sourceAsset &&
+              'hex' in sourceAsset
+                ? (sourceAsset as any).hex
+                : undefined
+            }
             defaultDescription={customPrompt}
           />
         )}

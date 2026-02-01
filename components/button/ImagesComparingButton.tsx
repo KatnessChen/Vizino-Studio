@@ -26,8 +26,8 @@ const ImagesComparingButton: React.FC<ImagesComparingButtonProps> = ({
   };
 
   const tooltipTitle = isEnabled
-    ? `Compare ${totalSelectedPhotos} image${totalSelectedPhotos !== 1 ? 's' : ''} (Original & Generated)`
-    : 'Select at least 2 images from Original or Generated to compare';
+    ? `Compare ${totalSelectedPhotos} asset${totalSelectedPhotos !== 1 ? 's' : ''}`
+    : 'Select at least 2 assets to compare';
 
   if (isToolbarMode) {
     // Toolbar mode: icon-only button
