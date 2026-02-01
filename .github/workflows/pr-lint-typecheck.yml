@@ -23,6 +23,12 @@ jobs:
         with:
           version: '8'
 
+      - name: Enable Corepack & prepare pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@8 --activate
+        shell: bash
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
