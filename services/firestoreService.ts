@@ -14,6 +14,7 @@ import {
   orderBy,
   where,
 } from 'firebase/firestore';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { app } from '@/config/firebaseConfig';
 import {
@@ -162,7 +163,13 @@ export async function fetchProjects(userId: string): Promise<Project[]> {
         createdAt:
           typeof spaceData.createdAt === 'string'
             ? spaceData.createdAt
-            : (spaceData.createdAt as any).toDate().toISOString(),
+            : spaceData.createdAt &&
+                typeof (spaceData.createdAt as Record<string, unknown>).toDate === 'function'
+              ? (spaceData.createdAt as { toDate(): Date }).toDate().toISOString()
+              : spaceData.createdAt &&
+                  ((spaceData.createdAt as unknown) instanceof Date ? true : false)
+                ? (spaceData.createdAt as Date).toISOString()
+                : String(spaceData.createdAt),
       };
 
       const projectSpaces = spacesByProject.get(spaceData.projectId) || [];
@@ -181,7 +188,13 @@ export async function fetchProjects(userId: string): Promise<Project[]> {
         createdAt:
           typeof projectData.createdAt === 'string'
             ? projectData.createdAt
-            : (projectData.createdAt as any).toDate().toISOString(),
+            : projectData.createdAt &&
+                typeof (projectData.createdAt as Record<string, unknown>).toDate === 'function'
+              ? (projectData.createdAt as { toDate(): Date }).toDate().toISOString()
+              : projectData.createdAt &&
+                  ((projectData.createdAt as unknown) instanceof Date ? true : false)
+                ? (projectData.createdAt as Date).toISOString()
+                : String(projectData.createdAt),
       };
     });
 
@@ -570,6 +583,7 @@ export async function createImage(
       width: imageMetadata.width ?? null,
       height: imageMetadata.height ?? null,
       aspect_ratio: imageMetadata.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     console.log({ newImageData });
@@ -628,7 +642,7 @@ export async function updateImageMetadata(
     throw new Error('User ID, Project ID, Space ID, and Image ID are required to update image.');
   }
 
-  const sanitizedUpdates: any = {};
+  const sanitizedUpdates: Partial<Pick<ImageData, 'name' | 'description' | 'updatedAt'>> = {};
   if (updates.name !== undefined) {
     if (!updates.name.trim()) {
       throw new Error('Image name cannot be empty.');
@@ -853,6 +867,7 @@ export async function duplicateImage(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore
@@ -967,6 +982,7 @@ export async function moveImageToSpace(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore in target space
@@ -1076,6 +1092,7 @@ export async function copyImageAsOriginal(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore in target space
@@ -1148,6 +1165,7 @@ export async function addColor(
       id: colorId,
       name: colorData.name.trim(),
       hex: colorData.hex.toUpperCase(),
+      assetType: ASSET_COLOR,
       description: colorData.description?.trim() || '',
       createdAt: now,
       updatedAt: now,
@@ -1164,6 +1182,7 @@ export async function addColor(
       id: colorDoc.id,
       name: colorDoc.name,
       hex: colorDoc.hex,
+      assetType: colorDoc.assetType || ASSET_COLOR,
       description: colorDoc.description,
       evolutionChain: new FirestoreDataHandler(colorDoc.evolutionChain || []).serializeTimestamps()
         .value as ImageOperation[],
@@ -1201,6 +1220,7 @@ export async function fetchColors(userId: string, projectId: string): Promise<Co
         id: data.id,
         name: data.name,
         hex: data.hex,
+        assetType: data.assetType || ASSET_COLOR,
         description: data.description,
         evolutionChain: new FirestoreDataHandler(data.evolutionChain || []).serializeTimestamps()
           .value as ImageOperation[],
@@ -1236,7 +1256,9 @@ export async function updateColor(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
 
-    const updateData: any = {
+    const updateData: Partial<
+      Pick<Color, 'name' | 'hex' | 'description'> & { updatedAt: Timestamp }
+    > = {
       updatedAt: Timestamp.now(),
     };
 
@@ -1341,6 +1363,7 @@ export async function addTexture(
       id: textureId,
       name: textureData.name.trim(),
       textureImageDownloadUrl,
+      assetType: ASSET_TEXTURE,
       description: textureData.description?.trim() || '',
       width: textureData.width ?? null,
       height: textureData.height ?? null,
@@ -1360,12 +1383,14 @@ export async function addTexture(
       id: textureDoc.id,
       name: textureDoc.name,
       textureImageDownloadUrl: textureDoc.textureImageDownloadUrl,
+      assetType: textureDoc.assetType || ASSET_TEXTURE,
       description: textureDoc.description,
       width: textureDoc.width,
       height: textureDoc.height,
       aspect_ratio: textureDoc.aspect_ratio,
-      evolutionChain: new FirestoreDataHandler(textureDoc.evolutionChain || []).serializeTimestamps()
-        .value as ImageOperation[],
+      evolutionChain: new FirestoreDataHandler(
+        textureDoc.evolutionChain || []
+      ).serializeTimestamps().value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add texture:', error);
@@ -1400,6 +1425,7 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
         id: data.id,
         name: data.name,
         textureImageDownloadUrl: data.textureImageDownloadUrl,
+        assetType: data.assetType || ASSET_TEXTURE,
         description: data.description,
         width: data.width,
         height: data.height,
@@ -1443,7 +1469,7 @@ export async function updateTexture(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
 
-    const updateData: any = {
+    const updateData: Partial<Texture> = {
       updatedAt: Timestamp.now(),
     };
 
@@ -1599,6 +1625,7 @@ export async function addItem(
       id: itemId,
       name: itemData.name.trim(),
       itemImageDownloadUrl,
+      assetType: ASSET_ITEM,
       description: itemData.description?.trim() || '',
       width: itemData.width ?? null,
       height: itemData.height ?? null,
@@ -1618,6 +1645,7 @@ export async function addItem(
       id: itemDoc.id,
       name: itemDoc.name,
       itemImageDownloadUrl: itemDoc.itemImageDownloadUrl,
+      assetType: itemDoc.assetType || ASSET_ITEM,
       description: itemDoc.description,
       width: itemDoc.width,
       height: itemDoc.height,
@@ -1658,6 +1686,7 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
         id: data.id,
         name: data.name,
         itemImageDownloadUrl: data.itemImageDownloadUrl,
+        assetType: data.assetType || ASSET_ITEM,
         description: data.description,
         width: data.width,
         height: data.height,
@@ -1701,7 +1730,7 @@ export async function updateItem(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
 
-    const updateData: any = {
+    const updateData: Partial<Item> = {
       updatedAt: Timestamp.now(),
     };
 
