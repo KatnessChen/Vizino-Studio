@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import type { UnknownAction } from '@reduxjs/toolkit';
 
 /**
  * Generic selection handler hook that provides unified selection logic
@@ -8,8 +9,8 @@ import { useDispatch } from 'react-redux';
 interface UseSelectionHandlerSetOptions {
   // Current selection state
   currentSelection: Set<string>;
-  // Redux action creator to update selection
-  setSelection: (selection: Set<string>) => any;
+  // Redux action creator or setter to update selection; may return an action or void
+  setSelection: (selection: Set<string>) => unknown;
   // Type of selection storage
   type: 'set';
 }
@@ -17,8 +18,8 @@ interface UseSelectionHandlerSetOptions {
 interface UseSelectionHandlerArrayOptions<T> {
   // Current selection state
   currentSelection: T[];
-  // Redux action creator to update selection
-  setSelection: (selection: T[]) => any;
+  // Redux action creator or setter to update selection; may return an action or void
+  setSelection: (selection: T[]) => unknown;
   // Type of selection storage
   type: 'array';
   // Filter function for array-based selections
@@ -27,12 +28,27 @@ interface UseSelectionHandlerArrayOptions<T> {
   findItemById: (id: string) => T | undefined;
 }
 
-type UseSelectionHandlerOptions<T = any> =
+type UseSelectionHandlerOptions<T extends { id: string } = { id: string }> =
   | UseSelectionHandlerSetOptions
   | UseSelectionHandlerArrayOptions<T>;
 
-export function useSelectionHandler<T = any>(options: UseSelectionHandlerOptions<T>) {
+export function useSelectionHandler<T extends { id: string } = { id: string }>(
+  options: UseSelectionHandlerOptions<T>
+) {
   const dispatch = useDispatch();
+
+  const tryDispatch = useCallback(
+    (maybeAction: unknown) => {
+      if (
+        maybeAction &&
+        typeof maybeAction === 'object' &&
+        'type' in (maybeAction as Record<string, unknown>)
+      ) {
+        dispatch(maybeAction as UnknownAction);
+      }
+    },
+    [dispatch]
+  );
 
   const handleSelect = useCallback(
     (id: string, event?: React.MouseEvent) => {
@@ -59,41 +75,48 @@ export function useSelectionHandler<T = any>(options: UseSelectionHandlerOptions
           }
         }
 
-        dispatch(options.setSelection(newSet));
+        const maybeAction = options.setSelection(newSet);
+        tryDispatch(maybeAction);
       } else {
         // Handle array-based selections (assets)
         const currentArray = options.currentSelection;
         const currentFiltered = currentArray.filter(options.filterFn);
-        const isSelected = currentFiltered.some((item: any) => item.id === id);
+        const isSelected = currentFiltered.some((item: T) => item.id === id);
 
         // If no event (drag selection) or Shift key pressed: multi-select toggle mode
         if (!event || event.shiftKey) {
           if (isSelected) {
             // Remove this item
-            dispatch(options.setSelection(currentFiltered.filter((item: any) => item.id !== id)));
+            const maybeAction = options.setSelection(
+              currentFiltered.filter((item: T) => item.id !== id)
+            );
+            tryDispatch(maybeAction);
           } else {
             // Add this item
             const newItem = options.findItemById(id);
             if (newItem) {
-              dispatch(options.setSelection([...currentFiltered, newItem]));
+              const maybeAction = options.setSelection([...currentFiltered, newItem]);
+              tryDispatch(maybeAction);
             }
           }
         } else {
           // Single-select mode
           if (isSelected && currentFiltered.length === 1) {
             // If clicking the only selected item, deselect it
-            dispatch(options.setSelection([]));
+            const maybeAction = options.setSelection([]);
+            tryDispatch(maybeAction);
           } else {
             // Clear all and select only this one
             const newItem = options.findItemById(id);
             if (newItem) {
-              dispatch(options.setSelection([newItem]));
+              const maybeAction = options.setSelection([newItem]);
+              tryDispatch(maybeAction);
             }
           }
         }
       }
     },
-    [options, dispatch]
+    [options, tryDispatch]
   );
 
   return handleSelect;
