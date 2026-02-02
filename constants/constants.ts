@@ -6,6 +6,7 @@ export const PRESET_COLOR: Color[] = [
     name: 'Raindance',
     hex: '#a7b3aa',
     description: 'Easygoing grey undertones bring an effortless versatility to this steely green.',
+    assetType: 'color',
   },
   {
     id: 'CSP-310',
@@ -13,18 +14,21 @@ export const PRESET_COLOR: Color[] = [
     hex: '#e8decf',
     description:
       'Infused with a hint of blush, this tender hue brings a subtle warmth to any space.',
+    assetType: 'color',
   },
   {
     id: 'OC-45',
     name: 'Swiss Coffee',
     hex: '#eeece1',
     description: 'An essential white paint colour with just the right amount of warmth.',
+    assetType: 'color',
   },
   {
     id: 'AF-610',
     name: 'Batik',
     hex: '#ccb9b5',
     description: 'Violet and rose come together to create this surprisingly versatile dusty hue.',
+    assetType: 'color',
   },
   {
     id: 'HC-157',
@@ -32,18 +36,21 @@ export const PRESET_COLOR: Color[] = [
     hex: '#435155',
     description:
       'A blackened teal that conveys a strong sense of history and architectural relevance.',
+    assetType: 'color',
   },
   {
     id: '048',
     name: 'Southwest Pottery',
     hex: '#975f57',
     description: 'A nuanced hue that captures the brown and red tones of kiln-fired clay.',
+    assetType: 'color',
   },
   {
     id: '1054',
     name: 'Sherwood Tan',
     hex: '#b8a183',
     description: 'A classic tan infused with notes of earthy brown.',
+    assetType: 'color',
   },
   {
     id: 'AF-655',
@@ -51,6 +58,7 @@ export const PRESET_COLOR: Color[] = [
     hex: '#57504c',
     description:
       'Reminiscent of tailored suiting, this elegant colour weaves rich espresso hues with refined notes of charcoal.',
+    assetType: 'color',
   },
 ];
 
@@ -67,11 +75,15 @@ export const MAX_SPACES_PER_PROJECT = 10;
 export const MAX_IMAGES_PER_SPACE = 50;
 export const MAX_OPERATIONS_PER_IMAGE = 20;
 
-// Asset types used in Custom Prompt asset picker
-export const CUSTOM_PROMPT_ASSET_TYPES = ['image', 'color', 'texture', 'object'] as const;
-export type CustomPromptAssetType = (typeof CUSTOM_PROMPT_ASSET_TYPES)[number];
 // Named constants for convenience
-export const CUSTOM_PROMPT_ASSET_IMAGE = 'image' as const;
-export const CUSTOM_PROMPT_ASSET_COLOR = 'color' as const;
-export const CUSTOM_PROMPT_ASSET_TEXTURE = 'texture' as const;
-export const CUSTOM_PROMPT_ASSET_OBJECT = 'object' as const;
+export const ASSET_IMAGE = 'image' as const;
+export const ASSET_COLOR = 'color' as const;
+export const ASSET_TEXTURE = 'texture' as const;
+export const ASSET_ITEM = 'item' as const;
+// Backwards-compatible alias (avoid using this; prefer ASSET_ITEM)
+export const ASSET_OBJECT = ASSET_ITEM;
+
+// Asset types used in Custom Prompt asset picker
+export const ASSET_TYPES = [ASSET_IMAGE, ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM] as const;
+export type CustomPromptAssetType = (typeof ASSET_TYPES)[number];
+export type AssetType = (typeof ASSET_TYPES)[number];

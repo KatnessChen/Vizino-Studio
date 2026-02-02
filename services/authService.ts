@@ -1,5 +1,7 @@
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -12,46 +14,123 @@ import { createOrUpdateUser } from './userService';
 
 const googleProvider = new GoogleAuthProvider();
 
+/**
+ * Detect if the browser is Safari
+ * Safari has issues with popup-based authentication due to ITP (Intelligent Tracking Prevention)
+ */
+const isSafari = (): boolean => {
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('safari') && !ua.includes('chrome') && !ua.includes('crios');
+};
+
 // Configure Google provider for additional scopes if needed
 googleProvider.addScope('profile');
 googleProvider.addScope('email');
 
 /**
- * Sign in user with Google using popup
+ * Sign in user with Google using popup or redirect
+ * Automatically uses redirect mode for Safari browsers to avoid popup blocking issues
+ * Falls back to redirect if popup is blocked in other browsers
  */
 export const signInWithGoogle = async () => {
   try {
     // Enable persistence so user stays logged in
     await setPersistence(auth, browserLocalPersistence);
 
-    // Use popup for authentication
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
+    // Safari has issues with popup authentication due to ITP, use redirect instead
+    if (isSafari()) {
+      console.log('Safari detected, using redirect authentication');
+      await signInWithRedirect(auth, googleProvider);
+      // After redirect, the page will reload and handleRedirectResult will process the result
+      return { success: true, isRedirecting: true };
+    }
 
-    // Create or update user in Firestore
-    await createOrUpdateUser({
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-    });
+    // Try popup authentication for other browsers
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-    return {
-      success: true,
-      user: {
+      // Create or update user in Firestore
+      await createOrUpdateUser({
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        isEmailVerified: user.emailVerified,
-      },
-      token: await user.getIdToken(),
-    };
-  } catch (error: any) {
+      });
+
+      return {
+        success: true,
+        user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          isEmailVerified: user.emailVerified,
+        },
+        token: await user.getIdToken(),
+      };
+    } catch (popupError: unknown) {
+      // If popup is blocked, fall back to redirect
+      if (popupError instanceof Error && 'code' in popupError) {
+        const firebaseError = popupError as { code: string };
+        if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/cancelled-popup-request') {
+          console.log('Popup blocked, falling back to redirect authentication');
+          await signInWithRedirect(auth, googleProvider);
+          return { success: true, isRedirecting: true };
+        }
+      }
+      throw popupError;
+    }
+  } catch (error) {
     console.error('Google sign-in error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to sign in with Google',
+      error: error instanceof Error ? error.message : 'Failed to sign in with Google',
+    };
+  }
+};
+
+/**
+ * Handle redirect result after user returns from Google sign-in page
+ * This should be called when the app initializes to process redirect authentication
+ */
+export const handleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    
+    if (result) {
+      // User just returned from Google sign-in page
+      const user = result.user;
+      console.log('Processing redirect authentication result');
+
+      // Create or update user in Firestore
+      await createOrUpdateUser({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      });
+
+      return {
+        success: true,
+        user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          isEmailVerified: user.emailVerified,
+        },
+        token: await user.getIdToken(),
+      };
+    }
+    
+    // No redirect result (normal page load)
+    return null;
+  } catch (error) {
+    console.error('Redirect result error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to process redirect result',
     };
   }
 };
@@ -63,11 +142,11 @@ export const signOutUser = async () => {
   try {
     await signOut(auth);
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Sign-out error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to sign out',
+      error: error instanceof Error ? error.message : 'Failed to sign out',
     };
   }
 };

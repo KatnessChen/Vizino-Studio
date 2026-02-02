@@ -7,7 +7,7 @@
 
 import { ImageData } from '@/types';
 import { Timestamp } from 'firebase/firestore';
-import { PRESET_COLOR } from './constants';
+import { PRESET_COLOR, ASSET_IMAGE } from './constants';
 
 // Demo image URLs - replace with actual Firebase Storage URLs
 // These should be publicly accessible images
@@ -31,6 +31,7 @@ const DEMO_IMAGES: ImageData[] = [
     width: 800,
     height: 600,
     aspect_ratio: 800 / 600,
+    assetType: ASSET_IMAGE,
   },
 ];
 
