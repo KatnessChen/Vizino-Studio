@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { ImageData, Color } from '@/types';
+import { ImageData, Color, Asset } from '@/types';
+import { ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
 import {
   generateRecoloredImage,
   generateRetexturedImage,
@@ -15,6 +16,7 @@ interface Texture {
   textureImageDownloadUrl: string;
   mimeType?: string;
   description?: string;
+  assetType: typeof ASSET_TEXTURE;
 }
 
 interface Item {
@@ -23,6 +25,7 @@ interface Item {
   itemImageDownloadUrl: string;
   mimeType?: string;
   description?: string;
+  assetType: typeof ASSET_ITEM;
 }
 
 interface UseImageProcessingProps {
@@ -80,10 +83,10 @@ export const useImageProcessing = ({
         let result: { base64: string; mimeType: string; hex?: string; name?: string };
 
         // Helper to ensure we have ImageData for older tasks that strictly require it
-        const ensureImageData = (src: any): ImageData => {
-           if ('imageDownloadUrl' in src) return src as ImageData;
-           throw new Error('This task requires an Image source.');
-        }
+        const ensureImageData = (src: Asset | ImageData): ImageData => {
+          if ('imageDownloadUrl' in src) return src as ImageData;
+          throw new Error('This task requires an Image source.');
+        };
 
         if (selectedTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name) {
           if (!selectedColor) {
@@ -155,9 +158,9 @@ export const useImageProcessing = ({
         setIsProcessingImage(false);
         abortControllerRef.current = null;
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check if error is due to abort
-        if (error.name === 'AbortError' || signal.aborted) {
+        if ((error instanceof Error && error.name === 'AbortError') || signal.aborted) {
           console.log('Request was cancelled by user');
           setIsProcessingImage(false);
           abortControllerRef.current = null;
@@ -168,7 +171,7 @@ export const useImageProcessing = ({
         const msg = error instanceof Error ? error.message : String(error);
         let displayMessage = `Processing failed: ${msg}.`;
 
-        let apiError: any = null;
+        let apiError: unknown = null;
         try {
           const jsonStringMatch = msg.match(/\{"error":\{.*\}\}/);
           if (jsonStringMatch) {
@@ -178,12 +181,25 @@ export const useImageProcessing = ({
           console.warn('Failed to parse error message as JSON:', e);
         }
 
-        if (apiError?.error?.status === 'RESOURCE_EXHAUSTED' || apiError?.error?.code === 429) {
-          const rateLimitDocsLink =
-            apiError?.error?.details?.[1]?.links?.[0]?.url ||
-            'https://ai.google.dev/gemini-api/docs/rate-limits';
-          const usageLink = 'https://ai.dev/usage?tab=rate-limit';
-          displayMessage = `Processing failed due to quota limits. You've exceeded your current usage limit for the Gemini API. Please check your plan and billing details. For more information, visit: ${rateLimitDocsLink} or monitor your usage at: ${usageLink}`;
+        if (apiError && typeof apiError === 'object' && 'error' in apiError) {
+          const errorObj = apiError as {
+            error?: { status?: string; code?: number; details?: unknown[] };
+          };
+          if (errorObj.error?.status === 'RESOURCE_EXHAUSTED' || errorObj.error?.code === 429) {
+            const rateLimitDocsLink =
+              (Array.isArray(errorObj.error.details) &&
+                errorObj.error.details[1] &&
+                typeof errorObj.error.details[1] === 'object' &&
+                'links' in errorObj.error.details[1] &&
+                Array.isArray((errorObj.error.details[1] as { links?: unknown[] }).links) &&
+                (errorObj.error.details[1] as { links?: unknown[] }).links?.[0] &&
+                typeof (errorObj.error.details[1] as { links?: unknown[] }).links?.[0] ===
+                  'object' &&
+                (errorObj.error.details[1] as { links?: { url?: string }[] }).links?.[0]?.url) ||
+              'https://ai.google.dev/gemini-api/docs/rate-limits';
+            const usageLink = 'https://ai.dev/usage?tab=rate-limit';
+            displayMessage = `Processing failed due to quota limits. You've exceeded your current usage limit for the Gemini API. Please check your plan and billing details. For more information, visit: ${rateLimitDocsLink} or monitor your usage at: ${usageLink}`;
+          }
         } else if (msg.includes('Requested entity was not found.')) {
           displayMessage = `Processing failed. This might indicate an invalid API key or an issue with model availability. Please try again.`;
         } else {
