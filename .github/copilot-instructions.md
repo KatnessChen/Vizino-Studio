@@ -138,6 +138,7 @@ Users can upload custom versions. These are stored in Firestore and pulled into 
 - **Enforcement**: PR reviewers should flag inline styles; consider adding an ESLint rule or plugin (e.g., `eslint-plugin-react/no-inline-styles`) in future PRs to help enforce this.
 - **Exceptions**: Inline styles are allowed for dynamic runtime values (animations, computed transforms) or third-party library constraints — document the reason in code and add a TODO to replace with a reusable solution if it becomes common.
 - **Component Props**: Use TypeScript interfaces; avoid `any` type
+- **TypeScript Types**: Strictly avoid using `any` type in all code. Use proper TypeScript types, interfaces, or union types instead. If a type is unknown, use `unknown` or define a proper interface.
 - **Imports**: Alias `@` resolves to workspace root (set in `vite.config.ts`)
 
 ## Testing
