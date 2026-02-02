@@ -15,6 +15,7 @@ import {
   createSlugId,
   extractShortId,
 } from './stringUtils';
+import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from './assetUtils';
 
 export {
   MIME_TYPE_MAP,
@@ -34,3 +35,7 @@ export {
   createSlugId,
   extractShortId,
 };
+
+export type { AssetKind };
+
+export { isTextureAsset, isItemAsset, isColorAsset };

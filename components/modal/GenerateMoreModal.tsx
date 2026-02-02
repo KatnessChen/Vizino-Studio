@@ -9,7 +9,8 @@ import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
-import { ImageData, ImageOperation, CustomPrompt } from '@/types';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
+import { ImageData, ImageOperation, CustomPrompt, Asset } from '@/types';
 import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,
@@ -17,7 +18,7 @@ import {
   getAddObjectDefaultPrompt,
   getUseCustomPromptDefaultPrompt,
 } from '@/services/gemini/prompts';
-import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
+import { GEMINI_TASKS, isCustomPromptRequired } from '@/services/gemini/geminiTasks';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
 import { formatImageOperationData, base64ToFile } from '@/utils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
@@ -37,7 +38,6 @@ import {
   setSourceImage,
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
-import { useCustomColors } from '@/hooks/useCustomColors';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
 import SelectedAssets from '@/components/SelectedAssets';
@@ -82,19 +82,21 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
     const selectedAssetRaw = selectedAssets[0] || null;
     const selectedColor =
-      selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
+      selectedAssetRaw && selectedAssetRaw.assetType === ASSET_COLOR
+        ? (selectedAssetRaw as Color)
+        : null;
     const selectedTexture =
-      selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw
+      selectedAssetRaw && selectedAssetRaw.assetType === ASSET_TEXTURE
         ? (selectedAssetRaw as Texture)
         : null;
     const selectedItem =
-      selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw
+      selectedAssetRaw && selectedAssetRaw.assetType === ASSET_ITEM
         ? (selectedAssetRaw as Item)
         : null;
 
-    const { addColor } = useCustomColors(activeProjectId);
-    const { addAsset: addTextureToStore } = useCustomAssets('texture', activeProjectId);
-    const { addAsset: addItemToStore } = useCustomAssets('item', activeProjectId);
+    const { addAsset: addColor } = useCustomAssets(ASSET_COLOR, activeProjectId);
+    const { addAsset: addTextureToStore } = useCustomAssets(ASSET_TEXTURE, activeProjectId);
+    const { addAsset: addItemToStore } = useCustomAssets(ASSET_ITEM, activeProjectId);
 
     const [validationError, setValidationError] = useState<string | null>(null);
     const [customPrompt, setCustomPrompt] = useState<string>('');
@@ -158,10 +160,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       let keyframes = '';
       for (let i = 1; i <= 24; i++) {
         keyframes += `
-    @keyframes shimmer${i} {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }`;
+                    @keyframes shimmer${i} {
+                      0% { transform: translateX(-100%); }
+                      100% { transform: translateX(100%); }
+                    }`;
       }
       return keyframes;
     }, []);
@@ -211,48 +213,39 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       if (sourceImage) return sourceImage;
       if (sourceAsset) {
         let downloadUrl = '';
-        if ('textureImageDownloadUrl' in sourceAsset) {
-          downloadUrl = (sourceAsset as any).textureImageDownloadUrl;
-        } else if ('itemImageDownloadUrl' in sourceAsset) {
-          downloadUrl = (sourceAsset as any).itemImageDownloadUrl;
-        } else if ('imageDownloadUrl' in sourceAsset) {
-          downloadUrl = (sourceAsset as any).imageDownloadUrl || '';
+        if (sourceAsset.assetType === ASSET_TEXTURE) {
+          downloadUrl = (sourceAsset as Texture).textureImageDownloadUrl;
+        } else if (sourceAsset.assetType === ASSET_ITEM) {
+          downloadUrl = (sourceAsset as Item).itemImageDownloadUrl;
+        } else if (sourceAsset.assetType === ASSET_IMAGE) {
+          downloadUrl = (sourceAsset as ImageData).imageDownloadUrl || '';
         }
 
         const baseAsset = {
           id: 'id' in sourceAsset ? sourceAsset.id : 'unknown',
           name: 'name' in sourceAsset ? sourceAsset.name : 'Asset',
           mimeType:
-            'mimeType' in sourceAsset ? (sourceAsset as any).mimeType || 'image/png' : 'image/png',
+            'mimeType' in sourceAsset && sourceAsset.mimeType ? sourceAsset.mimeType : 'image/png',
           spaceId: activeSpaceId || '',
           imageDownloadUrl: downloadUrl,
           storageFilePath: '',
           isDeleted: false,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
-          evolutionChain:
-            'evolutionChain' in sourceAsset ? (sourceAsset as any).evolutionChain || [] : [],
+          evolutionChain: 'evolutionChain' in sourceAsset ? sourceAsset.evolutionChain || [] : [],
           parentImageId: null,
           description: '',
           order: 0,
           deletedAt: null,
+          assetType: ASSET_IMAGE,
         } as ImageData;
         return baseAsset;
       }
       return null;
     }, [sourceImage, sourceAsset, activeSpaceId]);
 
-    // Helper function to get customPromptRequired for a task
-    const getCustomPromptRequired = (taskName: string | null): boolean => {
-      if (!taskName) return false;
-      const taskEntry = Object.entries(GEMINI_TASKS).find(
-        ([, task]) => task.task_name === taskName
-      );
-      return taskEntry?.[1]?.customPromptRequired ?? false;
-    };
-
     // Determine if custom prompt is required for current task
-    const isCustomPromptRequired = getCustomPromptRequired(activeTaskName);
+    const isCustomPromptRequiredForTask = isCustomPromptRequired(activeTaskName);
 
     // Use image processing hook
     const { processImage, isProcessingImage, errorMessage, setErrorMessage, cancelProcessing } =
@@ -281,7 +274,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       selectedTexture,
       selectedItem,
       customPrompt,
-      isCustomPromptRequired,
+      isCustomPromptRequired: isCustomPromptRequiredForTask,
       isGuestMode,
       hasGeneratedImage,
       hasSelectedImage: !!sourceImage,
@@ -352,7 +345,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       }
 
       // Check if custom prompt is required for current task
-      if (isCustomPromptRequired && !customPrompt.trim()) {
+      if (isCustomPromptRequiredForTask && !customPrompt.trim()) {
         setValidationError('Please enter a custom prompt.');
         return;
       }
@@ -434,7 +427,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       selectedTexture,
       selectedItem,
       disableReason,
-      isCustomPromptRequired,
+      isCustomPromptRequiredForTask,
       userId,
       guestSessionId,
       onGenerateClick,
@@ -541,12 +534,12 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         const isTexture =
           isSavingAsAsset &&
           ((activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
-            (selectedTexture || assetType === 'texture')) ||
+            (selectedTexture || assetType === ASSET_TEXTURE)) ||
             activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name);
         const isItem =
           isSavingAsAsset &&
           ((activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
-            (selectedItem || assetType === 'object' || assetType === 'item')) ||
+            (selectedItem || assetType === ASSET_ITEM || assetType === ASSET_ITEM)) ||
             activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name);
 
         if (isColor || isTexture || isItem) {
@@ -693,12 +686,14 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             const optimisticImage = {
               id: tempImageId,
               name: imageName,
+              assetType: ASSET_IMAGE,
               mimeType: imageData.mimeType,
               spaceId: activeSpaceId,
               evolutionChain: [operation],
               parentImageId: effectiveOriginalImage.id,
               imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
               storageFilePath: '',
+              order: 0,
               isDeleted: false,
               deletedAt: null,
               createdAt: now,
@@ -798,6 +793,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               createdAt: now,
               updatedAt: now,
               description: '',
+              assetType: ASSET_IMAGE,
             };
 
             // Save to IndexedDB (local storage)
@@ -1130,9 +1126,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     <Typography.Title level={5} className="m-0 mb-1 px-3 pt-3">
                       Input
                       <span
-                        className={`${isCustomPromptRequired ? 'text-red-500' : 'text-gray-500'} text-[0.85em] ml-1`}
+                        className={`${isCustomPromptRequiredForTask ? 'text-red-500' : 'text-gray-500'} text-[0.85em] ml-1`}
                       >
-                        ({isCustomPromptRequired ? 'Required' : 'Optional'})
+                        ({isCustomPromptRequiredForTask ? 'Required' : 'Optional'})
                       </span>
                     </Typography.Title>
 
@@ -1294,8 +1290,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               (activeTaskName === GEMINI_TASKS.COLOR_ADJUSTMENT.task_name ||
                 activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) &&
               sourceAsset &&
-              'hex' in sourceAsset
-                ? (sourceAsset as any).hex
+              sourceAsset.assetType === ASSET_COLOR
+                ? (sourceAsset as Color).hex
                 : undefined
             }
             defaultDescription={customPrompt}

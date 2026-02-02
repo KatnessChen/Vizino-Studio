@@ -3,11 +3,12 @@ import { Typography } from 'antd';
 import { imageCache } from '@/utils/imageCache';
 import { imageDownloadUrlToBase64 } from '@/utils';
 import { cardHeight } from '@/components/layout/AsideSection';
-import { ImageData, Color, Texture, Item, Asset } from '@/types';
+import { ImageData, Asset } from '@/types';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
 
 // Normalized Asset Interface for display purposes
 interface DisplayAsset {
-  type: 'color' | 'image';
+  renderType: 'backgroundColor' | 'image';
   id: string;
   name: string;
   description?: string;
@@ -15,12 +16,6 @@ interface DisplayAsset {
   url?: string; // Only for image-like assets
   mimeType?: string;
 }
-
-// Type guards
-const isColor = (asset: any): asset is Color => 'hex' in asset;
-const isTexture = (asset: any): asset is Texture => 'textureImageDownloadUrl' in asset;
-const isItem = (asset: any): asset is Item => 'itemImageDownloadUrl' in asset;
-const isImage = (asset: any): asset is ImageData => 'imageDownloadUrl' in asset && !('textureImageDownloadUrl' in asset) && !('itemImageDownloadUrl' in asset);
 
 interface SelectedAssetsProps {
   title?: string;
@@ -40,9 +35,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
   const displayAsset: DisplayAsset | null = useMemo(() => {
     if (!effectiveRawAsset) return null;
 
-    if (isColor(effectiveRawAsset)) {
+    if (effectiveRawAsset.assetType === ASSET_COLOR) {
       return {
-        type: 'color',
+        renderType: 'backgroundColor',
         id: effectiveRawAsset.id,
         name: effectiveRawAsset.name,
         hex: effectiveRawAsset.hex,
@@ -50,9 +45,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
       };
     }
 
-    if (isImage(effectiveRawAsset)) {
-       return {
-        type: 'image',
+    if ('imageDownloadUrl' in effectiveRawAsset) {
+      return {
+        renderType: 'image',
         id: effectiveRawAsset.id,
         name: effectiveRawAsset.name,
         description: effectiveRawAsset.description,
@@ -61,9 +56,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
       };
     }
 
-    if (isTexture(effectiveRawAsset)) {
+    if (effectiveRawAsset.assetType === ASSET_TEXTURE) {
       return {
-        type: 'image',
+        renderType: 'image',
         id: effectiveRawAsset.id,
         name: effectiveRawAsset.name,
         url: effectiveRawAsset.textureImageDownloadUrl,
@@ -72,9 +67,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
       };
     }
 
-    if (isItem(effectiveRawAsset)) {
+    if (effectiveRawAsset.assetType === ASSET_ITEM) {
       return {
-        type: 'image',
+        renderType: 'image',
         id: effectiveRawAsset.id,
         name: effectiveRawAsset.name,
         url: effectiveRawAsset.itemImageDownloadUrl,
@@ -91,7 +86,7 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
     if (assets.length > 1) {
       // Determine if they are images or other assets
       const firstAsset = assets[0];
-      if (isImage(firstAsset)) {
+      if ('imageDownloadUrl' in firstAsset) {
         return `${assets.length} images selected. Please select only 1 image.`;
       } else {
         return `${assets.length} assets selected. Please select only 1 asset.`;
@@ -103,10 +98,10 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const height = customCardHeight ? `${customCardHeight}px` : cardHeight;
 
-  // Load preview if it's an image type
+  // Load preview if it's an image renderType
   useEffect(() => {
     const loadPreview = async () => {
-      if (!displayAsset || displayAsset.type !== 'image' || !displayAsset.url) {
+      if (!displayAsset || displayAsset.renderType !== 'image' || !displayAsset.url) {
         setPreviewBase64(null);
         return;
       }
@@ -155,13 +150,10 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
       );
     }
 
-    if (displayAsset.type === 'color') {
+    if (displayAsset.renderType === 'backgroundColor') {
       return (
         <div className="relative border border-gray-200 rounded overflow-hidden" style={{ height }}>
-          <div
-            className="w-full h-full"
-            style={{ backgroundColor: displayAsset.hex }}
-          />
+          <div className="w-full h-full" style={{ backgroundColor: displayAsset.hex }} />
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2">
             <div className="text-sm font-medium">{displayAsset.name}</div>
             <div className="text-xs opacity-90">{displayAsset.hex}</div>
@@ -178,15 +170,9 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
     return (
       <div className="relative border border-gray-200 rounded overflow-hidden" style={{ height }}>
         {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={displayAsset.name}
-            className="w-full h-full object-cover"
-          />
+          <img src={imgSrc} alt={displayAsset.name} className="w-full h-full object-cover" />
         ) : (
-          <div
-            className="w-full h-full bg-gray-100 flex items-center justify-center"
-          >
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
             <span className="text-xs text-gray-400">Loading...</span>
           </div>
         )}

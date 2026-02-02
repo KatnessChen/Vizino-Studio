@@ -1,12 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Modal, message } from 'antd';
-import { Color, ImageData } from '@/types';
-import { PRESET_COLOR } from '@/constants/constants';
-import { useCustomColors } from '@/hooks/useCustomColors';
-import { RootState } from '@/stores/store';
+import { Color, ImageData, Asset } from '@/types';
+import { PRESET_COLOR, ASSET_COLOR } from '@/constants/constants';
+import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { setSelectedAssets, selectSelectedAssets } from '@/stores/taskStore';
-import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { sortColorsBySpectrum, getTextColor } from '@/utils/colorUtils';
 import { useGuest } from '@/contexts/GuestContext';
 import { setShowLoginRequiredModal } from '@/stores/guestStore';
@@ -14,6 +12,7 @@ import Gallery from '@/components/Gallery';
 import AddColorModal from '../modal/AddColorModal';
 import AssetRenameModal from '../modal/AssetRenameModal';
 import { Timestamp } from 'firebase/firestore';
+import { selectActiveProjectId } from '@/stores/projectStore';
 
 interface ColorGalleryProps {
   title?: string;
@@ -23,25 +22,29 @@ interface ColorGalleryProps {
 const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect }) => {
   const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
-  const activeProjectId = useSelector((state: RootState) => state.project.activeProjectId);
+  const activeProjectId = useSelector(selectActiveProjectId);
   const selectedAssets = useSelector(selectSelectedAssets);
-  const selectedColor =
-    selectedAssets[0] && 'hex' in selectedAssets[0] ? (selectedAssets[0] as Color) : null;
+  const selectedColor = selectedAssets.filter((c: Asset) => c.assetType === ASSET_COLOR)[0];
 
-  const { customColors, isLoadingColors, addColor, updateColor, deleteColor } =
-    useCustomColors(activeProjectId);
+  const {
+    customAssets: customColors,
+    isLoadingAssets: isLoadingColors,
+    addAsset: addColor,
+    updateAsset: updateColor,
+    deleteAsset: deleteColor,
+  } = useCustomAssets(ASSET_COLOR, activeProjectId);
 
   const [isAddColorModalOpen, setIsAddColorModalOpen] = useState(false);
   const [colorToRename, setColorToRename] = useState<Color | null>(null);
 
   // Derive selectedIds from selectedAssets for Gallery UI
   const selectedIds = useMemo(() => {
-    return new Set(selectedAssets.filter((a) => 'hex' in a).map((a) => a.id));
+    return new Set(selectedAssets.filter((a) => a.assetType === ASSET_COLOR).map((a) => a.id));
   }, [selectedAssets]);
 
   // Merge and sort colors
   const availableColors = useMemo(() => {
-    const combined = [...customColors, ...PRESET_COLOR];
+    const combined = [...(customColors as Color[]), ...PRESET_COLOR];
     return sortColorsBySpectrum(combined);
   }, [customColors]);
 
@@ -77,7 +80,9 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
       const color = availableColors.find((c) => c.id === id);
       if (!color) return;
 
-      const currentColors = selectedAssets.filter((a) => 'hex' in a) as Color[];
+      const currentColors = selectedAssets.filter(
+        (a) => 'assetType' in a && a.assetType === 'color'
+      ) as Color[];
       const isSelected = currentColors.some((c) => c.id === color.id);
 
       // If no event (drag selection) or Shift key pressed: multi-select toggle mode
@@ -204,6 +209,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
               id: crypto.randomUUID(),
               name: color.name,
               hex: color.hex,
+              assetType: 'color',
               description: color.description || '',
             };
             await addColor(newColor);
@@ -234,12 +240,12 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         onClearSelection={() => dispatch(setSelectedAssets([]))}
         onBulkDelete={handleBatchDelete}
         onBulkCopy={handleBulkDuplicate}
-        onUploadImage={() => {
+        onUploadImage={async () => {
           if (isGuestMode) {
             dispatch(setShowLoginRequiredModal(true));
-          } else {
-            setIsAddColorModalOpen(true);
+            return;
           }
+          setIsAddColorModalOpen(true);
         }}
         uploadButtonText="Color"
         uploadModalTitle="Add Custom Color"
@@ -252,7 +258,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         editLabel="Edit"
         showCompare={false}
         onSingleRename={(id) => {
-          const color = customColors.find((c) => c.id === id);
+          const color = (customColors as Color[]).find((c) => c.id === id);
           if (color) {
             setColorToRename(color);
           } else if (PRESET_COLOR.some((c) => c.id === id)) {
@@ -290,6 +296,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
                   id: crypto.randomUUID(),
                   name: color.name,
                   hex: color.hex,
+                  assetType: ASSET_COLOR,
                   description: color.description || '',
                 };
                 await addColor(newColor);
@@ -317,7 +324,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
       {colorToRename && (
         <AssetRenameModal
           isOpen={!!colorToRename}
-          asset={colorToRename as any}
+          asset={colorToRename}
           type="color"
           onCancel={() => setColorToRename(null)}
           onConfirm={async (id, updates) => {

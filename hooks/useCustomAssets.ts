@@ -1,7 +1,7 @@
 /**
  * useCustomAssets Hook
  *
- * Manages custom textures and items for the current context (user or guest).
+ * Manages custom assets (colors, textures, and items) for the current context (user or guest).
  * Uses the storage adapter pattern to abstract away the storage details.
  */
 
@@ -11,31 +11,41 @@ import { RootState } from '@/stores/store';
 import {
   setCustomTextures,
   setCustomItems,
+  setCustomColors,
   addCustomTexture as addCustomTextureAction,
   addCustomItem as addCustomItemAction,
+  addCustomColor as addCustomColorAction,
   removeCustomTexture as removeCustomTextureAction,
   removeCustomItem as removeCustomItemAction,
+  removeCustomColor as removeCustomColorAction,
   updateCustomTexture as updateCustomTextureAction,
   updateCustomItem as updateCustomItemAction,
+  updateCustomColor,
   setLoadingTextures,
   setLoadingItems,
+  setLoadingColors,
   setLoadTexturesError,
   setLoadItemsError,
+  setLoadColorsError,
 } from '@/stores/customAssetsStore';
 import { useStorageAdapter } from '@/hooks/useStorageAdapter';
 import { useUploadGate } from '@/hooks/useUploadGate';
-import { ImageOperation, Texture, Item } from '@/types';
-
-type AssetType = 'texture' | 'item';
+import { ImageOperation, Texture, Item, Color } from '@/types';
+import { ASSET_COLOR } from '@/constants/constants';
+import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from '@/utils/assetUtils';
+import { CreateAssetParams, CreateColorParams } from '@/services/storageAdapter';
 
 const GUEST_PROJECT_ID = 'guest-project';
 
-export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: string | null) => {
+export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: string | null) => {
   const dispatch = useDispatch();
   const { adapter, isReady, isGuestMode } = useStorageAdapter();
   const { gateUpload } = useUploadGate();
 
-  const isTexture = assetType === 'texture';
+  // Use shared utility functions for type checking
+  const isTexture = isTextureAsset(assetType);
+  const isItem = isItemAsset(assetType);
+  const isColor = isColorAsset(assetType);
 
   // Use virtual project ID for guests
   const effectiveProjectId = isGuestMode ? GUEST_PROJECT_ID : projectId;
@@ -51,13 +61,19 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
 
   const customAssets = isTexture
     ? (projectAssets?.customTextures ?? [])
-    : (projectAssets?.customItems ?? []);
+    : isItem
+      ? (projectAssets?.customItems ?? [])
+      : (projectAssets?.customColors ?? []);
   const isLoadingAssets = isTexture
     ? (projectAssets?.isLoadingTextures ?? false)
-    : (projectAssets?.isLoadingItems ?? false);
+    : isItem
+      ? (projectAssets?.isLoadingItems ?? false)
+      : (projectAssets?.isLoadingColors ?? false);
   const loadAssetsError = isTexture
     ? (projectAssets?.loadTexturesError ?? null)
-    : (projectAssets?.loadItemsError ?? null);
+    : isItem
+      ? (projectAssets?.loadItemsError ?? null)
+      : (projectAssets?.loadColorsError ?? null);
 
   // Load custom assets - only once per project/asset type
   useEffect(() => {
@@ -67,13 +83,19 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
     // Skip if already loaded (has assets)
     const hasAssets = isTexture
       ? (projectAssets?.customTextures?.length ?? 0) > 0
-      : (projectAssets?.customItems?.length ?? 0) > 0;
+      : isItem
+        ? (projectAssets?.customItems?.length ?? 0) > 0
+        : (projectAssets?.customColors?.length ?? 0) > 0;
     if (hasAssets) {
       return;
     }
 
     // Skip if already loading
-    const isLoading = isTexture ? projectAssets?.isLoadingTextures : projectAssets?.isLoadingItems;
+    const isLoading = isTexture
+      ? projectAssets?.isLoadingTextures
+      : isItem
+        ? projectAssets?.isLoadingItems
+        : projectAssets?.isLoadingColors;
     if (isLoading) {
       return;
     }
@@ -92,10 +114,14 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
           dispatch(setLoadingTextures({ projectId: effectiveProjectId, isLoadingTextures: true }));
           const textures = await adapter.fetchTextures();
           dispatch(setCustomTextures({ projectId: effectiveProjectId, textures }));
-        } else {
+        } else if (isItem) {
           dispatch(setLoadingItems({ projectId: effectiveProjectId, isLoadingItems: true }));
           const items = await adapter.fetchItems();
           dispatch(setCustomItems({ projectId: effectiveProjectId, items }));
+        } else {
+          dispatch(setLoadingColors({ projectId: effectiveProjectId, isLoadingColors: true }));
+          const colors = await adapter.fetchColors();
+          dispatch(setCustomColors({ projectId: effectiveProjectId, colors }));
         }
       } catch (error) {
         console.error(`Failed to load ${assetType}s:`, error);
@@ -106,9 +132,16 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
               error: error instanceof Error ? error.message : 'Unknown error',
             })
           );
-        } else {
+        } else if (isItem) {
           dispatch(
             setLoadItemsError({
+              projectId: effectiveProjectId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            })
+          );
+        } else {
+          dispatch(
+            setLoadColorsError({
               projectId: effectiveProjectId,
               error: error instanceof Error ? error.message : 'Unknown error',
             })
@@ -122,21 +155,30 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
   }, [isReady, effectiveProjectId, assetType]);
 
   const addAsset = useCallback(
-    async (assetData: {
-      name: string;
-      file: File;
-      description?: string;
-      width?: number;
-      height?: number;
-      aspect_ratio?: number;
-      evolutionChain?: ImageOperation[];
-    }): Promise<Texture | Item> => {
+    async (
+      assetData: T extends typeof ASSET_COLOR
+        ? {
+            name: string;
+            hex: string;
+            description?: string;
+            evolutionChain?: ImageOperation[];
+          }
+        : {
+            name: string;
+            file: File;
+            description?: string;
+            width?: number;
+            height?: number;
+            aspect_ratio?: number;
+            evolutionChain?: ImageOperation[];
+          }
+    ): Promise<Color | Texture | Item> => {
       if (!isReady || !effectiveProjectId) {
         throw new Error('Storage not ready');
       }
 
-      // For guests, check if upload should be gated
-      if (isGuestMode) {
+      // For guests, check if upload should be gated (only for textures and items)
+      if (isGuestMode && (isTexture || isItem)) {
         const allowed = gateUpload(assetType, assetData);
         if (!allowed) {
           throw new Error('LOGIN_REQUIRED');
@@ -144,16 +186,30 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
       }
 
       if (isTexture) {
-        const newTexture = await adapter.addTexture(assetData);
+        const newTexture = await adapter.addTexture(assetData as CreateAssetParams);
         dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture }));
         return newTexture;
-      } else {
-        const newItem = await adapter.addItem(assetData);
+      } else if (isItem) {
+        const newItem = await adapter.addItem(assetData as CreateAssetParams);
         dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem }));
         return newItem;
+      } else {
+        const newColor = await adapter.addColor(assetData as CreateColorParams);
+        dispatch(addCustomColorAction({ projectId: effectiveProjectId, color: newColor }));
+        return newColor;
       }
     },
-    [isReady, effectiveProjectId, isGuestMode, gateUpload, assetType, isTexture, adapter, dispatch]
+    [
+      isReady,
+      effectiveProjectId,
+      isGuestMode,
+      gateUpload,
+      assetType,
+      isTexture,
+      isItem,
+      adapter,
+      dispatch,
+    ]
   );
 
   const deleteAsset = useCallback(
@@ -165,12 +221,15 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
       if (isTexture) {
         await adapter.deleteTexture(assetId);
         dispatch(removeCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId }));
-      } else {
+      } else if (isItem) {
         await adapter.deleteItem(assetId);
         dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
+      } else if (isColor) {
+        await adapter.deleteColor(assetId);
+        dispatch(removeCustomColorAction({ projectId: effectiveProjectId, colorId: assetId }));
       }
     },
-    [isReady, effectiveProjectId, isTexture, adapter, dispatch]
+    [isReady, effectiveProjectId, isColor, isTexture, isItem, adapter, dispatch]
   );
 
   const updateAsset = useCallback(
@@ -184,14 +243,17 @@ export const useCustomAssets = <T extends AssetType>(assetType: T, projectId: st
         dispatch(
           updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates })
         );
-      } else {
+      } else if (isItem) {
         await adapter.updateItem(assetId, updates);
         dispatch(
           updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates })
         );
+      } else if (isColor) {
+        await adapter.updateColor(assetId, updates);
+        dispatch(updateCustomColor({ projectId: effectiveProjectId, colorId: assetId, updates }));
       }
     },
-    [isReady, effectiveProjectId, isTexture, adapter, dispatch]
+    [isReady, effectiveProjectId, isTexture, isItem, isColor, adapter, dispatch]
   );
 
   return {
