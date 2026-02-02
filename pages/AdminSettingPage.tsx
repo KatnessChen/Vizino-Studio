@@ -5,7 +5,7 @@ import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminSettings } from '@/utils/storageUtils';
 
-const ALLOWED_EMAILS = ((import.meta as any).env.VITE_ADMIN_EMAILS || '')
+const ALLOWED_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
   .split(',')
   .map((e: string) => e.trim().toLowerCase())
   .filter(Boolean);

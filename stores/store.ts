@@ -18,7 +18,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         // Ignore Firestore Timestamp in Redux state
-        isSerializable: (value: any) => {
+        isSerializable: (value: unknown) => {
           // Allow Firestore Timestamp objects in Redux state
           if (value instanceof Timestamp) {
             return true;

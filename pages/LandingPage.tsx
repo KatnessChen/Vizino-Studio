@@ -5,20 +5,13 @@ import { Timestamp } from 'firebase/firestore';
 import { Segmented, Tag, Modal } from 'antd';
 import { message } from '@/utils/antd';
 import {
-  CUSTOM_PROMPT_ASSET_TYPES,
-  CUSTOM_PROMPT_ASSET_IMAGE,
-  CUSTOM_PROMPT_ASSET_COLOR,
-  CUSTOM_PROMPT_ASSET_TEXTURE,
-  CUSTOM_PROMPT_ASSET_OBJECT,
+  ASSET_TYPES,
+  ASSET_IMAGE,
+  ASSET_COLOR,
+  ASSET_TEXTURE,
+  ASSET_ITEM,
   CustomPromptAssetType,
 } from '@/constants/constants';
-import {
-  PictureOutlined,
-  BgColorsOutlined,
-  AppstoreOutlined,
-  ShoppingOutlined,
-} from '@ant-design/icons';
-
 import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
 import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
@@ -35,7 +28,6 @@ import ColorGallery from '@/components/select/ColorGallery';
 import AssetRenameModal from '@/components/modal/AssetRenameModal';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelectionHandler } from '@/hooks/useSelectionHandler';
-// removed duplicate import
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, ImageOperation, Texture, Item, Color, Asset } from '@/types';
 import {
@@ -96,7 +88,6 @@ import {
   selectHasSeenGreeting,
   setHasSeenGreeting,
   setShowLoginRequiredModal,
-  selectHasGeneratedImage,
 } from '@/stores/guestStore';
 
 interface LandingPageProps {
@@ -147,13 +138,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // Get task-related state from taskStore
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
   const selectedAssets = useSelector(selectSelectedAssets);
-  const hasGeneratedImage = useSelector(selectHasGeneratedImage);
 
   // Derive legacy
   const selectedAssetRaw = selectedAssets[0] || null;
-  const selectedColor = selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
-  const selectedTexture = selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Texture) : null;
-  const selectedItem = selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Item) : null;
+  const selectedColor =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_COLOR
+      ? (selectedAssetRaw as Color)
+      : null;
+  const selectedTexture =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_TEXTURE
+      ? (selectedAssetRaw as Texture)
+      : null;
+  const selectedItem =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_ITEM
+      ? (selectedAssetRaw as Item)
+      : null;
 
   const sourceImage = useSelector(selectSourceImage);
 
@@ -174,7 +173,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     addAsset: addTexture,
     deleteAsset: deleteTexture,
     updateAsset: updateTexture,
-  } = useCustomAssets('texture', activeProjectId);
+  } = useCustomAssets(ASSET_TEXTURE, activeProjectId);
 
   const {
     customAssets: items,
@@ -182,15 +181,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     addAsset: addItem,
     deleteAsset: deleteItem,
     updateAsset: updateItem,
-  } = useCustomAssets('item', activeProjectId);
+  } = useCustomAssets(ASSET_ITEM, activeProjectId);
 
   // Derive selected IDs from selectedAssets
   const textureSelectedIds = useMemo(() => {
-    return new Set(selectedAssets.filter(a => 'textureImageDownloadUrl' in a).map(a => a.id));
+    return new Set(
+      selectedAssets
+        .filter((a) => 'assetType' in a && a.assetType === ASSET_TEXTURE)
+        .map((a) => a.id)
+    );
   }, [selectedAssets]);
 
   const itemSelectedIds = useMemo(() => {
-    return new Set(selectedAssets.filter(a => 'itemImageDownloadUrl' in a).map(a => a.id));
+    return new Set(
+      selectedAssets.filter((a) => 'assetType' in a && a.assetType === ASSET_ITEM).map((a) => a.id)
+    );
   }, [selectedAssets]);
 
   const [assetToRename, setAssetToRename] = useState<{
@@ -198,12 +203,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     name: string;
     description?: string;
   } | null>(null);
-  const [assetTypeToRename, setAssetTypeToRename] = useState<'texture' | 'item' | null>(null);
+  const [assetTypeToRename, setAssetTypeToRename] = useState<
+    typeof ASSET_TEXTURE | typeof ASSET_ITEM | null
+  >(null);
   const [showAssetRenameModal, setShowAssetRenameModal] = useState(false);
 
   // Custom Prompt Asset Selector State
   const [customPromptAssetType, setCustomPromptAssetType] = useState<CustomPromptAssetType>(
-    CUSTOM_PROMPT_ASSET_TYPES[0] as CustomPromptAssetType
+    ASSET_TYPES[0] as CustomPromptAssetType
   );
 
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -316,7 +323,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     );
   }, [items]);
 
-  const handleTextureUpload = async (file: File, metadata?: any) => {
+  const handleTextureUpload = async (
+    file: File,
+    metadata: {
+      width?: number;
+      height?: number;
+      aspect_ratio?: number;
+      name: string;
+      description: string;
+    }
+  ) => {
     if (!metadata) return;
     try {
       const newTexture = await addTexture({
@@ -334,7 +350,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     }
   };
 
-  const handleItemUpload = async (file: File, metadata?: any) => {
+  const handleItemUpload = async (
+    file: File,
+    metadata: {
+      width?: number;
+      height?: number;
+      aspect_ratio?: number;
+      name: string;
+      description: string;
+    }
+  ) => {
     if (!metadata) return;
     try {
       const newItem = await addItem({
@@ -356,34 +381,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     id: string,
     updates: { name: string; description: string }
   ) => {
-    if (assetTypeToRename === 'texture') {
+    if (assetTypeToRename === ASSET_TEXTURE) {
       await updateTexture(id, updates);
       message.success('Texture renamed successfully');
-    } else if (assetTypeToRename === 'item') {
+    } else if (assetTypeToRename === ASSET_ITEM) {
       await updateItem(id, updates);
       message.success('Item renamed successfully');
     }
   };
 
-  const handleBulkDeleteAssets = (type: 'texture' | 'item') => {
-    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
+  const handleBulkDeleteAssets = (type: typeof ASSET_TEXTURE | typeof ASSET_ITEM) => {
+    const ids = type === ASSET_TEXTURE ? textureSelectedIds : itemSelectedIds;
     if (ids.size === 0) return;
 
     Modal.confirm({
-      title: `Delete ${ids.size} ${type === 'texture' ? 'Textures' : 'Items'}`,
+      title: `Delete ${ids.size} ${type === ASSET_TEXTURE ? 'Textures' : 'Items'}`,
       content: 'Are you sure you want to delete these items? This action cannot be undone.',
       okText: 'Delete All',
       okType: 'danger',
       onOk: async () => {
         try {
-          if (type === 'texture') {
+          if (type === ASSET_TEXTURE) {
             for (const id of Array.from(ids)) await deleteTexture(id);
             // Remove deleted textures from selectedAssets
-            dispatch(setSelectedAssets(selectedAssets.filter(a => !ids.has(a.id))));
+            dispatch(setSelectedAssets(selectedAssets.filter((a) => !ids.has(a.id))));
           } else {
             for (const id of Array.from(ids)) await deleteItem(id);
             // Remove deleted items from selectedAssets
-            dispatch(setSelectedAssets(selectedAssets.filter(a => !ids.has(a.id))));
+            dispatch(setSelectedAssets(selectedAssets.filter((a) => !ids.has(a.id))));
           }
           message.success('Items deleted successfully');
         } catch (err) {
@@ -393,13 +418,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     });
   };
 
-  const handleBulkCopyAssets = (type: 'texture' | 'item') => {
-    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
-    const assetList = type === 'texture' ? textures : items;
+  const handleBulkCopyAssets = (type: typeof ASSET_TEXTURE | typeof ASSET_ITEM) => {
+    const ids = type === ASSET_TEXTURE ? textureSelectedIds : itemSelectedIds;
+    const assetList = type === ASSET_TEXTURE ? textures : items;
     const urls = assetList
       .filter((a) => ids.has(a.id))
       .map((a) =>
-        type === 'texture'
+        type === ASSET_TEXTURE
           ? (a as Texture).textureImageDownloadUrl
           : (a as Item).itemImageDownloadUrl
       )
@@ -411,14 +436,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       .catch(() => message.error('Failed to copy to clipboard'));
   };
 
-  const handleBulkDownloadAssets = async (type: 'texture' | 'item') => {
-    const ids = type === 'texture' ? textureSelectedIds : itemSelectedIds;
-    const assetList = type === 'texture' ? textures : items;
+  const handleBulkDownloadAssets = async (type: typeof ASSET_TEXTURE | typeof ASSET_ITEM) => {
+    const ids = type === ASSET_TEXTURE ? textureSelectedIds : itemSelectedIds;
+    const assetList = type === ASSET_TEXTURE ? textures : items;
     const selected = assetList.filter((a) => ids.has(a.id));
 
     for (const asset of selected) {
       const url =
-        type === 'texture'
+        type === ASSET_TEXTURE
           ? (asset as Texture).textureImageDownloadUrl
           : (asset as Item).itemImageDownloadUrl;
       downloadFile(url, buildDownloadFilename(asset.name, 'image/jpeg'));
@@ -478,12 +503,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const handleImageUpload = useCallback(
     async (
       file: File,
-      metadata?: {
-        width: number;
-        height: number;
-        aspect_ratio: number;
-        name?: string;
-        description?: string;
+      metadata: {
+        width?: number;
+        height?: number;
+        aspect_ratio?: number;
+        name: string;
+        description: string;
       }
     ) => {
       if (!user) {
@@ -510,12 +535,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       const optimisticOrder = currentMaxOrder + 1;
 
       // Use provided name or fall back to file name
-      const imageName = metadata?.name || file.name;
+      const imageName = metadata.name || file.name;
 
       // Optimistic update - add image immediately to UI
       const optimisticImage = {
         id: tempImageId,
         name: imageName,
+        assetType: ASSET_IMAGE,
         mimeType: file.type,
         spaceId: activeSpaceId,
         evolutionChain: [],
@@ -527,11 +553,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         deletedAt: null,
         createdAt: now,
         updatedAt: now,
-        description: metadata?.description,
+        description: metadata.description,
         // Add optimistic dimensions
-        width: metadata?.width,
-        height: metadata?.height,
-        aspect_ratio: metadata?.aspect_ratio,
+        width: metadata.width,
+        height: metadata.height,
+        aspect_ratio: metadata.aspect_ratio,
       };
 
       dispatch(
@@ -548,12 +574,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         await createImage(user.uid, activeProjectId, activeSpaceId, file, {
           id: tempImageId,
           name: imageName,
-          description: metadata?.description,
+          description: metadata.description,
           mimeType: file.type,
           // Include dimensions from client metadata when available
-          width: metadata?.width,
-          height: metadata?.height,
-          aspect_ratio: metadata?.aspect_ratio,
+          width: metadata.width,
+          height: metadata.height,
+          aspect_ratio: metadata.aspect_ratio,
         });
 
         // Fetch updated space images
@@ -719,6 +745,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       const optimisticImage = {
         id: tempImageId,
         name: imageName,
+        assetType: ASSET_IMAGE,
         mimeType: processedImageResult.mimeType,
         spaceId: activeSpaceId,
         evolutionChain: [operation],
@@ -840,7 +867,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     currentSelection: selectedAssets,
     setSelection: setSelectedAssets,
     type: 'array',
-    filterFn: (a) => 'textureImageDownloadUrl' in a,
+    filterFn: (a) => a.assetType === ASSET_TEXTURE,
     findItemById: (id) => textures.find((t) => t.id === id) as Asset | undefined,
   });
 
@@ -848,7 +875,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     currentSelection: selectedAssets,
     setSelection: setSelectedAssets,
     type: 'array',
-    filterFn: (a) => 'itemImageDownloadUrl' in a,
+    filterFn: (a) => a.assetType === ASSET_ITEM,
     findItemById: (id) => items.find((i) => i.id === id) as Asset | undefined,
   });
 
@@ -1387,6 +1414,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           order: 0,
           description: '',
           parentImageId: null,
+          assetType: ASSET_IMAGE,
         } as ImageData;
       } else if (selectedTexture) {
         return {
@@ -1404,6 +1432,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           order: 0,
           description: '',
           parentImageId: null,
+          assetType: ASSET_IMAGE,
         } as ImageData;
       } else if (selectedItem) {
         return {
@@ -1421,6 +1450,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           order: 0,
           description: '',
           parentImageId: null,
+          assetType: ASSET_IMAGE,
         } as ImageData;
       }
     }
@@ -1522,12 +1552,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             selectedImageIds={textureSelectedIds}
                             onSelectImage={handleSelectTexture}
                             onSelectMultiple={(id) => {
-                              const texture = textures.find(t => t.id === id);
+                              const texture = textures.find((t) => t.id === id);
                               if (!texture) return;
-                              const currentTextures = selectedAssets.filter(a => 'textureImageDownloadUrl' in a) as Texture[];
-                              const isSelected = currentTextures.some(t => t.id === id);
+                              const currentTextures = selectedAssets.filter(
+                                (a) => a.assetType === ASSET_TEXTURE
+                              ) as Texture[];
+                              const isSelected = currentTextures.some((t) => t.id === id);
                               if (isSelected) {
-                                dispatch(setSelectedAssets(currentTextures.filter(t => t.id !== id)));
+                                dispatch(
+                                  setSelectedAssets(currentTextures.filter((t) => t.id !== id))
+                                );
                               } else {
                                 dispatch(setSelectedAssets([...currentTextures, texture]));
                               }
@@ -1583,12 +1617,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             selectedImageIds={itemSelectedIds}
                             onSelectImage={handleSelectItem}
                             onSelectMultiple={(id) => {
-                              const item = items.find(i => i.id === id);
+                              const item = items.find((i) => i.id === id);
                               if (!item) return;
-                              const currentItems = selectedAssets.filter(a => 'itemImageDownloadUrl' in a) as Item[];
-                              const isSelected = currentItems.some(i => i.id === id);
+                              const currentItems = selectedAssets.filter(
+                                (a) => a.assetType === ASSET_ITEM
+                              ) as Item[];
+                              const isSelected = currentItems.some((i) => i.id === id);
                               if (isSelected) {
-                                dispatch(setSelectedAssets(currentItems.filter(i => i.id !== id)));
+                                dispatch(
+                                  setSelectedAssets(currentItems.filter((i) => i.id !== id))
+                                );
                               } else {
                                 dispatch(setSelectedAssets([...currentItems, item]));
                               }
@@ -1596,15 +1634,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             onClearSelection={() => dispatch(setSelectedAssets([]))}
                             onUploadImage={handleItemUpload}
                             onUploadError={setErrorMessage}
-                            onBulkDelete={() => handleBulkDeleteAssets('item')}
-                            onBulkCopy={() => handleBulkCopyAssets('item')}
-                            onBulkDownload={() => handleBulkDownloadAssets('item')}
+                            onBulkDelete={() => handleBulkDeleteAssets(ASSET_ITEM)}
+                            onBulkCopy={() => handleBulkCopyAssets(ASSET_ITEM)}
+                            onBulkDownload={() => handleBulkDownloadAssets(ASSET_ITEM)}
                             isLoading={isLoadingItems}
                             emptyMessage="No objects uploaded yet."
                             uploadButtonText="Objects"
                             uploadModalTitle="Upload Objects"
                             batchUploadMode="asset"
-                            assetType="item"
+                            assetType={ASSET_ITEM}
                             existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
                             detailModalTitle="Object Information"
                             viewMoreModalTitle="Object Information"
@@ -1645,16 +1683,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         {/* Asset Type Selector */}
                         <div className="flex justify-center px-6">
                           <Segmented
-                            options={CUSTOM_PROMPT_ASSET_TYPES.map(
-                              (type: CustomPromptAssetType) => {
-                                const label = type.charAt(0).toUpperCase() + type.slice(1);
+                            options={ASSET_TYPES.map((type: CustomPromptAssetType) => {
+                              const label = type.charAt(0).toUpperCase() + type.slice(1);
 
-                                return {
-                                  label,
-                                  value: type,
-                                };
-                              }
-                            )}
+                              return {
+                                label,
+                                value: type,
+                              };
+                            })}
                             value={customPromptAssetType}
                             onChange={(val) => {
                               setCustomPromptAssetType(val as CustomPromptAssetType);
@@ -1670,7 +1706,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         </div>
 
                         {/* Conditionally render galleries based on selector */}
-                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_IMAGE && (
+                        {customPromptAssetType === ASSET_IMAGE && (
                           <Gallery
                             title="Original Images"
                             images={originalImages}
@@ -1698,9 +1734,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                           />
                         )}
 
-                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_COLOR && <ColorGallery />}
+                        {customPromptAssetType === ASSET_COLOR && <ColorGallery />}
 
-                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_TEXTURE && (
+                        {customPromptAssetType === ASSET_TEXTURE && (
                           <Gallery
                             title="Textures"
                             images={mappedTextures}
@@ -1708,12 +1744,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             selectedImageIds={textureSelectedIds}
                             onSelectImage={handleSelectTexture}
                             onSelectMultiple={(id) => {
-                              const texture = textures.find(t => t.id === id);
+                              const texture = textures.find((t) => t.id === id);
                               if (!texture) return;
-                              const currentTextures = selectedAssets.filter(a => 'textureImageDownloadUrl' in a) as Texture[];
-                              const isSelected = currentTextures.some(t => t.id === id);
+                              const currentTextures = selectedAssets.filter(
+                                (a) => a.assetType === ASSET_TEXTURE
+                              ) as Texture[];
+                              const isSelected = currentTextures.some((t) => t.id === id);
                               if (isSelected) {
-                                dispatch(setSelectedAssets(currentTextures.filter(t => t.id !== id)));
+                                dispatch(
+                                  setSelectedAssets(currentTextures.filter((t) => t.id !== id))
+                                );
                               } else {
                                 dispatch(setSelectedAssets([...currentTextures, texture]));
                               }
@@ -1762,7 +1802,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                           />
                         )}
 
-                        {customPromptAssetType === CUSTOM_PROMPT_ASSET_OBJECT && (
+                        {customPromptAssetType === ASSET_ITEM && (
                           <Gallery
                             title="Objects"
                             images={mappedItems}
@@ -1770,12 +1810,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             selectedImageIds={itemSelectedIds}
                             onSelectImage={handleSelectItem}
                             onSelectMultiple={(id) => {
-                              const item = items.find(i => i.id === id);
+                              const item = items.find((i) => i.id === id);
                               if (!item) return;
-                              const currentItems = selectedAssets.filter(a => 'itemImageDownloadUrl' in a) as Item[];
-                              const isSelected = currentItems.some(i => i.id === id);
+                              const currentItems = selectedAssets.filter(
+                                (a) => a.assetType === ASSET_ITEM
+                              ) as Item[];
+                              const isSelected = currentItems.some((i) => i.id === id);
                               if (isSelected) {
-                                dispatch(setSelectedAssets(currentItems.filter(i => i.id !== id)));
+                                dispatch(
+                                  setSelectedAssets(currentItems.filter((i) => i.id !== id))
+                                );
                               } else {
                                 dispatch(setSelectedAssets([...currentItems, item]));
                               }
@@ -1827,8 +1871,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                     )}
 
                     {/* Generated Images Gallery - Always show except in Custom Prompt with non-image asset type */}
-                    {(selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name || 
-                      customPromptAssetType === CUSTOM_PROMPT_ASSET_IMAGE) && (
+                    {(selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name ||
+                      customPromptAssetType === ASSET_IMAGE) && (
                       <div data-tour="generated-gallery">
                         <Gallery
                           title="Generated Images"
