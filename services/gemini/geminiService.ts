@@ -2,6 +2,7 @@ import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
 import { ImageData, Color, Texture, Item } from '@/types';
 import { getPromptByTask, getNameSuggestionPrompt } from './prompts';
 import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
+import { ASSET_TEXTURE, ASSET_ITEM, ASSET_COLOR } from '@/constants/constants';
 import { GEMINI_ERRORS } from './geminiApiErrors';
 import { ref } from 'firebase/storage';
 import { getBytes } from 'firebase/storage';
@@ -135,51 +136,44 @@ export const generateCustomPromptImage = async (
   signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   let image: { base64String: string; mimeType: string };
-  const options: any = { // Use specific types if possible, but any allows flexibility for now
-      customPrompt,
-      userId,
-      signal
-  };
 
   // Handle Source Type
-  if ('colorId' in targetImageOrAsset || ('hex' in targetImageOrAsset && 'name' in targetImageOrAsset)) {
-      // It's a Color
-      const color = targetImageOrAsset as Color;
-      // Use efficient Text-to-Text generation for color adjustment
-      return await processColorAdjustment(userId, color, customPrompt, signal);
-  } else if ('textureImageDownloadUrl' in targetImageOrAsset) {
-      // It's a Texture
-      const texture = targetImageOrAsset as Texture;
-      const base64 = await fetchImageAsBase64(texture.textureImageDownloadUrl, signal);
-      image = {
-          base64String: base64,
-          mimeType: texture.mimeType || 'image/jpeg',
-      };
-      options.textureName = texture.name;
-  } else if ('itemImageDownloadUrl' in targetImageOrAsset) {
-      // It's an Item
-      const item = targetImageOrAsset as Item;
-      const base64 = await fetchImageAsBase64(item.itemImageDownloadUrl, signal);
-      image = {
-          base64String: base64,
-          mimeType: item.mimeType || 'image/jpeg',
-      };
-      options.itemName = item.name;
+  if (targetImageOrAsset.assetType === ASSET_COLOR) {
+    // It's a Color
+    const color = targetImageOrAsset as Color;
+    // Use efficient Text-to-Text generation for color adjustment
+    return await processColorAdjustment(userId, color, customPrompt, signal);
+  } else if (targetImageOrAsset.assetType === ASSET_TEXTURE) {
+    // It's a Texture
+    const texture = targetImageOrAsset as Texture;
+    const base64 = await fetchImageAsBase64(texture.textureImageDownloadUrl, signal);
+    image = {
+      base64String: base64,
+      mimeType: texture.mimeType || 'image/jpeg',
+    };
+  } else if (targetImageOrAsset.assetType === ASSET_ITEM) {
+    // It's an Item
+    const item = targetImageOrAsset as Item;
+    const base64 = await fetchImageAsBase64(item.itemImageDownloadUrl, signal);
+    image = {
+      base64String: base64,
+      mimeType: item.mimeType || 'image/jpeg',
+    };
   } else {
-      // It's ImageData
-      const imgData = targetImageOrAsset as ImageData;
-      image = {
-        base64String: await getBase64FromImageData(userId, imgData),
-        mimeType: imgData.mimeType,
-      };
+    // It's ImageData
+    const imgData = targetImageOrAsset as ImageData;
+    image = {
+      base64String: await getBase64FromImageData(userId, imgData),
+      mimeType: imgData.mimeType,
+    };
   }
 
   // Determine asset type for name suggestion
   let assetType = 'image';
-  if ('textureImageDownloadUrl' in targetImageOrAsset) {
-      assetType = 'texture';
-  } else if ('itemImageDownloadUrl' in targetImageOrAsset) {
-      assetType = 'object';
+  if (targetImageOrAsset.assetType === ASSET_TEXTURE) {
+    assetType = ASSET_TEXTURE;
+  } else if (targetImageOrAsset.assetType === ASSET_ITEM) {
+    assetType = ASSET_ITEM;
   }
 
   // Execute image generation with integrated name suggestion
@@ -189,9 +183,12 @@ export const generateCustomPromptImage = async (
     Return the name in a JSON object structure like this: {"name": "Suggested Name"}.
     The JSON should be in a text part of the response, separate from the image.
   `;
-  
-  options.customPrompt = (customPrompt || '') + promptSuffix;
-  options.responseModalities = [Modality.TEXT, Modality.IMAGE];
+
+  const options = {
+    customPrompt: (customPrompt || '') + promptSuffix,
+    responseModalities: [Modality.TEXT, Modality.IMAGE],
+    signal,
+  };
 
   return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, options);
 };
@@ -209,14 +206,14 @@ export const generateNameSuggestion = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-1.5-flash'; // Fast text model
     const prompt = getNameSuggestionPrompt(customPrompt, assetType);
-    
+
     const result = await ai.models.generateContent({
       model,
       contents: {
-        parts: [{ text: prompt }]
-      }
+        parts: [{ text: prompt }],
+      },
     });
-    
+
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
     return text?.trim();
   } catch (e) {
@@ -278,9 +275,7 @@ export const processImageWithTask = async (
 
   const prompt = getPromptByTask(task, options);
   // Priority: options.model > task.model_code > defaultModel
-  // Note: task.model_code is typed as string literal or undefined if strict
-  const taskModelCode = 'model_code' in task ? (task as any).model_code : undefined;
-  const model = options.model ?? taskModelCode ?? defaultModel;
+  const model = options.model ?? task.model_code ?? defaultModel;
 
   try {
     // Build parts array
@@ -319,7 +314,7 @@ export const processImageWithTask = async (
 
     // If the caller provided an AbortSignal and it's already aborted, throw early
     if (options.signal && options.signal.aborted) {
-      const abortErr: any = new Error('Request aborted');
+      const abortErr = new Error('Request aborted');
       abortErr.name = 'AbortError';
       throw abortErr;
     }
@@ -327,7 +322,7 @@ export const processImageWithTask = async (
     // Pass AbortSignal to the underlying request if supported by the SDK. Also race with the signal
     // to ensure we respond quickly to aborts even if the SDK doesn't forward the signal.
     // Build request params; avoid passing unknown properties directly to typed SDK call
-    const generateParams: any = {
+    const generateParams = {
       model,
       contents: {
         parts,
@@ -335,10 +330,8 @@ export const processImageWithTask = async (
       config: {
         responseModalities: options.responseModalities || [Modality.IMAGE],
       },
-    };
-
-    // Attach signal at runtime (SDK may respect it if implemented)
-    if (options.signal) generateParams.signal = options.signal;
+      signal: options.signal,
+    } as const;
 
     const generatePromise = ai.models.generateContent(generateParams);
 
@@ -349,7 +342,7 @@ export const processImageWithTask = async (
       // Race the generate promise with a promise that rejects when signal aborts
       const abortPromise = new Promise<never>((_, reject) => {
         abortHandler = () => {
-          const abortErr: any = new Error('Request aborted');
+          const abortErr = new Error('Request aborted');
           abortErr.name = 'AbortError';
           reject(abortErr);
         };
@@ -374,7 +367,7 @@ export const processImageWithTask = async (
 
     // If signal was aborted after response arrived, treat as aborted and ignore result
     if (options.signal && options.signal.aborted) {
-      const abortErr: any = new Error('Request aborted');
+      const abortErr = new Error('Request aborted');
       abortErr.name = 'AbortError';
       throw abortErr;
     }
@@ -388,26 +381,26 @@ export const processImageWithTask = async (
     }
 
     const candidates = response.candidates?.[0]?.content?.parts || [];
-    
+
     // Find Image Part
-    const generatedImagePart = candidates.find(p => p.inlineData);
-    
+    const generatedImagePart = candidates.find((p) => p.inlineData);
+
     // Find Text Part (for Name suggestion)
-    const generatedTextPart = candidates.find(p => p.text);
+    const generatedTextPart = candidates.find((p) => p.text);
     let suggestedName: string | undefined;
 
     if (generatedTextPart && generatedTextPart.text) {
-        try {
-            const cleanJson = generatedTextPart.text.replace(/```json\n?|\n?```/g, '').trim();
-            // Try to find JSON object pattern
-            const match = cleanJson.match(/\{.*"name":\s*".*"\s*.*\}/s) || cleanJson.match(/\{.*\}/s);
-            if (match) {
-               const parsed = JSON.parse(match[0]);
-               suggestedName = parsed.name;
-            }
-        } catch (e) {
-            console.warn('[Gemini] Failed to parse JSON name from text part:', e);
+      try {
+        const cleanJson = generatedTextPart.text.replace(/```json\n?|\n?```/g, '').trim();
+        // Try to find JSON object pattern
+        const match = cleanJson.match(/\{.*"name":\s*".*"\s*.*\}/s) || cleanJson.match(/\{.*\}/s);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          suggestedName = parsed.name;
         }
+      } catch (e) {
+        console.warn('[Gemini] Failed to parse JSON name from text part:', e);
+      }
     }
 
     if (!generatedImagePart || !generatedImagePart.inlineData) {
@@ -424,20 +417,20 @@ export const processImageWithTask = async (
     return {
       base64: newImageBase64,
       mimeType: newImageMimeType,
-      name: suggestedName
+      name: suggestedName,
     };
-  } catch (error: any) {
+  } catch (error) {
     // Propagate aborts so callers can distinguish cancellation
-    if (error && error.name === 'AbortError') {
+    if (error && (error as Error).name === 'AbortError') {
       console.warn('Gemini request aborted by signal');
-      const abortErr: any = new Error('Request aborted');
+      const abortErr = new Error('Request aborted');
       abortErr.name = 'AbortError';
       throw abortErr;
     }
 
     if (options.signal && options.signal.aborted) {
       console.warn('Gemini request aborted by provided signal');
-      const abortErr: any = new Error('Request aborted');
+      const abortErr = new Error('Request aborted');
       abortErr.name = 'AbortError';
       throw abortErr;
     }
@@ -466,23 +459,22 @@ export const processColorAdjustment = async (
   const task = GEMINI_TASKS.COLOR_ADJUSTMENT;
   const prompt = getPromptByTask(task, {
     colorHex: color.hex,
-    customPrompt
+    customPrompt,
   });
   const model = task.model_code || 'gemini-2.5-flash';
 
   try {
-     const generateParams: any = {
+    const generateParams = {
       model,
       contents: {
         parts: [{ text: prompt }],
       },
       // No responseModalities needed for Text output, default is TEXT
+      signal,
     };
 
-    if (signal) generateParams.signal = signal;
-
     const result = await ai.models.generateContent(generateParams);
-    
+
     // Extract text from response
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
@@ -517,10 +509,9 @@ export const processColorAdjustment = async (
       base64,
       mimeType: 'image/svg+xml',
       hex: newHex,
-      name: suggestedName
+      name: suggestedName,
     };
-
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error processing color adjustment:', error);
     throw new Error(
       GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))

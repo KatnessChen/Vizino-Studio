@@ -14,6 +14,7 @@ import {
 import { ImageData, Color, Texture, Item, CustomPrompt } from '@/types';
 import { guestIndexedDB } from '@/utils/guestIndexedDB';
 import { Timestamp } from 'firebase/firestore';
+import { ASSET_IMAGE } from '@/constants/constants';
 
 const GUEST_PROJECT_ID = 'guest-project';
 const GUEST_SPACE_ID = 'guest-space';
@@ -77,6 +78,7 @@ export class GuestStorageAdapter implements StorageAdapter {
         ...(imageMetadata.aspect_ratio !== undefined && {
           aspect_ratio: imageMetadata.aspect_ratio,
         }),
+        assetType: ASSET_IMAGE,
       };
 
       // Save to IndexedDB with base64 data
@@ -117,7 +119,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests use preset colors only
   }
 
-  async updateColor(_colorId: string, _updates: { name?: string; description?: string }): Promise<void> {
+  async updateColor(
+    _colorId: string,
+    _updates: { name?: string; description?: string }
+  ): Promise<void> {
     throw new Error('Guests cannot update colors');
   }
 
@@ -134,7 +139,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests cannot add textures
   }
 
-  async updateTexture(_textureId: string, _updates: { name?: string; description?: string }): Promise<void> {
+  async updateTexture(
+    _textureId: string,
+    _updates: { name?: string; description?: string }
+  ): Promise<void> {
     throw new Error('Guests cannot update textures');
   }
 
@@ -151,7 +159,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests cannot add items
   }
 
-  async updateItem(_itemId: string, _updates: { name?: string; description?: string }): Promise<void> {
+  async updateItem(
+    _itemId: string,
+    _updates: { name?: string; description?: string }
+  ): Promise<void> {
     throw new Error('Guests cannot update items');
   }
 

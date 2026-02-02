@@ -3,10 +3,12 @@ import { db } from './firestoreService';
 import { User } from '@/types';
 import { GEMINI_TASKS, GeminiTaskName } from './gemini/geminiTasks';
 
+import { DocumentData } from 'firebase/firestore';
+
 /**
  * Convert Firestore User document to User interface
  */
-const convertFirestoreUser = (data: any): User => {
+const convertFirestoreUser = (data: DocumentData): User => {
   return {
     uid: data.uid,
     email: data.email,

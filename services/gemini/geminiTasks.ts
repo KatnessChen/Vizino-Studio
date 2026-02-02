@@ -40,6 +40,34 @@ export type GeminiTask = (typeof GEMINI_TASKS)[keyof typeof GEMINI_TASKS];
 export type GeminiTaskName = GeminiTask['task_name'];
 
 /**
+ * Map for O(1) task lookup by task_name
+ * This eliminates the need for Object.values().find() every time
+ */
+export const TASKS_BY_NAME = new Map<GeminiTaskName, GeminiTask>(
+  Object.values(GEMINI_TASKS).map((task) => [task.task_name, task])
+);
+
+/**
+ * Get a task by its task_name
+ * @param taskName - The task_name to look up
+ * @returns The task object or undefined if not found
+ */
+export const getTask = (taskName: string | null): GeminiTask | undefined => {
+  if (!taskName) return undefined;
+  return TASKS_BY_NAME.get(taskName as GeminiTaskName);
+};
+
+/**
+ * Check if a task requires a custom prompt
+ * @param taskName - The task_name to check
+ * @returns true if custom prompt is required, false otherwise
+ */
+export const isCustomPromptRequired = (taskName: string | null): boolean => {
+  return getTask(taskName)?.customPromptRequired ?? false;
+};
+
+/**
+ * @deprecated Use getTask() instead for better performance
  * Helper function to find a task entry by task_name
  * @param taskName - The task_name value to search for
  * @returns The task entry [key, task] or undefined if not found
