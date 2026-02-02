@@ -12,23 +12,28 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useSortable } from '@dnd-kit/sortable';
-import { ImageData } from '@/types';
+import { ImageData, Color } from '@/types';
+import { ASSET_IMAGE } from '@/constants/constants';
 import { imageCache } from '@/utils/imageCache';
 import { CloseOutlined as CloseIcon } from '@ant-design/icons';
 
 interface ComparePhotosModalProps {
   isOpen: boolean;
-  images: ImageData[];
+  images: (ImageData | Color)[];
   onClose: () => void;
   onRemoveImage?: (imageId: string) => void;
 }
 
 // Draggable image card component
 interface DraggableImageCardProps {
-  image: ImageData;
+  image: ImageData | Color;
   cachedImageSrc: string | null;
   onRemove: (imageId: string) => void;
 }
+
+const isImageData = (obj: ImageData | Color): obj is ImageData => {
+  return obj.assetType === ASSET_IMAGE;
+};
 
 const DraggableImageCard: React.FC<DraggableImageCardProps> = ({
   image,
@@ -66,10 +71,10 @@ const DraggableImageCard: React.FC<DraggableImageCardProps> = ({
         >
           <CloseIcon className="text-white text-xs" />
         </button>
-        {image.mimeType === 'color/hex' ? (
-          <div 
-            className="w-full h-full" 
-            style={{ backgroundColor: (image as any).hex }}
+        {!isImageData(image) ? (
+          <div
+            className="w-full h-full"
+            style={{ backgroundColor: !isImageData(image) ? image.hex : undefined }}
           />
         ) : (
           <img
@@ -95,7 +100,7 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({
   onClose,
   onRemoveImage,
 }) => {
-  const [localImages, setLocalImages] = useState<ImageData[]>(images);
+  const [localImages, setLocalImages] = useState<(ImageData | Color)[]>(images);
   const [cachedImagesSrc, setCachedImagesSrc] = useState<Record<string, string | null>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -119,10 +124,15 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({
 
       for (const image of localImages) {
         try {
-          const base64 = await imageCache.get(image.imageDownloadUrl);
-          if (base64) {
-            newCachedImages[image.id] = `data:${image.mimeType};base64,${base64}`;
+          if (isImageData(image)) {
+            const base64 = await imageCache.get(image.imageDownloadUrl);
+            if (base64) {
+              newCachedImages[image.id] = `data:${image.mimeType};base64,${base64}`;
+            } else {
+              newCachedImages[image.id] = null;
+            }
           } else {
+            // Color swatches don't have image data
             newCachedImages[image.id] = null;
           }
         } catch (error) {
@@ -235,10 +245,12 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({
             <DragOverlay>
               {activeImage ? (
                 <div className="w-64 h-64 rounded-lg overflow-hidden border-2 border-blue-400 shadow-2xl bg-white">
-                  {activeImage.mimeType === 'color/hex' ? (
-                    <div 
-                      className="w-full h-full" 
-                      style={{ backgroundColor: (activeImage as any).hex }}
+                  {!isImageData(activeImage) ? (
+                    <div
+                      className="w-full h-full"
+                      style={{
+                        backgroundColor: !isImageData(activeImage) ? activeImage.hex : undefined,
+                      }}
                     />
                   ) : (
                     <img

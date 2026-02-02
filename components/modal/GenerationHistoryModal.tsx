@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Typography } from 'antd';
 import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
-import { ImageData } from '@/types';
+import { ImageData, Color } from '@/types';
+import { ASSET_COLOR } from '@/constants/constants';
 import { imageCache, formatTimestamp } from '@/utils';
 
 interface GenerationHistoryModalProps {
@@ -45,7 +46,7 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
               const base64 = await imageCache.get(operation.imageDownloadUrl);
               if (base64) {
                 // Use operation's mimeType if available, fallback to image.mimeType, then default to image/jpeg
-                const mimeType = (operation as any).mimeType || image.mimeType || 'image/jpeg';
+                const mimeType = image.mimeType || 'image/jpeg';
                 sources[operation.imageDownloadUrl] = `data:${mimeType};base64,${base64}`;
               }
             } catch (error) {
@@ -117,26 +118,30 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
                       </div>
                     ) : operation.options?.colorSnapshot?.hex ? (
                       <div className="md:w-[50%] p-4 bg-gray-100 flex items-center justify-center">
-                        <div 
+                        <div
                           className="w-full h-64 rounded-md border-2 border-gray-200 shadow-sm flex flex-col items-center justify-center text-white"
                           style={{ backgroundColor: operation.options.colorSnapshot.hex }}
                         >
-                          <span className="text-sm font-bold drop-shadow-md">{operation.options.colorSnapshot.name}</span>
-                          <span className="text-xs opacity-90 drop-shadow-md font-mono">{operation.options.colorSnapshot.hex}</span>
+                          <span className="text-sm font-bold drop-shadow-md">
+                            {operation.options.colorSnapshot.name}
+                          </span>
+                          <span className="text-xs opacity-90 drop-shadow-md font-mono">
+                            {operation.options.colorSnapshot.hex}
+                          </span>
                         </div>
                       </div>
-                    ) : (operation as any).hex ? (
+                    ) : operation.options?.colorSnapshot?.hex ? (
                       <div className="md:w-[50%] p-4 bg-gray-100 flex items-center justify-center">
-                        <div 
+                        <div
                           className="w-full h-64 rounded-md border-2 border-gray-200 shadow-sm"
-                          style={{ backgroundColor: (operation as any).hex }}
+                          style={{ backgroundColor: operation.options?.colorSnapshot?.hex }}
                         />
                       </div>
                     ) : null}
 
                     {/* Right Column - Details (50%) */}
                     <div
-                      className={`${(operation.imageDownloadUrl || operation.options?.colorSnapshot?.hex || (operation as any).hex) ? 'md:w-[50%]' : 'w-full'} p-4 space-y-3`}
+                      className={`${operation.imageDownloadUrl || operation.options?.colorSnapshot?.hex ? 'md:w-[50%]' : 'w-full'} p-4 space-y-3`}
                     >
                       {operation.customPrompt && (
                         <div className="space-y-1">
@@ -155,25 +160,25 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
                         <div className="space-y-2">
                           <div className="text-xs font-medium text-gray-600 mb-2">Options:</div>
                           <div className="bg-white rounded p-3 space-y-2 border border-gray-200">
-                             {operation.options?.colorSnapshot && operation.imageDownloadUrl && (
-                               <div className="space-y-1">
-                                 <span className="text-xs text-gray-600">New Color:</span>
-                                 <div className="flex items-center gap-2">
-                                   <div
-                                     className="w-6 h-6 rounded border-2 border-gray-200 shadow-sm flex-shrink-0"
-                                     style={{ backgroundColor: operation.options.colorSnapshot.hex }}
-                                   />
-                                   <div className="flex flex-col min-w-0">
-                                     <span className="text-sm font-medium text-gray-800 truncate">
-                                       {operation.options.colorSnapshot.name}
-                                     </span>
-                                     <span className="text-xs text-gray-500 font-mono">
-                                       {operation.options.colorSnapshot.hex}
-                                     </span>
-                                   </div>
-                                 </div>
-                               </div>
-                             )}
+                            {operation.options?.colorSnapshot && operation.imageDownloadUrl && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-gray-600">New Color:</span>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-6 h-6 rounded border-2 border-gray-200 shadow-sm flex-shrink-0"
+                                    style={{ backgroundColor: operation.options.colorSnapshot.hex }}
+                                  />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-medium text-gray-800 truncate">
+                                      {operation.options.colorSnapshot.name}
+                                    </span>
+                                    <span className="text-xs text-gray-500 font-mono">
+                                      {operation.options.colorSnapshot.hex}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                             {operation.options?.textureSnapshot && !operation.customPrompt && (
                               <div className="space-y-1">
@@ -243,31 +248,6 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
                       alt={image.name}
                       className="w-full object-contain rounded-md border border-gray-200 bg-white"
                     />
-                  ) : (image as any).hex ? (
-                    <div className="space-y-4">
-                      <div 
-                        className="w-full h-64 rounded-md border-2 border-gray-200 shadow-sm flex flex-col items-center justify-center text-white"
-                        style={{ backgroundColor: (image as any).hex }}
-                      >
-                        <span className="text-sm font-bold drop-shadow-md">{image.name}</span>
-                        <span className="text-xs opacity-90 drop-shadow-md font-mono">{(image as any).hex}</span>
-                      </div>
-                      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Color Information</div>
-                        <div className="space-y-2">
-                          <div>
-                            <span className="text-xs text-gray-400 block">Name</span>
-                            <span className="text-sm font-medium text-gray-800">{image.name}</span>
-                          </div>
-                          {image.description && (
-                            <div>
-                              <span className="text-xs text-gray-400 block">Description</span>
-                              <p className="text-sm text-gray-600 leading-relaxed italic">"{image.description}"</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   ) : (
                     <div className="w-full h-24 flex items-center justify-center bg-gray-100 rounded border border-dashed text-gray-400">
                       No Image Available

@@ -4,6 +4,7 @@ import { Color } from '@/types';
 import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
+  ASSET_COLOR,
 } from '@/constants/constants';
 
 interface AddColorModalProps {
@@ -125,14 +126,14 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
         id: crypto.randomUUID(),
         name: colorName.trim(),
         hex: normalizedHex,
+        assetType: ASSET_COLOR,
         description: description.trim() || '',
-      };
+      }; // eslint-disable-line @typescript-eslint/no-use-before-define
 
       await onAdd(newColor);
-      handleClose();
-    } catch (error) {
-      console.error('Failed to add color:', error);
-      // You might want to show an error message here using antd message or similar
+      handleReset();
+    } catch (err) {
+      console.error('Failed to add color:', err);
     } finally {
       setIsAdding(false);
     }

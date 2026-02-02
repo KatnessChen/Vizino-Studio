@@ -34,7 +34,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
 }) => {
   const hasEvolutionChain = image.evolutionChain && image.evolutionChain.length > 0;
   const isColor = image.mimeType === 'color/hex';
-  const colorHex = isColor ? (image as any).hex : null;
+  const colorHex: string | null = isColor ? (image as any).hex : null;
 
   // State for technical details
   const [cachedImageSrc, setCachedImageSrc] = useState<string>('');
@@ -172,7 +172,6 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
       styles={{ body: { padding: 0 } }}
     >
       <div className="flex flex-col transition-all duration-300" style={{ maxHeight: '90vh' }}>
-
         <div className="relative flex flex-col md:flex-row gap-6 overflow-y-auto pr-2 custom-scrollbar">
           {/* Left: Preview Area */}
           <div className="flex-1 min-w-0 flex flex-col">
@@ -185,9 +184,9 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                   {renderPreview()}
                 </div>
               ) : isColor && colorHex ? (
-                <div 
-                  className="w-full h-full rounded-lg shadow-2xl" 
-                  style={{ backgroundColor: colorHex }}
+                <div
+                  className="w-full h-full rounded-lg shadow-2xl"
+                  style={{ backgroundColor: colorHex || undefined }}
                 />
               ) : (
                 <img
@@ -205,12 +204,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
               <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                 <h4 className="text-base font-bold text-gray-900 m-0">Details</h4>
                 {onEdit && (
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={onEdit}
-                  >
+                  <Button type="link" size="small" icon={<EditOutlined />} onClick={onEdit}>
                     Edit
                   </Button>
                 )}
@@ -236,10 +230,10 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-4 h-4 rounded-sm border border-gray-300 shadow-sm"
-                        style={{ backgroundColor: colorHex }}
+                        style={{ backgroundColor: colorHex || undefined }}
                       />
                       <span className="text-xs font-bold text-gray-700 font-mono">
-                        {colorHex.toUpperCase()}
+                        {colorHex?.toUpperCase()}
                       </span>
                     </div>
                   </div>
@@ -305,11 +299,11 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
 
         {totalImages > 1 && (
           <div className="absolute left-1/2 -bottom-8 -translate-x-1/2 flex items-center justify-center z-20 pointer-events-none">
-              <p className="text-sm font-medium text-white tracking-wide">
-                Press <span className="text-indigo-300">⬅️</span> to view Previous •{' '}
-                <span className="text-indigo-300">➡️</span> for Next •{' '}
-                <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">Esc</span> to Close
-              </p>
+            <p className="text-sm font-medium text-white tracking-wide">
+              Press <span className="text-indigo-300">⬅️</span> to view Previous •{' '}
+              <span className="text-indigo-300">➡️</span> for Next •{' '}
+              <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">Esc</span> to Close
+            </p>
           </div>
         )}
       </div>

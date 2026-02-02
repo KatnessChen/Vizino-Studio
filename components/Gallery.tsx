@@ -51,7 +51,16 @@ interface GalleryProps {
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
   emptyMessage: string;
-  onUploadImage?: (...args: any[]) => any;
+  onUploadImage?: (
+    file: File,
+    metadata: {
+      width?: number;
+      height?: number;
+      aspect_ratio?: number;
+      name: string;
+      description: string;
+    }
+  ) => Promise<void>;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -342,7 +351,7 @@ const Gallery: React.FC<GalleryProps> = ({
   // In guest mode, use guestImages; otherwise use store images
   const allImages = isGuestMode ? guestImages : storeAllImages;
 
-  // Calculate total selected items. 
+  // Calculate total selected items.
   // If selectedImageIds prop is provided (Assets flow), use it.
   // Otherwise, use the global image selection (Images flow).
   const totalSelectedItems = useMemo(() => {
@@ -356,7 +365,7 @@ const Gallery: React.FC<GalleryProps> = ({
   const allSelectedItemsForComparison = useMemo(() => {
     // If the prop is provided, we use the local 'images' array (which contains the assets)
     if (selectedImageIds && selectedImageIds.size > 0) {
-      return images.filter(img => selectedImageIds.has(img.id));
+      return images.filter((img) => selectedImageIds.has(img.id));
     }
 
     // Default Flow (Images): use global Redux IDs and allImages array

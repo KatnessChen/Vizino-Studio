@@ -6,6 +6,7 @@ import {
   MAX_IMAGES_PER_SPACE,
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
+  ASSET_TEXTURE,
 } from '@/constants/constants';
 
 interface FilePreview {
@@ -53,7 +54,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
   const remainingSlots = MAX_IMAGES_PER_SPACE - currentCount;
   const acceptedFileTypes = '.jpg, .jpeg, .png';
   const isAssetMode = mode === 'asset';
-  const assetLabel = assetType === 'texture' ? 'Texture' : 'Item';
+  const assetLabel = assetType === ASSET_TEXTURE ? 'Texture' : 'Item';
 
   const validateFile = (file: File): string | null => {
     // Check file type - only allow jpg, jpeg, png
@@ -209,7 +210,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
       prev.map((fp) => {
         if (fp.id === id) {
           const trimmedName = name.substring(0, MAX_CUSTOM_ASSET_NAME_LENGTH);
-          
+
           // Only validate in asset mode
           if (isAssetMode) {
             let error: string | undefined;
@@ -226,7 +227,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
             }
             return { ...fp, name: trimmedName, error };
           }
-          
+
           // Image mode: no validation, just length limit
           return { ...fp, name: trimmedName };
         }
@@ -335,21 +336,15 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
         style={{ cursor: 'pointer' }}
       >
         <UploadIcon style={{ fontSize: 48, color: '#9ca3af' }} />
-        <p className="mt-2 text-sm font-semibold text-gray-700">
-          Click or drag files to upload
-        </p>
+        <p className="mt-2 text-sm font-semibold text-gray-700">Click or drag files to upload</p>
         <p className="mt-1 text-xs text-gray-500">
-          Accepted: {acceptedFileTypes} • Max {MAX_FILE_SIZE_MB}MB per file •{' '}
-          {remainingSlots} slots remaining
+          Accepted: {acceptedFileTypes} • Max {MAX_FILE_SIZE_MB}MB per file • {remainingSlots} slots
+          remaining
         </p>
       </div>
 
       {/* Error message */}
-      {error && (
-        <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {/* File previews - Horizontal layout */}
       {filePreviews.length > 0 && (
@@ -384,7 +379,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
             .preview-scroll::-webkit-scrollbar-thumb:hover {
               background: #555;
             }
-            
+
             @keyframes hoverModalFadeIn {
               from {
                 opacity: 0;
@@ -395,150 +390,150 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
                 transform: translateY(0) scale(1.5);
               }
             }
-            
+
             .hover-modal-animate {
               animation: hoverModalFadeIn 0.25s ease-out;
             }
           `}</style>
-          
+
           {isLoadingPreviews && (
             <div className="mb-2 text-sm text-blue-600 font-medium animate-pulse">
-               Processing images... please wait
+              Processing images... please wait
             </div>
           )}
 
           <div className="preview-scroll max-h-96 overflow-y-auto space-y-3 pr-2">
-            {isLoadingPreviews ? (
-              // Show skeletons while loading
-              Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={`skeleton-${index}`}
-                  className="rounded-lg border border-gray-200 overflow-hidden bg-white p-3 flex gap-3"
-                >
-                  <Skeleton.Image active style={{ width: '96px', height: '96px' }} />
-                  <div className="flex-1">
-                    <Skeleton active paragraph={{ rows: 2 }} />
-                  </div>
-                </div>
-              ))
-            ) : (
-              filePreviews.map((fp) => (
-                <div
-                  key={fp.id}
-                  className="relative group rounded-lg border border-gray-200 overflow-hidden bg-white p-3 flex gap-3 items-center"
-                >
-                  {/* Remove button */}
-                  <Tooltip title="Remove from upload list">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFile(fp.id);
-                      }}
-                      className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-300 hover:text-gray-800 cursor-pointer"
-                      disabled={isUploading}
-                    >
-                      <CloseIcon style={{ fontSize: 16 }} />
-                    </button>
-                  </Tooltip>
-
-                  {/* Image preview */}
+            {isLoadingPreviews
+              ? // Show skeletons while loading
+                Array.from({ length: 3 }).map((_, index) => (
                   <div
-                    className="w-48 h-32 flex-shrink-0 bg-gray-100 rounded cursor-pointer"
-                    style={{
-                      backgroundImage: `url(${fp.preview})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                    }}
-                    onMouseEnter={() =>
-                      setHoverPreview({ preview: fp.preview, name: fp.file.name })
-                    }
-                    onMouseLeave={() => setHoverPreview(null)}
-                  />
-
-                  {/* File info or metadata inputs */}
-                  <div className="flex-1 space-y-2">
-                    {isAssetMode ? (
-                      <>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {assetLabel} Name *
-                            <span className="text-gray-500 ml-1">
-                              ({fp.name?.length || 0}/{MAX_CUSTOM_ASSET_NAME_LENGTH})
-                            </span>
-                          </label>
-                          <Input
-                            value={fp.name || ''}
-                            onChange={(e) => handleNameChange(fp.id, e.target.value)}
-                            placeholder={`Enter ${assetLabel.toLowerCase()} name`}
-                            status={fp.error ? 'error' : ''}
-                            disabled={isUploading}
-                            size="small"
-                          />
-                          {fp.error && <p className="text-xs text-red-600 mt-1">{fp.error}</p>}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Description (Optional)
-                            <span className="text-gray-500 ml-1">
-                              ({fp.description?.length || 0}/{MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH})
-                            </span>
-                          </label>
-                          <Input.TextArea
-                            value={fp.description}
-                            onChange={(e) => handleDescriptionChange(fp.id, e.target.value)}
-                            placeholder="Add description"
-                            disabled={isUploading}
-                            size="small"
-                            rows={2}
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            File Name
-                            <span className="text-gray-500 ml-1">
-                              ({fp.name?.length || 0}/{MAX_CUSTOM_ASSET_NAME_LENGTH})
-                            </span>
-                          </label>
-                          <Input
-                            value={fp.name || ''}
-                            onChange={(e) => handleNameChange(fp.id, e.target.value)}
-                            placeholder="Enter file name"
-                            disabled={isUploading}
-                            size="small"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Description (Optional)
-                            <span className="text-gray-500 ml-1">
-                              ({fp.description?.length || 0}/{MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH})
-                            </span>
-                          </label>
-                          <Input.TextArea
-                            value={fp.description}
-                            onChange={(e) => handleDescriptionChange(fp.id, e.target.value)}
-                            placeholder="Add description"
-                            disabled={isUploading}
-                            size="small"
-                            rows={2}
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    <p className="text-xs text-gray-500">
-                      {(fp.file.size / 1024 / 1024).toFixed(2)} MB • {fp.width} × {fp.height} px
-                    </p>
+                    key={`skeleton-${index}`}
+                    className="rounded-lg border border-gray-200 overflow-hidden bg-white p-3 flex gap-3"
+                  >
+                    <Skeleton.Image active style={{ width: '96px', height: '96px' }} />
+                    <div className="flex-1">
+                      <Skeleton active paragraph={{ rows: 2 }} />
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              : filePreviews.map((fp) => (
+                  <div
+                    key={fp.id}
+                    className="relative group rounded-lg border border-gray-200 overflow-hidden bg-white p-3 flex gap-3 items-center"
+                  >
+                    {/* Remove button */}
+                    <Tooltip title="Remove from upload list">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFile(fp.id);
+                        }}
+                        className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-300 hover:text-gray-800 cursor-pointer"
+                        disabled={isUploading}
+                      >
+                        <CloseIcon style={{ fontSize: 16 }} />
+                      </button>
+                    </Tooltip>
+
+                    {/* Image preview */}
+                    <div
+                      className="w-48 h-32 flex-shrink-0 bg-gray-100 rounded cursor-pointer"
+                      style={{
+                        backgroundImage: `url(${fp.preview})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                      }}
+                      onMouseEnter={() =>
+                        setHoverPreview({ preview: fp.preview, name: fp.file.name })
+                      }
+                      onMouseLeave={() => setHoverPreview(null)}
+                    />
+
+                    {/* File info or metadata inputs */}
+                    <div className="flex-1 space-y-2">
+                      {isAssetMode ? (
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              {assetLabel} Name *
+                              <span className="text-gray-500 ml-1">
+                                ({fp.name?.length || 0}/{MAX_CUSTOM_ASSET_NAME_LENGTH})
+                              </span>
+                            </label>
+                            <Input
+                              value={fp.name || ''}
+                              onChange={(e) => handleNameChange(fp.id, e.target.value)}
+                              placeholder={`Enter ${assetLabel.toLowerCase()} name`}
+                              status={fp.error ? 'error' : ''}
+                              disabled={isUploading}
+                              size="small"
+                            />
+                            {fp.error && <p className="text-xs text-red-600 mt-1">{fp.error}</p>}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Description (Optional)
+                              <span className="text-gray-500 ml-1">
+                                ({fp.description?.length || 0}/{MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH}
+                                )
+                              </span>
+                            </label>
+                            <Input.TextArea
+                              value={fp.description}
+                              onChange={(e) => handleDescriptionChange(fp.id, e.target.value)}
+                              placeholder="Add description"
+                              disabled={isUploading}
+                              size="small"
+                              rows={2}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              File Name
+                              <span className="text-gray-500 ml-1">
+                                ({fp.name?.length || 0}/{MAX_CUSTOM_ASSET_NAME_LENGTH})
+                              </span>
+                            </label>
+                            <Input
+                              value={fp.name || ''}
+                              onChange={(e) => handleNameChange(fp.id, e.target.value)}
+                              placeholder="Enter file name"
+                              disabled={isUploading}
+                              size="small"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Description (Optional)
+                              <span className="text-gray-500 ml-1">
+                                ({fp.description?.length || 0}/{MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH}
+                                )
+                              </span>
+                            </label>
+                            <Input.TextArea
+                              value={fp.description}
+                              onChange={(e) => handleDescriptionChange(fp.id, e.target.value)}
+                              placeholder="Add description"
+                              disabled={isUploading}
+                              size="small"
+                              rows={2}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <p className="text-xs text-gray-500">
+                        {(fp.file.size / 1024 / 1024).toFixed(2)} MB • {fp.width} × {fp.height} px
+                      </p>
+                    </div>
+                  </div>
+                ))}
           </div>
         </div>
       )}

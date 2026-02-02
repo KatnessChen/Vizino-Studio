@@ -28,6 +28,7 @@ import { checkOperationLimit } from '@/utils/limitationUtils';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
 import { getDemoImages } from '@/constants/demoImages';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 
@@ -65,9 +66,18 @@ const AsideSection: React.FC = () => {
   // Derive legacy state for hooks/compatibility
   // Note: selectedAssets currently only holds 1 item max for now
   const selectedAssetRaw = selectedAssets[0] || null;
-  const selectedColor = selectedAssetRaw && 'hex' in selectedAssetRaw ? (selectedAssetRaw as Color) : null;
-  const selectedTexture = selectedAssetRaw && 'textureImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Texture) : null;
-  const selectedItem = selectedAssetRaw && 'itemImageDownloadUrl' in selectedAssetRaw ? (selectedAssetRaw as Item) : null;
+  const selectedColor =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_COLOR
+      ? (selectedAssetRaw as Color)
+      : null;
+  const selectedTexture =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_TEXTURE
+      ? (selectedAssetRaw as Texture)
+      : null;
+  const selectedItem =
+    selectedAssetRaw && selectedAssetRaw.assetType === ASSET_ITEM
+      ? (selectedAssetRaw as Item)
+      : null;
 
   // Use image processing hook to get sourceImage state
   const { isProcessingImage } = useImageProcessing({
@@ -106,7 +116,7 @@ const AsideSection: React.FC = () => {
     const allImages = [...originalImages, ...updatedImages];
     const result: AppImageData[] = [];
     for (const id of allSelectedIds) {
-      const img = allImages.find(img => img.id === id);
+      const img = allImages.find((img) => img.id === id);
       if (img) result.push(img);
     }
     return result;
@@ -116,31 +126,27 @@ const AsideSection: React.FC = () => {
   // Calculate button state
   const activeTask = selectedTaskNames[0];
   const isCustomPrompt = activeTask === GEMINI_TASKS.CUSTOM_PROMPT.task_name;
-  const selectedAsset = isCustomPrompt ? (selectedColor || selectedTexture || selectedItem) : null;
-  
+  const selectedAsset = isCustomPrompt ? selectedColor || selectedTexture || selectedItem : null;
+
   const effectiveSource = selectedImage || selectedAsset;
 
   const operationLimitCheck = effectiveSource
     ? checkOperationLimit(effectiveSource, adminSettings.mock_limit_reached)
     : null;
-  
-  const {
-    isDisabled,
-    guestHasUsedGeneration,
-    shouldShowLockedStyle,
-    buttonOpacity,
-  } = useGenerateButtonState({
-    activeTaskName: selectedTaskNames[0] || null,
-    isProcessingImage,
-    isSavingImage: false, // AsideSection doesn't track saving state, only processing
-    canAddOperation: operationLimitCheck?.canAdd ?? false,
-    selectedColor,
-    selectedTexture,
-    selectedItem,
-    isGuestMode,
-    hasGeneratedImage,
-    hasSelectedImage: !!selectedImage,
-  });
+
+  const { isDisabled, guestHasUsedGeneration, shouldShowLockedStyle, buttonOpacity } =
+    useGenerateButtonState({
+      activeTaskName: selectedTaskNames[0] || null,
+      isProcessingImage,
+      isSavingImage: false, // AsideSection doesn't track saving state, only processing
+      canAddOperation: operationLimitCheck?.canAdd ?? false,
+      selectedColor,
+      selectedTexture,
+      selectedItem,
+      isGuestMode,
+      hasGeneratedImage,
+      hasSelectedImage: !!selectedImage,
+    });
 
   // Determine selection state message
   const selectionMessage = useMemo(() => {
@@ -189,12 +195,7 @@ const AsideSection: React.FC = () => {
       <div className="px-6">
         {(() => {
           if (!activeTask) {
-            return (
-              <SelectedAssets
-                title="Target Image"
-                assets={selectedImages}
-              />
-            );
+            return <SelectedAssets title="Target Image" assets={selectedImages} />;
           }
 
           if (
@@ -204,14 +205,8 @@ const AsideSection: React.FC = () => {
           ) {
             return (
               <div className="flex flex-col gap-6">
-                <SelectedAssets
-                  title="Target Image"
-                  assets={selectedImages}
-                />
-                <SelectedAssets
-                  title="Design Material"
-                  assets={selectedAssets}
-                />
+                <SelectedAssets title="Target Image" assets={selectedImages} />
+                <SelectedAssets title="Design Material" assets={selectedAssets} />
               </div>
             );
           }
@@ -226,12 +221,7 @@ const AsideSection: React.FC = () => {
           }
 
           // Default fallback for other tasks
-          return (
-            <SelectedAssets
-              title="Target Image"
-              assets={selectedImages}
-            />
-          );
+          return <SelectedAssets title="Target Image" assets={selectedImages} />;
         })()}
       </div>
 

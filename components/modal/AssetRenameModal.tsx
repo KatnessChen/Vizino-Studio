@@ -3,12 +3,18 @@ import { Modal, Input, Alert } from 'antd';
 import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
+  ASSET_TEXTURE,
+  ASSET_ITEM,
+  ASSET_COLOR,
 } from '@/constants/constants';
 
 interface AssetRenameModalProps {
   isOpen: boolean;
   asset: { id: string; name: string; description?: string; hex?: string } | null;
-  onConfirm: (id: string, updates: { name: string; description: string; hex?: string }) => Promise<void>;
+  onConfirm: (
+    id: string,
+    updates: { name: string; description: string; hex?: string }
+  ) => Promise<void>;
   onCancel: () => void;
   type: 'texture' | 'item' | 'color';
   existingNames: Set<string>;
@@ -42,7 +48,9 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError(`${type === 'texture' ? 'Texture' : type === 'item' ? 'Item' : 'Color'} name cannot be empty`);
+      setError(
+        `${type === ASSET_TEXTURE ? 'Texture' : type === ASSET_ITEM ? 'Item' : 'Color'} name cannot be empty`
+      );
       return;
     }
 
@@ -51,7 +59,10 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
       return;
     }
 
-    if (existingNames.has(trimmedName.toLowerCase()) && trimmedName.toLowerCase() !== asset.name.toLowerCase()) {
+    if (
+      existingNames.has(trimmedName.toLowerCase()) &&
+      trimmedName.toLowerCase() !== asset.name.toLowerCase()
+    ) {
       setError(`This ${type} name already exists`);
       return;
     }
@@ -70,10 +81,10 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
 
     setIsLoading(true);
     try {
-      await onConfirm(asset.id, { 
-        name: trimmedName, 
+      await onConfirm(asset.id, {
+        name: trimmedName,
         description: description.trim(),
-        ...(type === 'color' ? { hex: hex.trim() } : {})
+        ...(type === 'color' ? { hex: hex.trim() } : {}),
       });
       onCancel();
     } catch (err) {
@@ -85,7 +96,9 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
 
   return (
     <Modal
-      title={type === 'texture' ? 'Edit Texture' : type === 'item' ? 'Edit Item' : 'Edit Color'}
+      title={
+        type === ASSET_TEXTURE ? 'Edit Texture' : type === ASSET_ITEM ? 'Edit Item' : 'Edit Color'
+      }
       open={isOpen}
       onOk={handleConfirm}
       onCancel={onCancel}
@@ -96,7 +109,7 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
     >
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 8 }}>
-          {type === 'texture' ? 'Texture' : type === 'item' ? 'Item' : 'Color'} Name
+          {type === ASSET_TEXTURE ? 'Texture' : type === ASSET_ITEM ? 'Item' : 'Color'} Name
           <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 8 }}>
             {name.length}/{MAX_CUSTOM_ASSET_NAME_LENGTH}
           </span>
@@ -112,7 +125,9 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
 
       {type === 'color' && (
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 8 }}>
+          <label
+            style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 8 }}
+          >
             Hex Code
           </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -128,18 +143,18 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
                   height: '100%',
                   opacity: 0,
                   cursor: 'pointer',
-                  zIndex: 2
+                  zIndex: 2,
                 }}
               />
-              <div 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  borderRadius: 4, 
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 4,
                   backgroundColor: /^#([A-Fa-f0-9]{3}){1,2}$/.test(hex) ? hex : '#ffffff',
                   border: '1px solid #d9d9d9',
-                  zIndex: 1
-                }} 
+                  zIndex: 1,
+                }}
               />
             </div>
             <Input
@@ -162,16 +177,16 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
         </label>
         <Input.TextArea
           value={description}
-          onChange={(e) => setDescription(e.target.value.substring(0, MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH))}
+          onChange={(e) =>
+            setDescription(e.target.value.substring(0, MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH))
+          }
           placeholder="Add description"
           maxLength={MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH}
           rows={2}
         />
       </div>
 
-      {error && (
-        <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />
-      )}
+      {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />}
     </Modal>
   );
 };
