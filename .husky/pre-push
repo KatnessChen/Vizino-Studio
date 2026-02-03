@@ -1,0 +1,30 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running pre-push checks..."
+
+# Fast checks by default
+pnpm run lint && pnpm run type-check
+status=$?
+if [ $status -ne 0 ]; then
+  echo "Lint or Type-check failed. Push aborted."
+  exit $status
+fi
+
+# If ACT_PRE_PUSH=1, also run the act job (slower / requires Docker)
+if [ "$ACT_PRE_PUSH" = "1" ]; then
+  if [ ! -f .env.act ]; then
+    echo ".env.act not found. Create it from .env.act.example to run act."
+    exit 1
+  fi
+
+  echo "Running act checks..."
+  pnpm run act:pr
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo "act checks failed. Push aborted."
+    exit $status
+  fi
+fi
+
+exit 0

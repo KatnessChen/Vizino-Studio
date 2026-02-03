@@ -25,3 +25,6 @@ dist-ssr
 
 # project setting
 cors.json
+
+# Local act env (secrets for local CI)
+.env.act

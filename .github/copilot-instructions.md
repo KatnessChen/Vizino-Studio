@@ -8,7 +8,9 @@
 
 3. **If user uses mixed languages, determine response language based on primary language**
 
-4. **For code and comments, Always use English**
+4. **All generated outputs (including `README.md`, source code, comments, and inline documentation) must be written in English.**
+
+5. **If a user explicitly requests a translation, provide it as a separate output while keeping the primary artifacts in English.**
 
 ## Copilot UI/UX Guidelines (English)
 
