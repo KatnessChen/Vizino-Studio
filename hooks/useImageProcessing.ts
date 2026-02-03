@@ -212,7 +212,7 @@ export const useImageProcessing = ({
         return null;
       }
     },
-    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem]
+    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem, userId]
   );
 
   return {

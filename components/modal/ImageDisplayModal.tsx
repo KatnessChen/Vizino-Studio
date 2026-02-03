@@ -5,7 +5,7 @@ import { formatTimestamp } from '@/utils';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
 import { storage } from '@/services/firestoreService';
 import { Button, Modal } from 'antd';
-import { EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { EditOutlined } from '@ant-design/icons';
 
 interface ImageDisplayModalProps {
   isOpen: boolean;
@@ -34,7 +34,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
 }) => {
   const hasEvolutionChain = image.evolutionChain && image.evolutionChain.length > 0;
   const isColor = image.mimeType === 'color/hex';
-  const colorHex: string | null = isColor ? (image as any).hex : null;
+  const colorHex: string | null = isColor ? (image as unknown as { hex: string }).hex : null;
 
   // State for technical details
   const [cachedImageSrc, setCachedImageSrc] = useState<string>('');

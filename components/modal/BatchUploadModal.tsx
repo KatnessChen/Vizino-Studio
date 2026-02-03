@@ -148,7 +148,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
           name: defaultName,
           description: '',
         });
-      } catch (error) {
+      } catch {
         errors.push(`${file.name}: Failed to process image`);
       }
     }

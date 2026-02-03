@@ -10,7 +10,7 @@ import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
 import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
-import { ImageData, ImageOperation, CustomPrompt, Asset } from '@/types';
+import { ImageData, ImageOperation, CustomPrompt } from '@/types';
 import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,

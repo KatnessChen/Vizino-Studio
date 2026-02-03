@@ -5,7 +5,6 @@ import {
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
   ASSET_TEXTURE,
   ASSET_ITEM,
-  ASSET_COLOR,
 } from '@/constants/constants';
 
 interface AssetRenameModalProps {

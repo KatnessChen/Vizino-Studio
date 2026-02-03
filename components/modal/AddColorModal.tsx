@@ -56,7 +56,7 @@ const normalizeColorInput = (input: string): string | null => {
 
 const DEFAULT_COLOR_PICKER_VALUE = '#FFFFF0';
 
-const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, existingColors }) => {
+const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd }) => {
   const [colorName, setColorName] = useState('');
   const [colorHex, setColorHex] = useState('');
   const [description, setDescription] = useState('');
@@ -128,7 +128,7 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd, exi
         hex: normalizedHex,
         assetType: ASSET_COLOR,
         description: description.trim() || '',
-      }; // eslint-disable-line @typescript-eslint/no-use-before-define
+      };  
 
       await onAdd(newColor);
       handleReset();

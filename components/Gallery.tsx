@@ -139,7 +139,6 @@ const Gallery: React.FC<GalleryProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Selection state for shift-click and drag selection
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{
@@ -234,19 +233,15 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const handleCardClick = useCallback(
     (imageId: string, event?: React.MouseEvent) => {
-      const currentIndex = images.findIndex((img) => img.id === imageId);
-
       if (event?.shiftKey) {
         // Shift-click: multi-select toggle mode
         onSelectMultiple?.(imageId, event);
-        setLastSelectedIndex(currentIndex);
       } else {
         // Normal click: single-select mode
         onSelectImage?.(imageId, event);
-        setLastSelectedIndex(currentIndex);
       }
     },
-    [images, onSelectMultiple, onSelectImage]
+    [onSelectMultiple, onSelectImage]
   );
 
   // Drag selection handlers

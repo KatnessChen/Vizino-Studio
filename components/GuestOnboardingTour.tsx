@@ -16,7 +16,6 @@ import { useDispatch } from 'react-redux';
 import { useGuest } from '@/contexts/GuestContext';
 import { Color } from '@/types';
 import { setSourceImage, setIsGenerateModalOpen, setSelectedAssets } from '@/stores/taskStore';
-import { setSelectedOriginalImageIds } from '@/stores/imageStore';
 import { getDemoImages, getDefaultDemoImageId } from '@/constants/demoImages';
 import { PRESET_COLOR } from '@/constants/constants';
 import { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';

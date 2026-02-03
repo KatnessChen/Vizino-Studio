@@ -44,8 +44,6 @@ const AuthPanel: React.FC = () => {
     setError(errorMsg);
   };
 
-  const firstName = user?.displayName?.split(' ')[0] || '';
-
   // Show loading state during authentication check
   if (isLoading) {
     return (

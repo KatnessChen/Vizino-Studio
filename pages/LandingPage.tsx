@@ -411,7 +411,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             dispatch(setSelectedAssets(selectedAssets.filter((a) => !ids.has(a.id))));
           }
           message.success('Items deleted successfully');
-        } catch (err) {
+        } catch {
           message.error('Failed to delete some items');
         }
       },

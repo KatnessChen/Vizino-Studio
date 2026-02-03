@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
@@ -17,7 +17,7 @@ import {
   setIsGenerateModalOpen,
   setSourceImage,
 } from '@/stores/taskStore';
-import { Color, Texture, Item, Asset, ImageData as AppImageData } from '@/types';
+import { Color, Texture, Item, ImageData as AppImageData } from '@/types';
 import {
   selectHasGeneratedImage,
   selectGuestImages,
@@ -147,15 +147,6 @@ const AsideSection: React.FC = () => {
       hasGeneratedImage,
       hasSelectedImage: !!selectedImage,
     });
-
-  // Determine selection state message
-  const selectionMessage = useMemo(() => {
-    const totalSelected = selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
-
-    if (totalSelected === 0) return 'No image selected';
-    if (totalSelected > 1) return `${totalSelected} images selected. Please select only 1 image.`;
-    return null;
-  }, [selectedOriginalImageIds.size, selectedUpdatedImageIds.size]);
 
   const handleGenerate = () => {
     // If guest has already generated, show login modal

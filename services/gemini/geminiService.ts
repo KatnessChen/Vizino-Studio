@@ -356,7 +356,7 @@ export const processImageWithTask = async (
         if (abortHandler) {
           try {
             options.signal!.removeEventListener('abort', abortHandler);
-          } catch (e) {
+          } catch {
             // ignore
           }
         }

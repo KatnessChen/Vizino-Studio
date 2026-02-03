@@ -107,7 +107,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
         }
       }
     },
-    [activeProjectId, availableColors, selectedAssets, dispatch, onSelect]
+    [availableColors, selectedAssets, dispatch, onSelect]
   );
 
   const existingNames = useMemo(
@@ -184,7 +184,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           // Remove deleted colors from selectedAssets
           const deletedIds = new Set(customSelected.map((c) => c.id));
           dispatch(setSelectedAssets(selectedAssets.filter((a) => !deletedIds.has(a.id))));
-        } catch (error) {
+        } catch {
           message.error('Failed to delete some colors');
         }
       },
@@ -217,7 +217,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           message.success(`Duplicated ${colors.length} color${colors.length > 1 ? 's' : ''}`);
           // Clear selection after duplication
           dispatch(setSelectedAssets([]));
-        } catch (err) {
+        } catch {
           message.error('Failed to duplicate colors');
         }
       },
@@ -301,7 +301,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
                 };
                 await addColor(newColor);
                 message.success('Color duplicated');
-              } catch (err) {
+              } catch {
                 message.error('Failed to duplicate color');
               }
             },

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Typography } from 'antd';
 import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
-import { ImageData, Color } from '@/types';
-import { ASSET_COLOR } from '@/constants/constants';
+import { ImageData } from '@/types';
 import { imageCache, formatTimestamp } from '@/utils';
 
 interface GenerationHistoryModalProps {

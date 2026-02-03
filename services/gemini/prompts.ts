@@ -196,7 +196,7 @@ export const getPromptByTask = (
       }
       return getAddObjectDefaultPrompt(itemName, customPrompt);
 
-    case GEMINI_TASKS.CUSTOM_PROMPT.task_name:
+    case GEMINI_TASKS.CUSTOM_PROMPT.task_name: {
       if (!customPrompt) {
         throw new Error('customPrompt is required for CUSTOM_PROMPT task');
       }
@@ -211,6 +211,7 @@ export const getPromptByTask = (
       }
 
       return getUseCustomPromptDefaultPrompt(customPrompt, assetContext);
+    }
 
     case GEMINI_TASKS.COLOR_ADJUSTMENT.task_name:
       if (!colorHex) {
