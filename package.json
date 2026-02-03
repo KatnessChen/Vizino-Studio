@@ -11,9 +11,7 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:ui": "vitest --ui",
-    "act:list": "act -l",
-    "act:pr": "act -j lint-and-type-check -e .github/workflows/event/pull_request.json --env-file .env.act"
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
