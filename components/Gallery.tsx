@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { ImageData } from '@/types';
+import { ASSET_IMAGE } from '@/constants/constants';
 import {
   selectSelectedOriginalImageIds,
   selectSelectedUpdatedImageIds,
@@ -79,7 +80,7 @@ interface GalleryProps {
   uploadButtonText?: string;
   uploadModalTitle?: string;
   batchUploadMode?: 'image' | 'asset';
-  assetType?: 'texture' | 'item';
+  assetType?: 'image' | 'texture' | 'item' | 'color';
   existingNames?: Set<string>;
   renderItemPreview?: (image: ImageData) => React.ReactNode;
   showViewButton?: boolean;
@@ -347,34 +348,49 @@ const Gallery: React.FC<GalleryProps> = ({
   const allImages = isGuestMode ? guestImages : storeAllImages;
 
   // Calculate total selected items.
-  // If selectedImageIds prop is provided (Assets flow), use it.
-  // Otherwise, use the global image selection (Images flow).
+  // For Image galleries (ASSET_IMAGE): use global count to enable cross-gallery comparison
+  // For other asset types (Texture/Item/Color): use local gallery selection only
   const totalSelectedItems = useMemo(() => {
-    if (selectedImageIds && selectedImageIds.size > 0) {
-      return selectedImageIds.size;
+    if (assetType === ASSET_IMAGE) {
+      // Images: count across both Original and Generated galleries
+      return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
+    } else if (assetType) {
+      // Other assets: count only within this gallery
+      return selectedImageIds?.size || 0;
     }
+    // Fallback: use global count (backward compatibility)
     return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
-  }, [selectedImageIds, selectedOriginalImageIds, selectedUpdatedImageIds]);
+  }, [selectedImageIds, selectedOriginalImageIds, selectedUpdatedImageIds, assetType]);
 
   // Get all selected objects for comparison modal
   const allSelectedItemsForComparison = useMemo(() => {
-    // If the prop is provided, we use the local 'images' array (which contains the assets)
-    if (selectedImageIds && selectedImageIds.size > 0) {
+    // For images (Original/Generated): use global Redux state to allow cross-gallery comparison
+    if (assetType === ASSET_IMAGE) {
+      const selected: ImageData[] = [];
+      const allSelectedIds = new Set([...selectedOriginalImageIds, ...selectedUpdatedImageIds]);
+
+      allSelectedIds.forEach((id) => {
+        const img = allImages.find((i) => i.id === id);
+        if (img) selected.push(img);
+      });
+
+      return selected;
+    }
+
+    // For other asset types (Texture/Item/Color): only compare items within this gallery
+    if (assetType && selectedImageIds && selectedImageIds.size > 0) {
       return images.filter((img) => selectedImageIds.has(img.id));
     }
 
-    // Default Flow (Images): use global Redux IDs and allImages array
-    const selected: ImageData[] = [];
-    selectedOriginalImageIds.forEach((id) => {
-      const img = allImages.find((i) => i.id === id);
-      if (img) selected.push(img);
-    });
-    selectedUpdatedImageIds.forEach((id) => {
-      const img = allImages.find((i) => i.id === id);
-      if (img) selected.push(img);
-    });
-    return selected;
-  }, [selectedImageIds, images, selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
+    return [];
+  }, [
+    selectedImageIds,
+    images,
+    selectedOriginalImageIds,
+    selectedUpdatedImageIds,
+    allImages,
+    assetType,
+  ]);
 
   // Calculate total image count (original + generated) for upload limit
   const totalImageCount = useMemo(() => {
@@ -472,9 +488,8 @@ const Gallery: React.FC<GalleryProps> = ({
             {/* Compare button */}
             {showCompare && (
               <ImagesComparingButton
-                totalSelectedPhotos={totalSelectedItems}
-                selectedPhotos={allSelectedItemsForComparison}
-                isToolbarMode={true}
+                totalSelectedCount={totalSelectedItems}
+                selectedAssets={allSelectedItemsForComparison}
               />
             )}
 
@@ -672,35 +687,39 @@ const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <Card title={cardTitle} styles={{ body: { padding: 0 } }}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        {galleryContent}
-        <DragOverlay>
-          {activeImage ? (
-            <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
-              <AssetCard
-                asset={activeImage}
-                isSelected={selectedImageIds.has(activeImage.id)}
-                onSelect={() => {}}
-                onViewExpand={() => {}}
-                onViewDetails={() => {}}
-                layout={layoutMode === 'List' ? 'list' : 'grid'}
-                renderPreview={
-                  activeImage && renderItemPreview
-                    ? () => renderItemPreview(activeImage)
-                    : undefined
-                }
-                showViewButton={showViewButton}
-              />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      {onReorder ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {galleryContent}
+          <DragOverlay>
+            {activeImage ? (
+              <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
+                <AssetCard
+                  asset={activeImage}
+                  isSelected={selectedImageIds.has(activeImage.id)}
+                  onSelect={() => {}}
+                  onViewExpand={() => {}}
+                  onViewDetails={() => {}}
+                  layout={layoutMode === 'List' ? 'list' : 'grid'}
+                  renderPreview={
+                    activeImage && renderItemPreview
+                      ? () => renderItemPreview(activeImage)
+                      : undefined
+                  }
+                  showViewButton={showViewButton}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        galleryContent
+      )}
 
       {/* Image Display Modal */}
       {imageToDisplayInModal && (

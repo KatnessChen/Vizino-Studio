@@ -7,6 +7,9 @@ import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
   ASSET_TEXTURE,
+  ASSET_IMAGE,
+  ASSET_COLOR,
+  ASSET_ITEM,
 } from '@/constants/constants';
 
 interface FilePreview {
@@ -29,7 +32,7 @@ interface BatchUploadModalProps {
   currentCount?: number;
   title?: string;
   mode?: 'image' | 'asset'; // 'image' for Gallery, 'asset' for Texture/Item
-  assetType?: 'texture' | 'item';
+  assetType?: 'image' | 'texture' | 'item' | 'color';
   existingNames?: Set<string>;
 }
 
@@ -54,7 +57,8 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
   const remainingSlots = MAX_IMAGES_PER_SPACE - currentCount;
   const acceptedFileTypes = '.jpg, .jpeg, .png';
   const isAssetMode = mode === 'asset';
-  const assetLabel = assetType === ASSET_TEXTURE ? 'Texture' : 'Item';
+  const assetLabel =
+    assetType === ASSET_TEXTURE ? 'Texture' : assetType === 'item' ? 'Item' : 'Color';
 
   const validateFile = (file: File): string | null => {
     // Check file type - only allow jpg, jpeg, png

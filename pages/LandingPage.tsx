@@ -120,19 +120,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   // For guests, show demo images if no images uploaded yet
   const originalImages = useMemo(() => {
+    let imgs = storeOriginalImages;
     if (isGuestMode && storeOriginalImages.length === 0) {
-      return getDemoImages();
+      imgs = getDemoImages();
     }
-    return storeOriginalImages;
+    // Ensure sorted by order ascending
+    return [...imgs].sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [isGuestMode, storeOriginalImages]);
 
   // For guests, show guest generated images; for users, show space updated images
   const updatedImages = useMemo(() => {
-    if (isGuestMode) {
-      // Filter to only show images with parentImageId (generated images)
-      return guestImages.filter((img) => img.parentImageId);
-    }
-    return storeUpdatedImages;
+    const imgs = isGuestMode 
+      ? guestImages.filter((img) => img.parentImageId)
+      : storeUpdatedImages;
+    // Ensure sorted by order ascending
+    return [...imgs].sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [isGuestMode, guestImages, storeUpdatedImages]);
 
   // Get task-related state from taskStore
@@ -173,6 +175,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     addAsset: addTexture,
     deleteAsset: deleteTexture,
     updateAsset: updateTexture,
+    reorderAssets: reorderTextures,
   } = useCustomAssets(ASSET_TEXTURE, activeProjectId);
 
   const {
@@ -181,6 +184,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     addAsset: addItem,
     deleteAsset: deleteItem,
     updateAsset: updateItem,
+    reorderAssets: reorderItems,
   } = useCustomAssets(ASSET_ITEM, activeProjectId);
 
   // Derive selected IDs from selectedAssets
@@ -284,43 +288,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   // Mapped assets for Galleries
   const mappedTextures = useMemo(() => {
-    return (textures as Texture[]).map(
-      (t) =>
-        ({
-          ...t,
-          imageDownloadUrl: t.textureImageDownloadUrl,
-          mimeType: t.mimeType || 'image/jpeg',
-          spaceId: '',
-          evolutionChain: t.evolutionChain || [],
-          parentImageId: null,
-          storageFilePath: '',
-          order: null,
-          isDeleted: false,
-          deletedAt: null,
-          createdAt: t.createdAt || Timestamp.now(),
-          updatedAt: t.updatedAt || Timestamp.now(),
-        }) as unknown as ImageData
-    );
+    return textures as unknown as ImageData[];
   }, [textures]);
 
   const mappedItems = useMemo(() => {
-    return (items as Item[]).map(
-      (i) =>
-        ({
-          ...i,
-          imageDownloadUrl: i.itemImageDownloadUrl,
-          mimeType: i.mimeType || 'image/jpeg',
-          spaceId: '',
-          evolutionChain: i.evolutionChain || [],
-          parentImageId: null,
-          storageFilePath: '',
-          order: null,
-          isDeleted: false,
-          deletedAt: null,
-          createdAt: i.createdAt || Timestamp.now(),
-          updatedAt: i.updatedAt || Timestamp.now(),
-        }) as unknown as ImageData
-    );
+    return items as unknown as ImageData[];
   }, [items]);
 
   const handleTextureUpload = async (
@@ -1468,13 +1440,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     <div className="flex bg-gray-50">
       <AsideSection />
       <main
-        className="flex-1 overflow-auto"
+        className="flex-1 flex flex-col overflow-auto"
         style={{ height: 'calc(100vh - var(--header-height))' }}
       >
-        <div
-          className="bg-gray-100"
-          style={{ minHeight: 'calc(100vh - var(--header-height) - var(--footer-height))' }}
-        >
+        <div className="bg-gray-100 flex-1">
           <div className="flex items-end justify-between pr-6">
             <MyBreadcrumb onStartTour={() => tourRef.current?.openTour()} />
             {imageLimitInfo && (
@@ -1514,6 +1483,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         <div data-tour="original-gallery">
                           <Gallery
                             title="Original Images"
+                            assetType={ASSET_IMAGE}
                             images={originalImages}
                             selectedImageIds={selectedOriginalImageIds}
                             onSelectImage={handleSelectOriginalImage}
@@ -1536,6 +1506,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             onSingleRename={handleSingleRename}
                             onSingleCopy={handleSingleCopy}
                             isLoading={isFetchingSpaceImages}
+                            showCompare={true}
                           />
                         </div>
 
@@ -1577,7 +1548,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             uploadButtonText="Textures"
                             uploadModalTitle="Upload Textures"
                             batchUploadMode="asset"
-                            assetType="texture"
+                            assetType={ASSET_TEXTURE}
                             existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
                             detailModalTitle="Texture Information"
                             viewMoreModalTitle="Texture Information"
@@ -1607,6 +1578,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                                 });
                               }
                             }}
+                            onReorder={reorderTextures}
                           />
                         )}
                         {selectedTaskNames[0] === GEMINI_TASKS.ADD_HOME_ITEM.task_name && (
@@ -1672,6 +1644,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                                 });
                               }
                             }}
+                            onReorder={reorderItems}
                           />
                         )}
                       </>
@@ -1684,7 +1657,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         <div className="flex justify-center px-6">
                           <Segmented
                             options={ASSET_TYPES.map((type: CustomPromptAssetType) => {
-                              const label = type.charAt(0).toUpperCase() + type.slice(1);
+                              let label = type.charAt(0).toUpperCase() + type.slice(1);
+
+                              if (label === 'Item') label = 'Object';
 
                               return {
                                 label,
@@ -1769,7 +1744,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             uploadButtonText="Textures"
                             uploadModalTitle="Upload Textures"
                             batchUploadMode="asset"
-                            assetType="texture"
+                            assetType={ASSET_TEXTURE}
                             existingNames={new Set(textures.map((t) => t.name.toLowerCase()))}
                             detailModalTitle="Texture Information"
                             viewMoreModalTitle="Texture Information"
@@ -1835,7 +1810,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             uploadButtonText="Objects"
                             uploadModalTitle="Upload Objects"
                             batchUploadMode="asset"
-                            assetType="item"
+                            assetType={ASSET_ITEM}
                             existingNames={new Set(items.map((i) => i.name.toLowerCase()))}
                             detailModalTitle="Object Information"
                             viewMoreModalTitle="Object Information"
@@ -1877,6 +1852,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                         <Gallery
                           title="Generated Images"
                           images={updatedImages}
+                          assetType={ASSET_IMAGE}
                           selectedImageIds={selectedUpdatedImageIds}
                           onSelectImage={handleSelectUpdatedImage}
                           onSelectMultiple={handleSelectUpdatedImage}
@@ -1895,6 +1871,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                           onSingleRename={handleSingleRename}
                           onSingleCopy={handleSingleCopy}
                           isLoading={isFetchingSpaceImages}
+                          showCompare={true}
                         />
                       </div>
                     )}
