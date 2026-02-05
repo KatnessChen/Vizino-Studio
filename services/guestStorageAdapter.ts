@@ -142,6 +142,10 @@ export class GuestStorageAdapter implements StorageAdapter {
     throw new Error('Guests cannot delete textures');
   }
 
+  async reorderTextures(): Promise<void> {
+    throw new Error('Guests cannot reorder textures');
+  }
+
   // ============ Items ============
   async addItem(): Promise<Item> {
     throw new Error('Guests cannot add custom items. Please log in to add items.');
@@ -157,6 +161,10 @@ export class GuestStorageAdapter implements StorageAdapter {
 
   async deleteItem(): Promise<void> {
     throw new Error('Guests cannot delete items');
+  }
+
+  async reorderItems(): Promise<void> {
+    throw new Error('Guests cannot reorder items');
   }
 
   // ============ Custom Prompts ============

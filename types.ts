@@ -212,6 +212,7 @@ export interface Texture {
   id: string;
   name: string;
   textureImageDownloadUrl: string;
+  imageDownloadUrl?: string; // For compatibility with ImageData
   assetType: typeof ASSET_TEXTURE;
   description?: string;
   base64?: string;
@@ -222,12 +223,20 @@ export interface Texture {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   evolutionChain?: ImageOperation[];
+  // For ImageData compatibility
+  spaceId?: string | null;
+  parentImageId?: string | null;
+  storageFilePath?: string;
+  order?: number | null;
+  isDeleted?: boolean;
+  deletedAt?: Timestamp | null;
 }
 
 export interface Item {
   id: string;
   name: string;
   itemImageDownloadUrl: string;
+  imageDownloadUrl?: string; // For compatibility with ImageData
   assetType: typeof ASSET_ITEM;
   description?: string;
   base64?: string;
@@ -238,6 +247,13 @@ export interface Item {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   evolutionChain?: ImageOperation[];
+  // For ImageData compatibility
+  spaceId?: string | null;
+  parentImageId?: string | null;
+  storageFilePath?: string;
+  order?: number | null;
+  isDeleted?: boolean;
+  deletedAt?: Timestamp | null;
 }
 
 export type Asset = Color | Texture | Item;

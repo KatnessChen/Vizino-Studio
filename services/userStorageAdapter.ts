@@ -29,6 +29,7 @@ import {
   updateItem,
   saveCustomPrompt,
   fetchAllCustomPrompts,
+  batchUpdateImagesOrder,
 } from './firestoreService';
 
 export class UserStorageAdapter implements StorageAdapter {
@@ -127,6 +128,21 @@ export class UserStorageAdapter implements StorageAdapter {
     return updateTexture(this.contextId, projectId, textureId, updates);
   }
 
+  async reorderTextures(updates: Array<{ textureId: string; order: number }>): Promise<void> {
+    const projectId = this.requireProject();
+    const normalizedUpdates = updates.map(({ textureId, order }) => ({
+      id: textureId,
+      order,
+    }));
+    return batchUpdateImagesOrder(
+      this.contextId,
+      projectId,
+      null,
+      normalizedUpdates,
+      'custom_textures'
+    );
+  }
+
   // ============ Items ============
   async addItem(params: CreateAssetParams): Promise<Item> {
     const projectId = this.requireProject();
@@ -146,6 +162,18 @@ export class UserStorageAdapter implements StorageAdapter {
   async updateItem(itemId: string, updates: { name?: string; description?: string }): Promise<void> {
     const projectId = this.requireProject();
     return updateItem(this.contextId, projectId, itemId, updates);
+  }
+
+  async reorderItems(updates: Array<{ itemId: string; order: number }>): Promise<void> {
+    const projectId = this.requireProject();
+    const normalizedUpdates = updates.map(({ itemId, order }) => ({ id: itemId, order }));
+    return batchUpdateImagesOrder(
+      this.contextId,
+      projectId,
+      null,
+      normalizedUpdates,
+      'custom_items'
+    );
   }
 
   // ============ Custom Prompts ============

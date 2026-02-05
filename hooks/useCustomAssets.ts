@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '@/stores/store';
+import { RootState, AppDispatch } from '@/stores/store';
 import {
   setCustomTextures,
   setCustomItems,
@@ -28,6 +28,7 @@ import {
   setLoadItemsError,
   setLoadColorsError,
 } from '@/stores/customAssetsStore';
+import { reorderAssetsWithDebounce } from '@/stores/imageOrderThunks';
 import { useStorageAdapter } from '@/hooks/useStorageAdapter';
 import { useUploadGate } from '@/hooks/useUploadGate';
 import { ImageOperation, Texture, Item, Color } from '@/types';
@@ -38,7 +39,7 @@ import { CreateAssetParams, CreateColorParams } from '@/services/storageAdapter'
 const GUEST_PROJECT_ID = 'guest-project';
 
 export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: string | null) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { adapter, isReady, isGuestMode } = useStorageAdapter();
   const { gateUpload } = useUploadGate();
 
@@ -113,10 +114,12 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
         if (isTexture) {
           dispatch(setLoadingTextures({ projectId: effectiveProjectId, isLoadingTextures: true }));
           const textures = await adapter.fetchTextures();
+          textures.sort((a, b) => (a.order || 0) - (b.order || 0));
           dispatch(setCustomTextures({ projectId: effectiveProjectId, textures }));
         } else if (isItem) {
           dispatch(setLoadingItems({ projectId: effectiveProjectId, isLoadingItems: true }));
           const items = await adapter.fetchItems();
+          items.sort((a, b) => (a.order || 0) - (b.order || 0));
           dispatch(setCustomItems({ projectId: effectiveProjectId, items }));
         } else {
           dispatch(setLoadingColors({ projectId: effectiveProjectId, isLoadingColors: true }));
@@ -149,6 +152,8 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
         }
       }
     };
+
+
 
     loadAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -256,6 +261,43 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
     [isReady, effectiveProjectId, isTexture, isItem, isColor, adapter, dispatch]
   );
 
+  const reorderAssets = useCallback(
+    async (reorderedIds: string[]): Promise<void> => {
+      // Basic validation
+      if (!isReady || !effectiveProjectId) return;
+      
+      // Determine collection name
+      let collectionName: 'custom_textures' | 'custom_items' | null = null;
+      if (isTexture) collectionName = 'custom_textures';
+      if (isItem) collectionName = 'custom_items';
+      
+      if (!collectionName) return; 
+
+      // Get current assets for this type
+      const currentAssets = isTexture 
+         ? projectAssets?.customTextures 
+         : projectAssets?.customItems;
+
+      if (!currentAssets || currentAssets.length === 0) return;
+
+      // Dispatch the thunk
+      // effectiveProjectId is used as projectId
+      // spaceId is null for project-level assets
+      // contextId in adapter is essentially the userId (or guest ID)
+      dispatch(
+        reorderAssetsWithDebounce(
+            adapter.contextId, // userId
+            effectiveProjectId,
+            null, // spaceId for project-level
+            collectionName,
+            reorderedIds,
+            currentAssets as any[] // Start with cast, better would be proper union type handling
+        )
+      );
+    },
+    [isReady, effectiveProjectId, isTexture, isItem, projectAssets, adapter.contextId, dispatch]
+  );
+
   return {
     customAssets,
     isLoadingAssets,
@@ -263,5 +305,6 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
     addAsset,
     deleteAsset,
     updateAsset,
+    reorderAssets,
   };
 };

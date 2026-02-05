@@ -23,7 +23,6 @@ class ImageCache {
     // Check memory cache first (fastest)
     const memCached = this.memoryCache.get(cacheKey);
     if (memCached && !this.isExpired(memCached)) {
-      console.log('[Cache] Memory hit:', cacheKey);
       return memCached.base64;
     }
 
@@ -31,7 +30,6 @@ class ImageCache {
     try {
       const entry = await indexedDBService.get(cacheKey);
       if (entry && !this.isExpired(entry)) {
-        console.log('[Cache] IndexedDB hit:', cacheKey.substring(0, 50));
         // Restore to memory cache for faster access
         this.memoryCache.set(cacheKey, entry);
         if (this.memoryCache.size > MAX_MEMORY_CACHE) {
@@ -46,7 +44,6 @@ class ImageCache {
       console.warn('[Cache] IndexedDB read failed:', error);
     }
 
-    console.log('[Cache] Cache miss:', cacheKey.substring(0, 50));
     return null;
   }
 
@@ -72,7 +69,6 @@ class ImageCache {
     // Store in IndexedDB
     try {
       await indexedDBService.set(cacheKey, entry);
-      console.log('[Cache] Stored in IndexedDB, memory cache size:', this.memoryCache.size);
     } catch (error) {
       console.warn('[Cache] IndexedDB write failed:', error);
     }
@@ -90,7 +86,6 @@ class ImageCache {
    */
   clearMemory(): void {
     this.memoryCache.clear();
-    console.log('[Cache] Memory cache cleared');
   }
 
   /**
@@ -118,7 +113,6 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
   const totalImages = images.length;
 
   if (totalImages === 0) {
-    console.log('[Cache] No images to cache');
     return;
   }
 
@@ -131,7 +125,6 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
       const existingCache = await imageCache.get(image.imageDownloadUrl);
       if (existingCache) {
         skippedCount++;
-        console.log(`[Cache] Skipped (already cached): ${image.id}`);
         continue;
       }
 
@@ -140,13 +133,6 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
       imageDownloadUrlToBase64(image.imageDownloadUrl)
         .then(() => {
           cachedCount++;
-          if (cachedCount % 5 === 0 || cachedCount === totalImages - skippedCount) {
-            console.log(
-              `[Cache] Progress: ${cachedCount}/${
-                totalImages - skippedCount
-              } images cached (${skippedCount} skipped)`
-            );
-          }
         })
         .catch((error) => {
           console.warn(`[Cache] Failed to cache image ${image.id}:`, error);
@@ -155,12 +141,6 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
       console.warn(`[Cache] Error caching image ${image.id}:`, error);
     }
   }
-
-  console.log(
-    `[Cache] Queued ${
-      totalImages - skippedCount
-    } images for caching (${skippedCount} already cached)`
-  );
 }
 
 // Export singleton instance

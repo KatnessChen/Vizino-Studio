@@ -1,31 +1,34 @@
 import { debounce } from 'lodash';
 import { AppDispatch } from './store';
 import { reorderImagesOptimistic, rollbackReorderImages } from './projectStore';
+import { setCustomTextures, setCustomItems } from './customAssetsStore';
 import { batchUpdateImagesOrder } from '@/services/firestoreService';
-import { ImageData } from '@/types';
+import { ImageData, Texture, Item } from '@/types';
 import { message } from '@/utils/antd';
 
+type Asset = ImageData | Texture | Item;
+type CollectionName = 'images' | 'custom_textures' | 'custom_items';
 
 /**
- * Calculate new order values for reordered images
- * Strategy: Reassign all images with sequential ordering (1, 2, 3...)
+ * Calculate new order values for reordered assets
+ * Strategy: Reassign all assets with sequential ordering (1, 2, 3...)
  */
 function calculateNewOrders(
-  allImages: ImageData[],
-  reorderedImageIds: string[]
-): Array<{ imageId: string; order: number }> {
-  const updates: Array<{ imageId: string; order: number }> = [];
+  allAssets: Asset[],
+  reorderedIds: string[]
+): Array<{ id: string; order: number }> {
+  const updates: Array<{ id: string; order: number }> = [];
 
-  // Find images that need reordering
-  const reorderedImages = reorderedImageIds
-    .map((id) => allImages.find((img) => img.id === id))
-    .filter(Boolean) as ImageData[];
+  // Find assets that need reordering
+  const reorderedAssets = reorderedIds
+    .map((id) => allAssets.find((asset) => asset.id === id))
+    .filter(Boolean) as Asset[];
 
   // Calculate new orders (1, 2, 3...)
-  reorderedImages.forEach((img, index) => {
+  reorderedAssets.forEach((asset, index) => {
     const newOrder = index + 1;
-    if (img.order !== newOrder) {
-      updates.push({ imageId: img.id, order: newOrder });
+    if (asset.order !== newOrder) {
+      updates.push({ id: asset.id, order: newOrder });
     }
   });
 
@@ -33,35 +36,34 @@ function calculateNewOrders(
 }
 
 /**
- * Debounced function for batch updating image orders in Firestore
+ * Debounced function for batch updating asset orders in Firestore
  * Uses trailing edge debouncing (waits 500ms after last call)
  */
 const debouncedBatchUpdate = debounce(
   async (
     userId: string,
     projectId: string,
-    spaceId: string,
-    updates: Array<{ imageId: string; order: number }>,
-    previousOrders: Array<{ imageId: string; order: number | null }>,
+    spaceId: string | null,
+    collectionName: CollectionName,
+    reorderedIds: string[],
+    rollbackAction: (dispatch: AppDispatch) => void,
     dispatch: AppDispatch
   ) => {
     try {
-      await batchUpdateImagesOrder(userId, projectId, spaceId, updates);
-      console.log('Successfully synced image order to Firestore');
-      message.success('Image order saved successfully');
+      // Calculate updates here to ensure we always write the full latest state
+      // This prevents "lost updates" due to optimistic state mismatches during debounce
+      const updates = reorderedIds.map((id, index) => ({ id, order: index + 1 }));
+
+      await batchUpdateImagesOrder(userId, projectId, spaceId, updates, collectionName);
+      console.log(`Successfully synced ${collectionName} order to Firestore`);
+      message.success('Order saved successfully');
     } catch (error) {
-      console.error('Failed to update image order in Firestore:', error);
+      console.error(`Failed to update ${collectionName} order in Firestore:`, error);
 
       // Rollback optimistic update
-      dispatch(
-        rollbackReorderImages({
-          projectId,
-          spaceId,
-          previousOrders,
-        })
-      );
+      rollbackAction(dispatch);
 
-      message.error('Failed to save image order. Changes have been reverted.');
+      message.error('Failed to save order. Changes have been reverted.');
     }
   },
   500, // 500ms debounce delay
@@ -69,45 +71,148 @@ const debouncedBatchUpdate = debounce(
 );
 
 /**
- * Thunk action creator for reordering images with optimistic updates and debounced sync
- * @param userId - User ID
- * @param projectId - Project ID
- * @param spaceId - Space ID
- * @param reorderedImageIds - Array of image IDs in the new desired order
- * @param allImages - All images in the space (for calculating order values)
+ * Thunk action creator for reordering assets with optimistic updates and debounced sync
  */
-export const reorderImagesWithDebounce =
+export const reorderAssetsWithDebounce =
   (
     userId: string,
     projectId: string,
-    spaceId: string,
-    reorderedImageIds: string[],
-    allImages: ImageData[]
+    spaceId: string | null,
+    collectionName: CollectionName,
+    reorderedIds: string[],
+    allAssets: Asset[]
   ) =>
   (dispatch: AppDispatch) => {
-    // Calculate what needs to be updated
-    const updates = calculateNewOrders(allImages, reorderedImageIds);
+    // Calculate what needs to be updated (FOR REDUX OPTIMISTIC UPDATE)
+    const updates = calculateNewOrders(allAssets, reorderedIds);
 
     if (updates.length === 0) {
       console.log('No order changes needed');
       return;
     }
 
-    // Store previous orders for potential rollback
-    const previousOrders = updates.map(({ imageId }) => {
-      const img = allImages.find((i) => i.id === imageId);
-      return { imageId, order: img?.order ?? null };
-    });
+    // Prepare rollback action
+    let rollbackAction: (dispatch: AppDispatch) => void;
 
-    // Optimistically update Redux state immediately
-    dispatch(
-      reorderImagesOptimistic({
-        projectId,
-        spaceId,
-        reorderedImages: updates,
-      })
-    );
+    // Optimistically update Redux state immediately AND define rollback
+    if (collectionName === 'images') {
+      if (!spaceId) {
+        console.error('Space ID required for image reordering');
+        return;
+      }
+      const previousOrders = updates.map(({ id }) => {
+        const img = allAssets.find((i) => i.id === id);
+        return { imageId: id, order: img?.order ?? null };
+      });
+
+      dispatch(
+        reorderImagesOptimistic({
+          projectId,
+          spaceId,
+          reorderedImages: updates.map((u) => ({ imageId: u.id, order: u.order })),
+        })
+      );
+
+      rollbackAction = (d) =>
+        d(
+          rollbackReorderImages({
+            projectId,
+            spaceId,
+            previousOrders,
+          })
+        );
+    } else if (collectionName === 'custom_textures') {
+      // For custom assets, we don't have atomic reorder actions, so we just set the full list
+      // Creating the new sorted list
+      const assetMap = new Map(allAssets.map((a) => [a.id, a as Texture]));
+      
+      // Create shallow copies to avoid mutating read-only Redux state
+      const newSortedAssets = reorderedIds
+        .map((id) => {
+          const asset = assetMap.get(id);
+          return asset ? { ...asset } : null;
+        })
+        .filter((a): a is Texture => !!a);
+      
+      // Update orders in the new list to match the calculated updates (optimistic)
+      updates.forEach(u => {
+        const asset = newSortedAssets.find(a => a.id === u.id);
+        if (asset) asset.order = u.order;
+      });
+
+      // Preserve any assets that weren't in reorderedIds (append them)
+      const missingAssets = (allAssets as Texture[])
+        .filter(a => !assetMap.has(a.id) || !reorderedIds.includes(a.id)); 
+      
+      // Simplified missing check:
+      const processedIds = new Set(newSortedAssets.map(a => a.id));
+      const remainingAssets = (allAssets as Texture[]).filter(a => !processedIds.has(a.id));
+      
+      if(remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
+
+
+      dispatch(setCustomTextures({ projectId, textures: newSortedAssets }));
+
+      // Rollback is just setting the original list back
+      rollbackAction = (d) => d(setCustomTextures({ projectId, textures: allAssets as Texture[] }));
+    } else if (collectionName === 'custom_items') {
+      const assetMap = new Map(allAssets.map((a) => [a.id, a as Item]));
+      
+      // Create shallow copies
+      const newSortedAssets = reorderedIds
+        .map((id) => {
+          const asset = assetMap.get(id);
+          return asset ? { ...asset } : null;
+        })
+        .filter((a): a is Item => !!a);
+
+      updates.forEach(u => {
+        const asset = newSortedAssets.find(a => a.id === u.id);
+        if (asset) asset.order = u.order;
+      });
+
+      const processedIds = new Set(newSortedAssets.map(a => a.id));
+      const remainingAssets = (allAssets as Item[]).filter(a => !processedIds.has(a.id));
+      
+      if(remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
+
+      dispatch(setCustomItems({ projectId, items: newSortedAssets }));
+
+      rollbackAction = (d) => d(setCustomItems({ projectId, items: allAssets as Item[] }));
+    } else {
+      console.error('Unknown collection name for reordering');
+      return;
+    }
 
     // Debounced sync to Firestore
-    debouncedBatchUpdate(userId, projectId, spaceId, updates, previousOrders, dispatch);
+    // IMPORTANT: We pass the FULL reorderedIds list, not the incremental updates.
+    // The debounce function will persist the entire order to ensure consistency because
+    // calculating incremental updates against Redux state during a debounce sequence is unreliable.
+    debouncedBatchUpdate(
+      userId,
+      projectId,
+      spaceId,
+      collectionName,
+      reorderedIds,
+      rollbackAction,
+      dispatch
+    );
   };
+
+// Backward compatibility alias (deprecated)
+export const reorderImagesWithDebounce = (
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  reorderedImageIds: string[],
+  allImages: ImageData[]
+) =>
+  reorderAssetsWithDebounce(
+    userId,
+    projectId,
+    spaceId,
+    'images',
+    reorderedImageIds,
+    allImages
+  );
+
