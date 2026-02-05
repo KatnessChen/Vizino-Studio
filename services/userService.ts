@@ -95,11 +95,14 @@ export const getUser = async (uid: string): Promise<User | null> => {
 };
 
 /**
- * Increment usage count for a specific Gemini task
+ * Increment usage count for a specific Gemini task or feature
  * @param uid - User ID
- * @param taskName - Gemini task name
+ * @param usageKey - Gemini task name or feature key (e.g., 'thinking_mode')
  */
-export const incrementTaskUsage = async (uid: string, taskName: GeminiTaskName): Promise<void> => {
+export const incrementTaskUsage = async (
+  uid: string,
+  usageKey: GeminiTaskName | 'thinking_mode'
+): Promise<void> => {
   try {
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
@@ -108,7 +111,7 @@ export const incrementTaskUsage = async (uid: string, taskName: GeminiTaskName):
       const currentUsage = userDoc.data().usage || initializeUsage();
       const newUsage = {
         ...currentUsage,
-        [taskName]: (currentUsage[taskName] || 0) + 1,
+        [usageKey]: (currentUsage[usageKey] || 0) + 1,
       };
 
       await setDoc(
@@ -118,12 +121,12 @@ export const incrementTaskUsage = async (uid: string, taskName: GeminiTaskName):
         },
         { merge: true }
       );
-      console.log(`Task usage incremented: ${taskName}`);
+      console.log(`Usage incremented: ${usageKey}`);
     } else {
       console.warn('User not found, cannot increment usage');
     }
   } catch (error) {
-    console.error('Failed to increment task usage:', error);
+    console.error('Failed to increment usage:', error);
     throw error;
   }
 };

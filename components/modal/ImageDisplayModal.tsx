@@ -252,7 +252,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
                   <div className="flex justify-between items-center pb-1">
                     <span className="text-sm font-medium text-gray-500">Dimensions</span>
                     <span className="text-sm text-gray-700">
-                      {image.width && image.height ? `${image.width} × ${image.height} px` : '-'}
+                      {image.width && image.height ? `${image.width} x ${image.height} px` : '-'}
                     </span>
                   </div>
                 )}
