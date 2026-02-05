@@ -61,3 +61,34 @@ export const getBase64FromImageData = async (storage: FirebaseStorage, imageData
     );
   }
 };
+
+/**
+ * Extract image dimensions from base64 data
+ * Loads the image into memory and reads naturalWidth/naturalHeight
+ *
+ * @param base64 Base64 encoded image string (without data URL prefix)
+ * @param mimeType MIME type of the image
+ * @returns Promise resolving to { width, height, aspect_ratio }
+ */
+export function extractImageDimensions(
+  base64: string,
+  mimeType: string
+): Promise<{ width: number; height: number; aspect_ratio: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      const aspect_ratio = width / height;
+
+      resolve({ width, height, aspect_ratio });
+    };
+
+    img.onerror = () => {
+      reject(new Error(`Failed to load image from base64 data (${mimeType})`));
+    };
+
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+}

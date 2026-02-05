@@ -38,6 +38,7 @@ interface UseImageProcessingProps {
   userId: string | undefined;
   guestSessionId?: string | null;
   selectedTaskName: GeminiTaskName;
+  thinkingMode?: boolean;
   options: {
     selectedColor?: Color | null;
     selectedTexture?: Texture | null;
@@ -49,6 +50,7 @@ export const useImageProcessing = ({
   userId,
   guestSessionId,
   selectedTaskName,
+  thinkingMode,
   options: { selectedColor, selectedTexture, selectedItem },
 }: UseImageProcessingProps) => {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
@@ -107,7 +109,8 @@ export const useImageProcessing = ({
             selectedColor.name,
             selectedColor.hex,
             customPrompt,
-            signal
+            signal,
+            thinkingMode
           );
         } else if (selectedTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name) {
           if (!selectedTexture) {
@@ -122,7 +125,8 @@ export const useImageProcessing = ({
             selectedTexture.mimeType || 'image/jpeg',
             selectedTexture.name,
             customPrompt,
-            signal
+            signal,
+            thinkingMode
           );
         } else if (selectedTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name) {
           if (!selectedItem) {
@@ -137,7 +141,8 @@ export const useImageProcessing = ({
             selectedItem.mimeType || 'image/jpeg',
             selectedItem.name,
             customPrompt,
-            signal
+            signal,
+            thinkingMode
           );
         } else if (
           selectedTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name ||
@@ -162,7 +167,8 @@ export const useImageProcessing = ({
             source,
             effectivePrompt,
             signal,
-            task
+            task,
+            thinkingMode
           );
         } else {
           throw new Error('Unknown task type');
@@ -172,6 +178,10 @@ export const useImageProcessing = ({
         if (userId) {
           try {
             await incrementTaskUsage(userId, selectedTaskName);
+            // Also track thinking mode usage if enabled
+            if (thinkingMode) {
+              await incrementTaskUsage(userId, 'thinking_mode');
+            }
           } catch (error) {
             console.error('Failed to increment task usage:', error);
             // Don't block the user flow if usage tracking fails
@@ -235,7 +245,7 @@ export const useImageProcessing = ({
         return null;
       }
     },
-    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem, userId]
+    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem, userId, thinkingMode]
   );
 
   return {

@@ -1,6 +1,17 @@
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Skeleton, Tabs } from 'antd';
+import {
+  Modal,
+  Button,
+  Input,
+  Alert,
+  Tooltip,
+  Drawer,
+  Typography,
+  Skeleton,
+  Tabs,
+  Switch,
+} from 'antd';
 import { message } from '@/utils/antd';
 
 import {
@@ -30,10 +41,13 @@ import {
   getTask,
   isMagicPromptTask,
   hasDefaultPrompt,
+  isThinkingModeAvailable,
 } from '@/services/gemini/geminiTasks';
 import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
+import { incrementTaskUsage } from '@/services/userService';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
 import { formatImageOperationData, base64ToFile } from '@/utils';
+import { extractImageDimensions } from '@/utils/imageUtils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
   selectActiveProjectId,
@@ -127,6 +141,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
     const [activePromptTab, setActivePromptTab] = useState<'magic' | 'saved'>('saved');
     const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
+    const [thinkingMode, setThinkingMode] = useState(false);
 
     const { Text } = Typography;
 
@@ -284,6 +299,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         userId,
         guestSessionId,
         selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
+        thinkingMode,
         options: {
           selectedColor,
           selectedTexture,
@@ -482,10 +498,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       (e: React.MouseEvent, customPrompt: string) => {
         e.stopPropagation();
         setCustomPrompt(customPrompt);
-        dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
+        // Only switch task to CUSTOM_PROMPT if the current task is already CUSTOM_PROMPT
+        if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+          dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
+        }
         message.success('Prompt applied!');
       },
-      [dispatch]
+      [dispatch, activeTaskName]
     );
 
     const handlePickMagicPrompt = useCallback(
@@ -527,7 +546,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         return;
       }
 
-      // Require a source image (not color assets)
+      // For most tasks, we need a source image. For asset-based views, use sourceAsset.
       const effectiveSource = sourceImage || sourceAsset;
       if (!effectiveSource || effectiveSource.assetType === ASSET_COLOR) {
         message.warning('Please select an image first.');
@@ -544,71 +563,100 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       setIsOptimizingPrompt(true);
 
       try {
-        // Get base64 image data
-        let imageBase64: string;
-        let imageMimeType: string;
+        // Helper function to fetch image as base64
+        const fetchAsBase64 = async (url: string): Promise<string> => {
+          if (url.startsWith('data:')) {
+            return url.split(',')[1] || '';
+          }
+          const response = await fetch(url);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] || '');
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        };
+
+        // Get the main room image (effectiveSource)
+        let mainImageBase64: string;
+        let mainImageMimeType: string;
 
         if (effectiveSource.assetType === ASSET_TEXTURE) {
           const texture = effectiveSource as Texture;
-          const response = await fetch(texture.textureImageDownloadUrl);
-          const blob = await response.blob();
-          imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              resolve(result.split(',')[1] || '');
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          imageMimeType = texture.mimeType || 'image/jpeg';
+          mainImageBase64 = await fetchAsBase64(texture.textureImageDownloadUrl);
+          mainImageMimeType = texture.mimeType || 'image/jpeg';
         } else if (effectiveSource.assetType === ASSET_ITEM) {
           const item = effectiveSource as Item;
-          const response = await fetch(item.itemImageDownloadUrl);
-          const blob = await response.blob();
-          imageBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              resolve(result.split(',')[1] || '');
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          imageMimeType = item.mimeType || 'image/jpeg';
+          mainImageBase64 = await fetchAsBase64(item.itemImageDownloadUrl);
+          mainImageMimeType = item.mimeType || 'image/jpeg';
         } else {
           // It's ImageData
           const imgData = effectiveSource as ImageData;
-          const url = imgData.imageDownloadUrl || '';
-          if (url.startsWith('data:')) {
-            // Already base64
-            const parts = url.split(',');
-            imageBase64 = parts[1] || '';
-            imageMimeType = imgData.mimeType;
-          } else {
-            // Fetch from URL
-            const response = await fetch(url);
-            const blob = await response.blob();
-            imageBase64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const result = reader.result as string;
-                resolve(result.split(',')[1] || '');
-              };
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
-            imageMimeType = imgData.mimeType;
-          }
+          mainImageBase64 = await fetchAsBase64(imgData.imageDownloadUrl || '');
+          mainImageMimeType = imgData.mimeType;
+        }
+
+        // Build additional context based on task type
+        type AdditionalContextType = {
+          textureImage?: { base64: string; mimeType: string };
+          textureName?: string;
+          itemImage?: { base64: string; mimeType: string };
+          itemName?: string;
+          colorName?: string;
+          colorHex?: string;
+        };
+        let additionalContext: AdditionalContextType | undefined;
+
+        // For ADD_HOME_ITEM task: include the selected item image
+        if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && selectedItem) {
+          const itemBase64 = await fetchAsBase64(selectedItem.itemImageDownloadUrl);
+          additionalContext = {
+            itemImage: {
+              base64: itemBase64,
+              mimeType: selectedItem.mimeType || 'image/jpeg',
+            },
+            itemName: selectedItem.name,
+          };
+        }
+
+        // For ADD_TEXTURE task: include the selected texture image
+        if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && selectedTexture) {
+          const textureBase64 = await fetchAsBase64(selectedTexture.textureImageDownloadUrl);
+          additionalContext = {
+            textureImage: {
+              base64: textureBase64,
+              mimeType: selectedTexture.mimeType || 'image/jpeg',
+            },
+            textureName: selectedTexture.name,
+          };
+        }
+
+        // For RECOLOR_WALL task: include the selected color info
+        if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && selectedColor) {
+          additionalContext = {
+            colorName: selectedColor.name,
+            colorHex: selectedColor.hex,
+          };
         }
 
         // Call the backend to generate optimized prompt
         const optimizedPrompt = await generateOptimizedPrompt(
           task,
           customPrompt.trim(),
-          imageBase64,
-          imageMimeType
+          mainImageBase64,
+          mainImageMimeType,
+          undefined, // signal
+          additionalContext
         );
+
+        // Record usage for prompt optimization (only for authenticated users)
+        if (userId) {
+          void incrementTaskUsage(userId, GEMINI_TASKS.OPTIMIZE_PROMPT.task_name);
+        }
 
         // Set the optimized prompt in the textarea
         setCustomPrompt(optimizedPrompt);
@@ -619,7 +667,17 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       } finally {
         setIsOptimizingPrompt(false);
       }
-    }, [customPrompt, sourceImage, sourceAsset, activeTask]);
+    }, [
+      customPrompt,
+      sourceImage,
+      sourceAsset,
+      activeTask,
+      activeTaskName,
+      selectedItem,
+      selectedTexture,
+      selectedColor,
+      userId,
+    ]);
 
     const handleClose = () => {
       // If processing, cancel the request and keep modal open while preserving form state
@@ -898,6 +956,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
             // Save processed image to Firestore in background
             try {
+              // Extract dimensions from generated image base64
+              const dimensions = await extractImageDimensions(imageData.base64, imageData.mimeType);
+
               await createImage(
                 userId,
                 activeProjectId,
@@ -908,6 +969,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   name: imageName,
                   mimeType: imageData.mimeType,
                   description: finalDescription,
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  aspect_ratio: dimensions.aspect_ratio,
                 },
                 {
                   base64: imageData.base64,
@@ -942,6 +1006,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             // Guests save their generated image to local IndexedDB storage
             const now = Timestamp.fromDate(new Date());
 
+            // Extract dimensions from generated image base64
+            const dimensions = await extractImageDimensions(imageData.base64, imageData.mimeType);
+
             // Create the image data
             const guestImageData: ImageData = {
               id: tempImageId,
@@ -959,6 +1026,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               updatedAt: now,
               description: '',
               assetType: ASSET_IMAGE,
+              width: dimensions.width,
+              height: dimensions.height,
+              aspect_ratio: dimensions.aspect_ratio,
             };
 
             // Save to IndexedDB (local storage)
@@ -1127,26 +1197,46 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           width="1152px"
           maskClosable={!isSavingImage && !isProcessingImage}
           keyboard={!isSavingImage && !isProcessingImage}
-          footer={[
-            <Button
-              key="cancel"
-              onClick={handleClose}
-              disabled={isSavingImage || isOptimizingPrompt}
-            >
-              Cancel
-            </Button>,
-            <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
+          footer={
+            <div className="flex items-center justify-between w-full">
               <Button
-                key="generate"
-                type="primary"
-                onClick={handleGenerate}
-                disabled={isGenerateDisabled || isOptimizingPrompt}
-                data-tour="modal-generate-button"
+                key="cancel"
+                onClick={handleClose}
+                disabled={isSavingImage || isOptimizingPrompt}
               >
-                Generate
+                Cancel
               </Button>
-            </Tooltip>,
-          ]}
+              <div className="flex items-center">
+                {isThinkingModeAvailable(activeTaskName) && (
+                  <Tooltip
+                    key="thinking-tooltip"
+                    title="Use a more capable model for higher quality results"
+                  >
+                    <span className="inline-flex items-center gap-2 mr-3">
+                      <span className="text-sm text-gray-600">Thinking</span>
+                      <Switch
+                        size="small"
+                        checked={thinkingMode}
+                        onChange={setThinkingMode}
+                        disabled={isSavingImage || isProcessingImage || isOptimizingPrompt}
+                      />
+                    </span>
+                  </Tooltip>
+                )}
+                <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
+                  <Button
+                    key="generate"
+                    type="primary"
+                    onClick={handleGenerate}
+                    disabled={isGenerateDisabled || isOptimizingPrompt}
+                    data-tour="modal-generate-button"
+                  >
+                    Generate
+                  </Button>
+                </Tooltip>
+              </div>
+            </div>
+          }
         >
           {/* Error Messages */}
           {errorMessage && (
