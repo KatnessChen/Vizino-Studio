@@ -291,7 +291,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
             null, // spaceId for project-level
             collectionName,
             reorderedIds,
-            currentAssets as any[] // Start with cast, better would be proper union type handling
+            currentAssets as Array<Asset>
         )
       );
     },

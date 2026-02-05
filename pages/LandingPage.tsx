@@ -28,7 +28,7 @@ import AssetRenameModal from '@/components/modal/AssetRenameModal';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelectionHandler } from '@/hooks/useSelectionHandler';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
-import { ImageData, ImageOperation, Texture, Item, Color, Asset } from '@/types';
+import { ImageData, Texture, Item, Color, Asset } from '@/types';
 import {
   createImage,
   deleteImages,
@@ -42,8 +42,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
-import { formatImageOperationData, downloadFile, buildDownloadFilename } from '@/utils';
-import { extractImageDimensions } from '@/utils/imageUtils';
+import { downloadFile, buildDownloadFilename } from '@/utils';
 import { generateRoute } from '@/constants/routes';
 import { checkImageLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
@@ -76,7 +75,6 @@ import {
   selectSelectedTaskNames,
   selectSelectedAssets,
   selectSourceImage,
-  setSourceImage,
   setSelectedAssets,
   selectIsGenerateModalOpen,
   setIsGenerateModalOpen,
@@ -162,10 +160,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   const isGenerateModalOpen = useSelector(selectIsGenerateModalOpen);
 
-  const [generatedImage, setGeneratedImage] = useState<{ base64: string; mimeType: string } | null>(
-    null
-  );
-
   // Asset states
   const {
     customAssets: textures,
@@ -214,17 +208,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const [customPromptAssetType, setCustomPromptAssetType] = useState<CustomPromptAssetType>(
     ASSET_TYPES[0] as CustomPromptAssetType
   );
-
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-
-  // State for processing context (to track source image and custom prompt)
-  const [processingContext, setProcessingContext] = useState<{
-    selectedImage: ImageData | null;
-    customPrompt: string | undefined;
-  }>({
-    selectedImage: null,
-    customPrompt: undefined,
-  });
 
   const hasSeenGreeting = useSelector(selectHasSeenGreeting);
   const [isGreetingModalOpen, setIsGreetingModalOpen] = useState(false);
@@ -1220,87 +1203,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     return null;
   }, [activeProjectId, activeSpaceId, projects.length, isGuestMode]);
 
-  const selectedOriginalImageId = Array.from(selectedOriginalImageIds)[0] || null;
-  const selectedOriginalImage =
-    originalImages.find((img) => img.id === selectedOriginalImageId) || null;
-
-  // Derive "effective" original image for Confirmation Modal
-  // If we have a real image, use it.
-  // If generating from Asset (Color/Texture/Item) via Custom Prompt, create a mock ImageData.
-  const effectiveOriginalImage = useMemo(() => {
-    if (selectedOriginalImage) return selectedOriginalImage;
-
-    // Only applicable if Custom Prompt task and an asset is selected
-    if (selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-      if (selectedColor) {
-        // Create SVG data URI for the color
-        const encodedHex = encodeURIComponent(selectedColor.hex);
-        const svgDataUri = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' fill='${encodedHex}' /%3E%3C/svg%3E`;
-
-        return {
-          id: selectedColor.id,
-          name: selectedColor.name, // Use color name as base
-          mimeType: 'image/svg+xml',
-          imageDownloadUrl: svgDataUri,
-          spaceId: activeSpaceId || '',
-          storageFilePath: '',
-          isDeleted: false,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          deletedAt: null,
-          evolutionChain: [], // Or selectedColor.evolutionChain if we implement strict mode
-          order: 0,
-          description: '',
-          parentImageId: null,
-          assetType: ASSET_IMAGE,
-        } as ImageData;
-      } else if (selectedTexture) {
-        return {
-          id: selectedTexture.id,
-          name: selectedTexture.name,
-          mimeType: selectedTexture.mimeType || 'image/png',
-          imageDownloadUrl: selectedTexture.textureImageDownloadUrl,
-          spaceId: activeSpaceId || '',
-          storageFilePath: '',
-          isDeleted: false,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          deletedAt: null,
-          evolutionChain: [],
-          order: 0,
-          description: '',
-          parentImageId: null,
-          assetType: ASSET_IMAGE,
-        } as ImageData;
-      } else if (selectedItem) {
-        return {
-          id: selectedItem.id,
-          name: selectedItem.name,
-          mimeType: selectedItem.mimeType || 'image/png',
-          imageDownloadUrl: selectedItem.itemImageDownloadUrl,
-          spaceId: activeSpaceId || '',
-          storageFilePath: '',
-          isDeleted: false,
-          deletedAt: null,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          evolutionChain: [],
-          order: 0,
-          description: '',
-          parentImageId: null,
-          assetType: ASSET_IMAGE,
-        } as ImageData;
-      }
-    }
-    return null;
-  }, [
-    selectedOriginalImage,
-    selectedTaskNames,
-    selectedColor,
-    selectedTexture,
-    selectedItem,
-    activeSpaceId,
-  ]);
 
   return (
     <div className="flex bg-gray-50">

@@ -116,23 +116,23 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
     return;
   }
 
-  let cachedCount = 0;
-  let skippedCount = 0;
+  // Track cache progress for monitoring (variables commented out as they are managed internally)
+  // let cacheProgress = 0;
+  // let skippedProgress = 0;
 
   for (const image of images) {
     try {
       // Check if already cached before attempting to cache
       const existingCache = await imageCache.get(image.imageDownloadUrl);
       if (existingCache) {
-        skippedCount++;
+        // Skip already cached images
         continue;
       }
 
       // Fire and forget - we don't need to wait for each one sequentially
-      // But we'll track progress
       imageDownloadUrlToBase64(image.imageDownloadUrl)
         .then(() => {
-          cachedCount++;
+          // Cache completed
         })
         .catch((error) => {
           console.warn(`[Cache] Failed to cache image ${image.id}:`, error);

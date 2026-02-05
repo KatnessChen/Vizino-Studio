@@ -6,7 +6,6 @@ import {
   FAST_TEXT_MODEL,
   FAST_IMAGE_MODEL,
   PRO_IMAGE_MODEL,
-  DEFAULT_THINKING_MODEL,
   getGeminiClient,
 } from './geminiConfig';
 import {
@@ -426,7 +425,7 @@ export const generateOptimizedPrompt = async (
       signal,
     };
 
-    const result = await ai.models.generateContent(generateParams as any);
+    const result = await ai.models.generateContent(generateParams as unknown as Parameters<typeof ai.models.generateContent>[0]);
 
     let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
@@ -658,7 +657,7 @@ export const generateNameSuggestion = async (
           parts: [{ text: prompt }],
         },
       ],
-    } as any);
+    } as unknown as Parameters<typeof ai.models.generateContent>[0]);
 
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
     return text?.trim();
@@ -973,139 +972,6 @@ export const processColorAdjustment = async (
 };
 
 /**
- * Use a Thinking model to analyze the image and optimize the prompt before generation.
- * This simulates the "Thinking Mode" workflow.
+ * Extended thinking mode optimization is currently unused.
+ * TODO: Integrate with image generation workflow for better prompt quality if needed.
  */
-const optimizePromptWithThinking = async (
-  originalPrompt: string,
-  imageBase64: string,
-  imageMimeType: string,
-  task: GeminiTask
-): Promise<string> => {
-  try {
-    const ai = getGeminiClient();
-
-    // Structured thinking prompt based on prompt engineering best practices
-    // For REMOVE_CLUTTER task: focus on creating a clean, show-home aesthetic
-    const thinkingPrompt = `<role>
-      You are an expert interior designer and prompt engineer specializing in photorealistic interior design transformation for image generation.
-      </role>
-
-      <context>
-      CURRENT TASK: ${task.label_name}
-      TARGET OUTPUT: Generate an optimized, detailed prompt that instructs an image generation AI to create a cleaner, more organized version of the interior space while strictly following the user instructions.
-      </context>
-
-      <analysis_requirements>
-      Analyze the provided interior photo and user instructions:
-
-      1. FIXED ELEMENTS (must preserve 100%):
-        - Architectural structure (walls, floors, ceilings, doors, windows, trim, molding)
-        - Main furniture pieces (sofas, beds, tables, chairs)
-        - Built-in fixtures (shelves, cabinets, fixtures permanently attached)
-        - Lighting fixtures and light sources
-
-      2. CLUTTER TARGETS (identify but frame positively):
-        - Small personal items on surfaces (books, decorations, toys, papers)
-        - Loose items on floors, tables, counters
-        - Visible disorder or disorganization
-        - Unnecessary items that reduce visual cleanliness
-
-      3. VISUAL PROPERTIES TO MAINTAIN:
-        - Camera angle, perspective, framing (exactly the same viewpoint)
-        - Lighting direction, intensity, color temperature
-        - Material textures (fabric, wood, stone, paint finishes)
-        - Room proportions and spatial relationships
-        - Shadow patterns and depth
-
-      4. DESIRED OUTCOME STATE:
-        - Spacious, organized appearance
-        - Pristine, professional show-home quality
-        - All surfaces clean and organized
-        - Minimal visual distractions
-      </analysis_requirements>
-
-      <prompt_generation>
-      Create ONE coherent, detailed prompt with these characteristics:
-
-      STRUCTURE YOUR PROMPT AROUND PRESERVATION (what to keep):
-      - Start with: "Generate this room BUT organized/clean"
-      - Explicitly list architectural and furniture elements to preserve
-      - Describe the desired clean aesthetic
-
-      BE SPECIFIC ABOUT REPLACEMENTS (not removals):
-      - Instead of "remove clutter", say "make surfaces clear and organized"
-      - Instead of "delete items", say "create an organized, minimalist arrangement"
-      - Describe what empty/organized surfaces should look like
-      - Fill empty spaces with organized arrangements if needed
-
-      OPERATIONAL SPECIFICS:
-      - Specify which surfaces should be cleared (counters, tables, floors)
-      - Indicate that storage should look organized but closed
-      - Request that any visible items be arranged neatly and purposefully
-      - Ensure spacing between objects for visual clarity
-
-      QUALITY ANCHORS:
-      - Maintain photorealistic quality with consistent lighting
-      - Ensure shadows and depth stay natural and logical
-      - Keep color palette and ambient tone consistent
-      - Verify proportions and scaling remain accurate
-      </prompt_generation>
-
-      <output_constraint>
-      Output ONLY the optimized prompt text.
-      - No preamble or explanation
-      - No markdown formatting (no \`, #, **, etc.)
-      - Single, coherent paragraph or well-structured instruction block
-      - Approximately 150-250 words for clarity and specificity
-      </output_constraint>
-    `;
-
-    const generateParams = {
-      model: DEFAULT_THINKING_MODEL,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: imageBase64,
-              mimeType: imageMimeType,
-            },
-          },
-          { text: thinkingPrompt },
-        ],
-      },
-      config: {
-        responseModalities: [Modality.TEXT],
-        temperature: task.temperature,
-      },
-    };
-
-    const result = await ai.models.generateContent(generateParams as any);
-
-    let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (optimizedPrompt) {
-      // Clean up any markdown formatting
-      optimizedPrompt = optimizedPrompt.replace(/```(?:json|text|markdown)?\n?|\n?```/g, '');
-
-      // Remove common prefixes
-      optimizedPrompt = optimizedPrompt.replace(
-        /^(Here is|Here's|Here are|The optimized|Optimized|Prompt:)\s*/i,
-        ''
-      );
-
-      // Remove surrounding quotes if present
-      optimizedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
-
-      optimizedPrompt = optimizedPrompt.trim();
-      console.log('[Gemini] Extended Thinking Mode Optimized Prompt:', optimizedPrompt);
-      return optimizedPrompt;
-    }
-
-    return originalPrompt;
-  } catch (error) {
-    console.warn('[Gemini] Extended Thinking Mode failed, falling back to original prompt:', error);
-    // Fall back to original prompt on error
-    return originalPrompt;
-  }
-};

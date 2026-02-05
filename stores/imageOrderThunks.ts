@@ -141,9 +141,7 @@ export const reorderAssetsWithDebounce =
       });
 
       // Preserve any assets that weren't in reorderedIds (append them)
-      const missingAssets = (allAssets as Texture[])
-        .filter(a => !assetMap.has(a.id) || !reorderedIds.includes(a.id)); 
-      
+      // Filter to check for any missing assets (if needed for future validation)
       // Simplified missing check:
       const processedIds = new Set(newSortedAssets.map(a => a.id));
       const remainingAssets = (allAssets as Texture[]).filter(a => !processedIds.has(a.id));

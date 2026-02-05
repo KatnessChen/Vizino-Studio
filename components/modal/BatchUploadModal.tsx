@@ -7,9 +7,6 @@ import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
   ASSET_TEXTURE,
-  ASSET_IMAGE,
-  ASSET_COLOR,
-  ASSET_ITEM,
 } from '@/constants/constants';
 
 interface FilePreview {
