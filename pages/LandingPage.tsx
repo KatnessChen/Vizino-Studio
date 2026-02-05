@@ -12,7 +12,6 @@ import {
   ASSET_ITEM,
   CustomPromptAssetType,
 } from '@/constants/constants';
-import ConfirmImageUpdateModal from '@/components/modal/ConfirmImageUpdateModal';
 import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
 import EmptyState from '@/components/EmptyState';
@@ -44,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
 import { formatImageOperationData, downloadFile, buildDownloadFilename } from '@/utils';
+import { extractImageDimensions } from '@/utils/imageUtils';
 import { generateRoute } from '@/constants/routes';
 import { checkImageLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
@@ -130,9 +130,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   // For guests, show guest generated images; for users, show space updated images
   const updatedImages = useMemo(() => {
-    const imgs = isGuestMode 
-      ? guestImages.filter((img) => img.parentImageId)
-      : storeUpdatedImages;
+    const imgs = isGuestMode ? guestImages.filter((img) => img.parentImageId) : storeUpdatedImages;
     // Ensure sorted by order ascending
     return [...imgs].sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [isGuestMode, guestImages, storeUpdatedImages]);
@@ -673,138 +671,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     },
     [handleRenameImage]
   );
-
-  const handleImageSatisfied = useCallback(
-    async (processedImageResult: { base64: string; mimeType: string }, customFileName: string) => {
-      dispatch(setSourceImage(null));
-
-      if (!user) {
-        setErrorMessage('Please log in to save images.');
-        return;
-      }
-
-      if (!processingContext.selectedImage) {
-        setErrorMessage('Processing context lost. Please try again.');
-        return;
-      }
-
-      if (!activeProjectId || !activeSpaceId) {
-        setErrorMessage('No project and space selected. Please try again.');
-        return;
-      }
-
-      const tempImageId = crypto.randomUUID();
-      const now = Timestamp.fromDate(new Date());
-
-      // Use custom name from modal
-      const imageName = customFileName;
-
-      // Create ImageOperation for evolution chain using utility function
-      const operation: ImageOperation = formatImageOperationData(
-        processingContext.selectedImage,
-        selectedTaskNames[0] || GEMINI_TASKS.RECOLOR_WALL.task_name,
-        processingContext.customPrompt,
-        selectedColor,
-        selectedTexture,
-        selectedItem
-      );
-
-      // Calculate optimistic order value (max current order + 1) for generated images
-      const currentMaxOrder = Math.max(0, ...updatedImages.map((img) => img.order ?? 0));
-      const optimisticOrder = currentMaxOrder + 1;
-
-      // Optimistic update - show processed image immediately
-      const optimisticImage = {
-        id: tempImageId,
-        name: imageName,
-        assetType: ASSET_IMAGE,
-        mimeType: processedImageResult.mimeType,
-        spaceId: activeSpaceId,
-        evolutionChain: [operation],
-        parentImageId: processingContext.selectedImage.id,
-        imageDownloadUrl: `data:${processedImageResult.mimeType};base64,${processedImageResult.base64}`,
-        storageFilePath: '',
-        order: optimisticOrder,
-        isDeleted: false,
-        deletedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      dispatch(
-        addImageOptimistic({
-          projectId: activeProjectId!,
-          spaceId: activeSpaceId!,
-          image: optimisticImage,
-        })
-      );
-
-      setShowConfirmationModal(false);
-      setGeneratedImage(null);
-      setProcessingContext({ selectedImage: null, customPrompt: undefined });
-
-      try {
-        // Save processed image to Firestore
-        await createImage(
-          user.uid,
-          activeProjectId,
-          activeSpaceId,
-          null,
-          {
-            id: tempImageId,
-            name: imageName,
-            mimeType: processedImageResult.mimeType,
-          },
-          {
-            base64: processedImageResult.base64,
-            base64MimeType: processedImageResult.mimeType,
-            parentImage: processingContext.selectedImage,
-            operation,
-          }
-        );
-
-        // Fetch updated space images to get real Firebase Storage URL
-        dispatch(setIsFetchingSpaceImages(true));
-        try {
-          const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
-          dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
-        } finally {
-          dispatch(setIsFetchingSpaceImages(false));
-        }
-      } catch (error) {
-        console.error('Failed to save processed image:', error);
-
-        // Rollback on error
-        dispatch(
-          removeImageOptimistic({
-            projectId: activeProjectId!,
-            spaceId: activeSpaceId!,
-            imageId: tempImageId,
-          })
-        );
-
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to save processed image.');
-      }
-    },
-    [
-      user,
-      selectedColor,
-      selectedTexture,
-      selectedItem,
-      updatedImages,
-      selectedTaskNames,
-      processingContext,
-      activeProjectId,
-      activeSpaceId,
-      dispatch,
-      setErrorMessage,
-    ]
-  );
-
-  const handleCancelRecolor = useCallback(() => {
-    setShowConfirmationModal(false);
-    setGeneratedImage(null);
-  }, []);
 
   const handleGenerateMoreSuccess = useCallback(async () => {
     if (!user || !activeProjectId || !activeSpaceId) return;
@@ -1883,18 +1749,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         </div>
         <Footer />
       </main>
-
-      {showConfirmationModal && effectiveOriginalImage && (
-        <ConfirmImageUpdateModal
-          isOpen={showConfirmationModal}
-          originalImage={effectiveOriginalImage}
-          generatedImage={generatedImage}
-          onConfirm={handleImageSatisfied}
-          onCancel={handleCancelRecolor}
-          colorName={selectedColor?.name || 'N/A'}
-          taskName={selectedTaskNames[0] || GEMINI_TASKS.RECOLOR_WALL.task_name}
-        />
-      )}
 
       {/* Generic Delete Confirmation Modal */}
       {showDeleteConfirmModal && deleteConfirmConfig && (

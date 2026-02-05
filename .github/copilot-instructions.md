@@ -173,6 +173,6 @@ Users can upload custom versions. These are stored in Firestore and pulled into 
 3. Update imports in dependent files or provide migration path
 4. Delete deprecated files in the same commit as the new feature
 5. Update this `copilot-instructions.md` and `IMAGE_REORDERING_FEATURE.md` to document deprecated files
-6. If migration required for existing data, create migration scripts in `utils/migrationScripts.ts` (for manual/admin use only)
+6. If migration is required for existing data, create migration scripts as needed (for manual/admin use only).
 7. When deprecating or replacing a UI library (for example, migrating from Material-UI to Ant Design), identify all files that rely on the deprecated library, migrate them in the same change where practical, and remove the library dependency in the same commit as the replacement. Document the migration plan in the PR description and add migration steps or helper utilities if needed.
 8. Do NOT expose migration UI in user-facing components; migrations should be manual/documented processes
