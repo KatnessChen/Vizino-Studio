@@ -66,6 +66,7 @@ export const MAX_FILE_SIZE_MB = 10;
 
 export const MAX_CUSTOM_ASSET_NAME_LENGTH = 50;
 export const MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH = 100;
+export const MAX_CUSTOM_PROMPT_LENGTH = 1000;
 
 // ============================================================================
 // User Limitation Constants
@@ -80,8 +81,6 @@ export const ASSET_IMAGE = 'image' as const;
 export const ASSET_COLOR = 'color' as const;
 export const ASSET_TEXTURE = 'texture' as const;
 export const ASSET_ITEM = 'item' as const;
-// Backwards-compatible alias (avoid using this; prefer ASSET_ITEM)
-export const ASSET_OBJECT = ASSET_ITEM;
 
 // Asset types used in Custom Prompt asset picker
 export const ASSET_TYPES = [ASSET_IMAGE, ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM] as const;

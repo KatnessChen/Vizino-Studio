@@ -1,9 +1,15 @@
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Skeleton } from 'antd';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Skeleton, Tabs } from 'antd';
 import { message } from '@/utils/antd';
 
-import { BulbOutlined, CloseOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import {
+  BulbOutlined,
+  CloseOutlined,
+  InfoCircleOutlined,
+  EditOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons';
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
@@ -18,7 +24,14 @@ import {
   getAddObjectDefaultPrompt,
   getUseCustomPromptDefaultPrompt,
 } from '@/services/gemini/prompts';
-import { GEMINI_TASKS, isCustomPromptRequired } from '@/services/gemini/geminiTasks';
+import {
+  GEMINI_TASKS,
+  isCustomPromptRequired,
+  getTask,
+  isMagicPromptTask,
+  hasDefaultPrompt,
+} from '@/services/gemini/geminiTasks';
+import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
 import { formatImageOperationData, base64ToFile } from '@/utils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
@@ -34,6 +47,7 @@ import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';
 import {
   selectSelectedAssets,
   selectSelectedTaskNames,
+  setSelectedTaskNames,
   setCustomPrompt as setReduxCustomPrompt,
   setSourceImage,
 } from '@/stores/taskStore';
@@ -41,7 +55,7 @@ import { useCustomPrompts } from '@/hooks/useCustomPrompts';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
 import SelectedAssets from '@/components/SelectedAssets';
-import { MAX_OPERATIONS_PER_IMAGE } from '@/constants/constants';
+import { MAX_OPERATIONS_PER_IMAGE, MAX_CUSTOM_PROMPT_LENGTH } from '@/constants/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { guestIndexedDB } from '@/utils/guestIndexedDB';
@@ -110,6 +124,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const [isSavingImage, setIsSavingImage] = useState(false);
     const [isDefaultPromptExpanded, setIsDefaultPromptExpanded] = useState(false);
     const [searchPrompts, setSearchPrompts] = useState<string>('');
+
+    const [activePromptTab, setActivePromptTab] = useState<'magic' | 'saved'>('saved');
+    const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
 
     const { Text } = Typography;
 
@@ -185,6 +202,17 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       }
     }, [isOpen, userId, activeProjectId, fetchPrompts]);
 
+    // Magic Prompts list
+    const magicPromptsList = useMemo(
+      () => [
+        {
+          taskName: GEMINI_TASKS.REMOVE_CLUTTER.task_name,
+          label: GEMINI_TASKS.REMOVE_CLUTTER.label_name,
+        },
+      ],
+      []
+    );
+
     // Filter prompts based on search keyword using %match% logic
     const filteredPrompts = useMemo(() => {
       if (!searchPrompts.trim()) {
@@ -204,6 +232,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       if (selectedTaskNames.length === 0) return null;
       return selectedTaskNames[0];
     }, [selectedTaskNames]);
+
+    const activeTask = useMemo(() => getTask(activeTaskName), [activeTaskName]);
+    const isMagicTask = useMemo(() => isMagicPromptTask(activeTaskName), [activeTaskName]);
 
     // Check operation limit
     const operationLimitCheck = checkOperationLimit(sourceImage, adminSettings.mock_limit_reached);
@@ -321,9 +352,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       }
 
       // Check custom prompt character limit
-      if (customPrompt.length > 500) {
+      if (customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
         setErrorMessage(
-          'Custom prompt exceeds the 500 character limit. Please reduce the prompt length.'
+          `Custom prompt exceeds the ${MAX_CUSTOM_PROMPT_LENGTH} character limit. Please reduce the prompt length.`
         );
         return;
       }
@@ -451,10 +482,144 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       (e: React.MouseEvent, customPrompt: string) => {
         e.stopPropagation();
         setCustomPrompt(customPrompt);
+        dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
         message.success('Prompt applied!');
       },
-      []
+      [dispatch]
     );
+
+    const handlePickMagicPrompt = useCallback(
+      (e: React.MouseEvent, taskName: string, taskLabel: string) => {
+        e.stopPropagation();
+        const task = getTask(taskName);
+
+        // Reset task-related state before switching
+        setGeneratedImage(null);
+        setErrorMessage(null);
+        setValidationError(null);
+
+        dispatch(
+          setSelectedTaskNames([
+            taskName as (typeof GEMINI_TASKS)[keyof typeof GEMINI_TASKS]['task_name'],
+          ])
+        );
+
+        // Apply default prompt to the custom prompt input
+        if (hasDefaultPrompt(task)) {
+          setCustomPrompt(task.defaultPrompt);
+        } else {
+          setCustomPrompt('');
+        }
+
+        message.success(`${taskLabel} selected!`);
+      },
+      [dispatch, setErrorMessage]
+    );
+
+    /**
+     * Handle 'Help me write' button click
+     * Calls generateOptimizedPrompt to get an AI-optimized version of the user's prompt
+     */
+    const handleHelpMeWrite = useCallback(async () => {
+      // Validate: require user to start writing first
+      if (!customPrompt.trim()) {
+        message.warning('Start writing your prompt first!');
+        return;
+      }
+
+      // Require a source image (not color assets)
+      const effectiveSource = sourceImage || sourceAsset;
+      if (!effectiveSource || effectiveSource.assetType === ASSET_COLOR) {
+        message.warning('Please select an image first.');
+        return;
+      }
+
+      // Get the current task or default to CUSTOM_PROMPT
+      const task = activeTask || getTask(GEMINI_TASKS.CUSTOM_PROMPT.task_name);
+      if (!task) {
+        message.error('Invalid task configuration.');
+        return;
+      }
+
+      setIsOptimizingPrompt(true);
+
+      try {
+        // Get base64 image data
+        let imageBase64: string;
+        let imageMimeType: string;
+
+        if (effectiveSource.assetType === ASSET_TEXTURE) {
+          const texture = effectiveSource as Texture;
+          const response = await fetch(texture.textureImageDownloadUrl);
+          const blob = await response.blob();
+          imageBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] || '');
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          imageMimeType = texture.mimeType || 'image/jpeg';
+        } else if (effectiveSource.assetType === ASSET_ITEM) {
+          const item = effectiveSource as Item;
+          const response = await fetch(item.itemImageDownloadUrl);
+          const blob = await response.blob();
+          imageBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] || '');
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          imageMimeType = item.mimeType || 'image/jpeg';
+        } else {
+          // It's ImageData
+          const imgData = effectiveSource as ImageData;
+          const url = imgData.imageDownloadUrl || '';
+          if (url.startsWith('data:')) {
+            // Already base64
+            const parts = url.split(',');
+            imageBase64 = parts[1] || '';
+            imageMimeType = imgData.mimeType;
+          } else {
+            // Fetch from URL
+            const response = await fetch(url);
+            const blob = await response.blob();
+            imageBase64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1] || '');
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            imageMimeType = imgData.mimeType;
+          }
+        }
+
+        // Call the backend to generate optimized prompt
+        const optimizedPrompt = await generateOptimizedPrompt(
+          task,
+          customPrompt.trim(),
+          imageBase64,
+          imageMimeType
+        );
+
+        // Set the optimized prompt in the textarea
+        setCustomPrompt(optimizedPrompt);
+        message.success('Prompt optimized!');
+      } catch (error) {
+        console.error('[GenerateMoreModal] Help me write failed:', error);
+        message.error('Failed to optimize prompt. Please try again.');
+      } finally {
+        setIsOptimizingPrompt(false);
+      }
+    }, [customPrompt, sourceImage, sourceAsset, activeTask]);
 
     const handleClose = () => {
       // If processing, cancel the request and keep modal open while preserving form state
@@ -963,7 +1128,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           maskClosable={!isSavingImage && !isProcessingImage}
           keyboard={!isSavingImage && !isProcessingImage}
           footer={[
-            <Button key="cancel" onClick={handleClose} disabled={isSavingImage}>
+            <Button
+              key="cancel"
+              onClick={handleClose}
+              disabled={isSavingImage || isOptimizingPrompt}
+            >
               Cancel
             </Button>,
             <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
@@ -971,7 +1140,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 key="generate"
                 type="primary"
                 onClick={handleGenerate}
-                disabled={isGenerateDisabled}
+                disabled={isGenerateDisabled || isOptimizingPrompt}
                 data-tour="modal-generate-button"
               >
                 Generate
@@ -1019,7 +1188,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               </div>
 
               {/* Design Material */}
-              {selectedTaskNames[0] !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && (
+              {activeTaskName !== GEMINI_TASKS.CUSTOM_PROMPT.task_name && !isMagicTask && (
                 <SelectedAssets
                   title="Design Material"
                   customCardHeight={240}
@@ -1035,95 +1204,191 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 <Typography.Title level={5} className="mb-2">
                   Custom Prompt
                 </Typography.Title>
+
                 <div className="flex gap-0 flex-1 min-h-0 border border-gray-200 rounded-md overflow-hidden h-[420px] relative">
                   {/* Left: Historical Custom Prompts List */}
                   <div className="flex-1 flex flex-col min-w-0">
-                    <Typography.Title
-                      level={5}
-                      className="m-0 mb-1 px-3 pt-3 flex items-center gap-1.5"
-                    >
-                      Saved Prompts
-                      <InfoIconWithTooltip title="Used custom prompts from previous image operations in this project" />
-                    </Typography.Title>
-
-                    {/* Search Input */}
-                    <div className="mt-2 mb-2 px-3">
-                      <Input
-                        placeholder="Filter prompts..."
-                        value={searchPrompts}
-                        onChange={(e) => setSearchPrompts(e.target.value)}
-                        allowClear
-                        className="w-full rounded-none border-l-0 border-r-0 border-t-0"
+                    {(activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name ||
+                      activeTaskName === GEMINI_TASKS.REMOVE_CLUTTER.task_name) &&
+                    (sourceImage || sourceAsset?.assetType === ASSET_IMAGE) ? (
+                      <Tabs
+                        activeKey={activePromptTab}
+                        onChange={(key) => setActivePromptTab(key as 'magic' | 'saved')}
+                        style={{ padding: '0 12px' }}
+                        items={[
+                          {
+                            key: 'magic',
+                            label: (
+                              <Tooltip title="Use system optimized prompts for common tasks">
+                                <span className="text-[0.80rem] font-semibold flex items-center">
+                                  Magic Prompts
+                                  <span className="ml-1.5 inline-flex">
+                                    <InfoCircleOutlined />
+                                  </span>
+                                </span>
+                              </Tooltip>
+                            ),
+                          },
+                          {
+                            key: 'saved',
+                            label: (
+                              <Tooltip title="Used custom prompts from previous image operations in this project">
+                                <span className="text-[0.80rem] font-semibold flex items-center">
+                                  Saved Prompts
+                                  <span className="ml-1.5 inline-flex">
+                                    <InfoCircleOutlined />
+                                  </span>
+                                </span>
+                              </Tooltip>
+                            ),
+                          },
+                        ]}
                       />
-                    </div>
+                    ) : (
+                      <div className="m-0 mb-1 px-3 pt-3 flex items-center gap-1.5 text-[0.85rem] font-semibold text-gray-800">
+                        Saved Prompts
+                        <InfoIconWithTooltip title="Used custom prompts from previous image operations in this project" />
+                      </div>
+                    )}
 
-                    {/* Prompts List */}
-                    <div className="overflow-auto flex-1">
-                      {isLoadingPrompts ? (
-                        <div className="p-2">
-                          <Skeleton active paragraph={{ rows: 2 }} />
-                          <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
-                          <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
+                    {/* Saved Prompts Search + List (or Magic Prompts List) */}
+                    {activePromptTab === 'saved' ? (
+                      <>
+                        {/* Search Input - Only for Saved Prompts */}
+                        <div className="mt-2 mb-2 px-3">
+                          <Input
+                            placeholder="Filter prompts..."
+                            value={searchPrompts}
+                            onChange={(e) => setSearchPrompts(e.target.value)}
+                            allowClear
+                            className="w-full rounded-none border-l-0 border-r-0 border-t-0"
+                          />
                         </div>
-                      ) : filteredPrompts.length === 0 ? (
-                        <div className="p-4 flex items-center justify-center h-full">
-                          <MyEmpty description="No historical prompts found." />
-                        </div>
-                      ) : (
-                        <List
-                          sx={{
-                            width: '100%',
-                            bgcolor: 'background.paper',
-                            paddingBottom: 0,
-                            height: '334px', // hardcoded height to make both columns same height
-                          }}
-                        >
-                          {filteredPrompts.map((prompt: CustomPrompt, index) => (
-                            <ListItem
-                              key={prompt.id || index}
+
+                        {/* Saved Prompts List */}
+                        <div className="overflow-auto flex-1">
+                          {isLoadingPrompts ? (
+                            <div className="p-2">
+                              <Skeleton active paragraph={{ rows: 2 }} />
+                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
+                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
+                            </div>
+                          ) : filteredPrompts.length === 0 ? (
+                            <div className="p-4 flex items-center justify-center h-full">
+                              <MyEmpty description="No historical prompts found." />
+                            </div>
+                          ) : (
+                            <List
                               sx={{
-                                padding: '8px 12px',
-                                borderBottom: '1px solid #f0f0f0',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.2s',
-                                '&:hover': {
-                                  backgroundColor: '#f5f5f5',
-                                },
+                                width: '100%',
+                                bgcolor: 'background.paper',
+                                paddingBottom: 0,
+                                height: '334px', // hardcoded height to make both columns same height
                               }}
-                              onClick={(e) => handlePickHistoricalCustomPrompt(e, prompt.content)}
                             >
-                              <Box
-                                sx={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                  gap: 1,
-                                }}
-                              >
-                                <Text>{prompt.content}</Text>
-                                <MuiTooltip title="Use this prompt">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) =>
-                                      handlePickHistoricalCustomPrompt(e, prompt.content)
-                                    }
-                                    sx={{ flexShrink: 0 }}
+                              {filteredPrompts.map((prompt: CustomPrompt, index) => (
+                                <ListItem
+                                  key={prompt.id || index}
+                                  sx={{
+                                    padding: '8px 12px',
+                                    borderBottom: '1px solid #f0f0f0',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s',
+                                    '&:hover': {
+                                      backgroundColor: '#f5f5f5',
+                                    },
+                                  }}
+                                  onClick={(e) =>
+                                    handlePickHistoricalCustomPrompt(e, prompt.content)
+                                  }
+                                >
+                                  <Box
+                                    sx={{
+                                      width: '100%',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'flex-start',
+                                      gap: 1,
+                                    }}
                                   >
-                                    <CopyIcon sx={{ fontSize: '1rem' }} />
-                                  </IconButton>
-                                </MuiTooltip>
-                              </Box>
-                            </ListItem>
-                          ))}
-                        </List>
-                      )}
-                    </div>
+                                    <Text>{prompt.content}</Text>
+                                    <MuiTooltip title="Use this prompt">
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handlePickHistoricalCustomPrompt(e, prompt.content)
+                                        }
+                                        sx={{ flexShrink: 0 }}
+                                      >
+                                        <CopyIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    </MuiTooltip>
+                                  </Box>
+                                </ListItem>
+                              ))}
+                            </List>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Magic Prompts List */}
+                        <div className="overflow-auto flex-1">
+                          <List
+                            sx={{
+                              width: '100%',
+                              bgcolor: 'background.paper',
+                              paddingBottom: 0,
+                              height: '334px',
+                            }}
+                          >
+                            {magicPromptsList.map((item) => (
+                              <ListItem
+                                key={item.taskName}
+                                sx={{
+                                  padding: '8px 12px',
+                                  borderBottom: '1px solid #f0f0f0',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s',
+                                  '&:hover': {
+                                    backgroundColor: '#f5f5f5',
+                                  },
+                                }}
+                                onClick={(e) => handlePickMagicPrompt(e, item.taskName, item.label)}
+                              >
+                                <Box
+                                  sx={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Text>{item.label}</Text>
+                                  <MuiTooltip title="Use this magic prompt">
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) =>
+                                        handlePickMagicPrompt(e, item.taskName, item.label)
+                                      }
+                                      sx={{ flexShrink: 0 }}
+                                    >
+                                      <CopyIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </Box>
+                              </ListItem>
+                            ))}
+                          </List>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Right: Custom Prompt Textarea */}
                   <div className="flex-1 flex flex-col min-w-0 border-l border-gray-200">
-                    <Typography.Title level={5} className="m-0 mb-1 px-3 pt-3">
+                    <Typography.Title level={5} className="m-0 px-3 pt-3">
                       Input
                       <span
                         className={`${isCustomPromptRequiredForTask ? 'text-red-500' : 'text-gray-500'} text-[0.85em] ml-1`}
@@ -1133,52 +1398,88 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     </Typography.Title>
 
                     {/* Custom Prompt Input */}
-                    <div className="flex-1 flex flex-col px-3 pb-6 pt-2 min-h-0">
+                    <div className="flex-1 flex flex-col px-3 pb-6 min-h-0 relative">
                       <Input.TextArea
                         placeholder={getPromptPlaceholder()}
                         value={customPrompt}
-                        onChange={(e) => setCustomPrompt(e.target.value)}
-                        disabled={isProcessingImage}
-                        maxLength={500}
+                        onChange={(e) => {
+                          setCustomPrompt(e.target.value);
+                          if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
+                            dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
+                          }
+                        }}
+                        disabled={isProcessingImage || isOptimizingPrompt}
+                        maxLength={MAX_CUSTOM_PROMPT_LENGTH}
                         showCount
                         allowClear
                         className="flex-1 resize-none"
                         data-tour="custom-prompt-input"
+                        style={{ paddingBottom: '48px' }}
                       />
+                      {/* Help me write button */}
+                      {(sourceImage || (sourceAsset && sourceAsset.assetType !== ASSET_COLOR)) && (
+                        <div className="absolute bottom-10 right-6 z-10 flex items-center gap-2">
+                          <Tooltip title="Let AI optimize your prompt">
+                            <Button
+                              type={customPrompt.trim() ? 'primary' : 'default'}
+                              size="small"
+                              icon={
+                                isOptimizingPrompt ? <LoadingOutlined spin /> : <EditOutlined />
+                              }
+                              onClick={handleHelpMeWrite}
+                              disabled={
+                                isProcessingImage || isOptimizingPrompt || !customPrompt.trim()
+                              }
+                              className={
+                                customPrompt.trim()
+                                  ? 'shadow-md'
+                                  : 'opacity-50 bg-gray-100 border-gray-200 text-gray-400'
+                              }
+                            >
+                              {isOptimizingPrompt ? 'Optimizing...' : 'Help me write'}
+
+                              <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-sm" />
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Prompt Writing Guide */}
-              {activeTaskName && (
-                <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
-                  <div className="flex flex-col gap-0.5">
-                    {getPromptWritingGuide().tips.map((tip, index) => (
-                      <div key={index} className="text-[0.85rem] leading-none">
-                        <h6 className="m-0 leading-none">
-                          <BulbOutlined className="mr-2 text-[#1890ff]" />
-                          {tip.text}.
-                          <span>
-                            {' '}
-                            See
-                            <Button
-                              type="link"
-                              onClick={() => setIsDefaultPromptExpanded(true)}
-                              className="p-0 h-auto"
-                              style={{ padding: '0 6px' }}
-                            >
-                              default prompt
-                              <InfoCircleOutlined />
-                            </Button>
-                          </span>{' '}
-                          to understand what's behind.
-                        </h6>
-                      </div>
-                    ))}
+              {/* TODO: handle tips display logic for magic prompts or custom prompts */}
+              {activeTaskName &&
+                activeTaskName !== GEMINI_TASKS.CUSTOM_PROMPT.task_name &&
+                !isMagicTask && (
+                  <div className="p-3 bg-[#e6f7ff] rounded-md border border-[#91d5ff]">
+                    <div className="flex flex-col gap-0.5">
+                      {getPromptWritingGuide().tips.map((tip, index) => (
+                        <div key={index} className="text-[0.85rem] leading-none">
+                          <h6 className="m-0 leading-none">
+                            <BulbOutlined className="mr-2 text-[#1890ff]" />
+                            {tip.text}.
+                            <span>
+                              {' '}
+                              See
+                              <Button
+                                type="link"
+                                onClick={() => setIsDefaultPromptExpanded(true)}
+                                className="p-0 h-auto"
+                                style={{ padding: '0 6px' }}
+                              >
+                                default prompt
+                                <InfoCircleOutlined />
+                              </Button>
+                            </span>{' '}
+                            to understand what's behind.
+                          </h6>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
               {hasReachedOperationLimit && (
                 <Alert
                   title={getLimitExceededMessage('operations', MAX_OPERATIONS_PER_IMAGE)}

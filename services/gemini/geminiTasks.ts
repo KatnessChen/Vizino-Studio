@@ -1,38 +1,62 @@
-/**
- * Gemini API Task Types
- * Use these constants to specify which task/prompt template to use
- */
+import { MAGIC_PROMPT } from './prompts';
+import {
+  FAST_TEXT_MODEL,
+  FAST_IMAGE_MODEL,
+  PRO_IMAGE_MODEL,
+  DEFAULT_THINKING_MODEL,
+} from './geminiConfig';
 
 export const GEMINI_TASKS = {
   RECOLOR_WALL: {
     task_name: 'recolor_wall',
     label_name: 'Recolor',
     customPromptRequired: false,
-    model_code: 'gemini-2.5-flash-image',
+    model_code: FAST_IMAGE_MODEL,
+    temperature: 1.0,
   },
   ADD_TEXTURE: {
     task_name: 'add_texture',
     label_name: 'Add Texture',
     customPromptRequired: false,
-    model_code: 'gemini-2.5-flash-image',
+    model_code: FAST_IMAGE_MODEL,
+    temperature: 1.0,
   },
   ADD_HOME_ITEM: {
     task_name: 'add_home_item',
     label_name: 'Add Object',
     customPromptRequired: false,
-    model_code: 'gemini-2.5-flash-image',
+    model_code: FAST_IMAGE_MODEL,
+    temperature: 1.0,
   },
   CUSTOM_PROMPT: {
     task_name: 'custom_prompt',
     label_name: 'Prompt Only',
     customPromptRequired: true,
-    model_code: 'gemini-2.5-flash-image',
+    model_code: FAST_IMAGE_MODEL,
+    temperature: 1.0,
   },
   COLOR_ADJUSTMENT: {
     task_name: 'color_adjustment',
     label_name: 'Color Adjustment',
     customPromptRequired: true,
-    model_code: 'gemini-2.5-flash-lite',
+    model_code: FAST_TEXT_MODEL,
+    temperature: 1.0,
+  },
+  REMOVE_CLUTTER: {
+    task_name: 'remove_clutter',
+    label_name: 'Remove Clutter',
+    customPromptRequired: false,
+    model_code: PRO_IMAGE_MODEL, // Use Pro model for better instruction following and fidelity
+    useThinkingMode: true,
+    temperature: 0.4,
+    defaultPrompt: MAGIC_PROMPT.REMOVE_CLUTTER,
+  },
+  OPTIMIZE_PROMPT: {
+    task_name: 'optimize_prompt',
+    label_name: 'Optimize Prompt',
+    customPromptRequired: true,
+    model_code: DEFAULT_THINKING_MODEL,
+    temperature: 0.4,
   },
 } as const;
 
@@ -66,6 +90,26 @@ export const isCustomPromptRequired = (taskName: string | null): boolean => {
   return getTask(taskName)?.customPromptRequired ?? false;
 };
 
+/**
+ * Check if a task is a Magic Prompt task
+ * Magic Prompt tasks are identified by having useThinkingMode enabled
+ * @param taskName - The task_name to check
+ * @returns true if this is a Magic Prompt task, false otherwise
+ */
+export const isMagicPromptTask = (taskName: string | null): boolean => {
+  const task = getTask(taskName);
+  return task ? 'useThinkingMode' in task && task.useThinkingMode === true : false;
+};
+/**
+ * Type guard to check if a task has a defaultPrompt property
+ * @param task - The task to check
+ * @returns true if the task has a defaultPrompt, false otherwise
+ */
+export const hasDefaultPrompt = (
+  task: GeminiTask | undefined
+): task is GeminiTask & { defaultPrompt: string } => {
+  return task !== undefined && 'defaultPrompt' in task && typeof task.defaultPrompt === 'string';
+};
 /**
  * @deprecated Use getTask() instead for better performance
  * Helper function to find a task entry by task_name

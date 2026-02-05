@@ -7,7 +7,13 @@ import {
   generateItemPlacedImage,
   generateCustomPromptImage,
 } from '@/services/gemini/geminiService';
-import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
+import {
+  GEMINI_TASKS,
+  GeminiTaskName,
+  isMagicPromptTask,
+  getTask,
+  hasDefaultPrompt,
+} from '@/services/gemini/geminiTasks';
 import { incrementTaskUsage } from '@/services/userService';
 
 interface Texture {
@@ -133,14 +139,31 @@ export const useImageProcessing = ({
             customPrompt,
             signal
           );
-        } else if (selectedTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-          if (!customPrompt || customPrompt.trim() === '') {
+        } else if (
+          selectedTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name ||
+          isMagicPromptTask(selectedTaskName)
+        ) {
+          // For custom prompt and magic prompt tasks, no validation needed if task provides default prompt
+          const task = getTask(selectedTaskName);
+          const taskHasDefaultPrompt = hasDefaultPrompt(task);
+
+          if (!taskHasDefaultPrompt && (!customPrompt || customPrompt.trim() === '')) {
             setErrorMessage('Please enter a custom prompt first.');
             setIsProcessingImage(false);
             return null;
           }
+
+          // Use custom prompt if provided, otherwise use default prompt from task
+          const effectivePrompt = customPrompt || (taskHasDefaultPrompt ? task.defaultPrompt : '');
+
           // source can be ImageData, Color, Texture, or Item. Service handles logic.
-          result = await generateCustomPromptImage(effectiveUserId, source, customPrompt, signal);
+          result = await generateCustomPromptImage(
+            effectiveUserId,
+            source,
+            effectivePrompt,
+            signal,
+            task
+          );
         } else {
           throw new Error('Unknown task type');
         }

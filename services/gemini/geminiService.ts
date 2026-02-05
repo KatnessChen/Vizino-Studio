@@ -1,47 +1,287 @@
-import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
+import { Modality, GenerateContentResponse } from '@google/genai';
 import { ImageData, Color, Texture, Item } from '@/types';
 import { getPromptByTask, getNameSuggestionPrompt } from './prompts';
 import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
-import { ASSET_TEXTURE, ASSET_ITEM, ASSET_COLOR } from '@/constants/constants';
+import {
+  FAST_TEXT_MODEL,
+  FAST_IMAGE_MODEL,
+  DEFAULT_THINKING_MODEL,
+  getGeminiClient,
+} from './geminiConfig';
+import {
+  ASSET_TEXTURE,
+  ASSET_ITEM,
+  ASSET_COLOR,
+  MAX_CUSTOM_PROMPT_LENGTH,
+} from '@/constants/constants';
 import { GEMINI_ERRORS } from './geminiApiErrors';
-import { ref } from 'firebase/storage';
-import { getBytes } from 'firebase/storage';
 import { storage } from '../firestoreService';
+import { fetchImageAsBase64, getBase64FromImageData } from '@/utils';
+
+/**
+ * Helper to convert numeric aspect ratio to Gemini-friendly string
+ */
+const getGeminiAspectRatio = (aspectRatio: number | null | undefined): string | undefined => {
+  if (!aspectRatio) return undefined;
+
+  const ratios = [
+    { label: '1:1', value: 1.0 },
+    { label: '4:3', value: 4 / 3 },
+    { label: '3:4', value: 3 / 4 },
+    { label: '16:9', value: 16 / 9 },
+    { label: '9:16', value: 9 / 16 },
+  ];
+
+  // Find closest supported ratio
+  const closest = ratios.reduce((prev, curr) => {
+    return Math.abs(curr.value - aspectRatio) < Math.abs(prev.value - aspectRatio) ? curr : prev;
+  });
+
+  return closest.label;
+};
 
 export { GEMINI_TASKS };
 export type { GeminiTask };
 
-// TODO: explore more model solutions and make this selectable to users
-// https://ai.google.dev/gemini-api/docs/models
-const defaultModel = 'gemini-2.5-flash-image';
+/**
+ * Task-aware thinking prompt templates
+ * Each task type has a customized analysis and generation strategy
+ */
+const getThinkingPromptForTask = (task: GeminiTask, userPrompt: string): string => {
+  const baseStructure = `<role>
+    You are an expert interior designer and prompt engineer specializing in photorealistic interior design transformation for image generation.
+    </role>
 
-const getBase64FromImageData = async (userId: string | undefined, imageData: ImageData) => {
-  // Fetch the image from Firebase Storage using SDK
-  const storageFilePath = imageData.storageFilePath;
+    <context>
+      CURRENT TASK: ${task.label_name}
+      USER REQUEST: "${userPrompt}"
+      TARGET OUTPUT: Generate an optimized, detailed prompt that instructs an image generation AI to accurately execute the user's request.
+    </context>
+  `;
 
-  // If no storage path, try to fetch directly from imageDownloadUrl (for demo images or external URLs)
-  if (!storageFilePath) {
-    if (imageData.imageDownloadUrl) {
-      console.log(
-        '[Gemini] Fetching image from URL (no storage path):',
-        imageData.imageDownloadUrl
-      );
-      return await fetchImageAsBase64(imageData.imageDownloadUrl);
-    }
-    throw new Error(GEMINI_ERRORS.IMAGE_STORAGE_PATH_MISSING(imageData.id));
+  // Task-specific analysis and generation instructions
+  switch (task.task_name) {
+    case GEMINI_TASKS.REMOVE_CLUTTER.task_name:
+      return `${baseStructure}
+
+        <analysis_requirements>
+        Analyze the provided interior photo and user instructions:
+
+        1. FIXED ELEMENTS (must preserve 100%):
+          - Architectural structure (walls, floors, ceilings, doors, windows, trim, molding)
+          - Main furniture pieces (sofas, beds, tables, chairs)
+          - Built-in fixtures (shelves, cabinets, fixtures permanently attached)
+          - Lighting fixtures and light sources
+
+        2. CLUTTER TARGETS (identify but frame positively):
+          - Small personal items on surfaces (books, decorations, toys, papers)
+          - Loose items on floors, tables, counters
+          - Visible disorder or disorganization
+          - Unnecessary items that reduce visual cleanliness
+
+        3. VISUAL PROPERTIES TO MAINTAIN:
+          - Camera angle, perspective, framing (exactly the same viewpoint)
+          - Lighting direction, intensity, color temperature
+          - Material textures (fabric, wood, stone, paint finishes)
+          - Room proportions and spatial relationships
+          - Shadow patterns and depth
+
+        4. DESIRED OUTCOME STATE:
+          - Spacious, organized appearance
+          - Pristine, professional show-home quality
+          - All surfaces clean and organized
+          - Minimal visual distractions
+        </analysis_requirements>
+
+        <prompt_generation>
+        Create ONE coherent, detailed prompt with these characteristics:
+
+        STRUCTURE YOUR PROMPT AROUND PRESERVATION (what to keep):
+        - Start with: "Generate this room BUT organized/clean"
+        - Explicitly list architectural and furniture elements to preserve
+        - Describe the desired clean aesthetic
+
+        BE SPECIFIC ABOUT REPLACEMENTS (not removals):
+        - Instead of "remove clutter", say "make surfaces clear and organized"
+        - Instead of "delete items", say "create an organized, minimalist arrangement"
+        - Describe what empty/organized surfaces should look like
+        - Fill empty spaces with organized arrangements if needed
+
+        OPERATIONAL SPECIFICS:
+        - Specify which surfaces should be cleared (counters, tables, floors)
+        - Indicate that storage should look organized but closed
+        - Request that any visible items be arranged neatly and purposefully
+        - Ensure spacing between objects for visual clarity
+
+        QUALITY ANCHORS:
+        - Maintain photorealistic quality with consistent lighting
+        - Ensure shadows and depth stay natural and logical
+        - Keep color palette and ambient tone consistent
+        - Verify proportions and scaling remain accurate
+        </prompt_generation>
+
+        <output_constraint>
+        Output ONLY the optimized prompt text.
+        - No preamble or explanation
+        - No markdown formatting (no \`, #, **, etc.)
+        - Single, coherent paragraph or well-structured instruction block
+        - CRITICAL: Maximum ${MAX_CUSTOM_PROMPT_LENGTH} characters (strict limit)
+        - Approximately 150-250 words for clarity and specificity
+        </output_constraint>
+      `;
+
+    case GEMINI_TASKS.CUSTOM_PROMPT.task_name:
+    default:
+      return `${baseStructure}
+
+        <analysis_requirements>
+        Analyze the provided interior photo carefully:
+
+        1. ROOM CHARACTERISTICS:
+          - Room type and purpose (living room, bedroom, kitchen, etc.)
+          - Architectural structure (walls, floors, ceilings, doors, windows)
+          - Main furniture and fixtures
+          - Lighting conditions and color temperature
+
+        2. USER REQUEST INTERPRETATION:
+          - What specific changes does the user want?
+          - What elements should be preserved?
+          - What is the desired outcome or aesthetic?
+
+        3. VISUAL PROPERTIES TO MAINTAIN:
+          - Camera angle, perspective, framing
+          - Lighting direction and intensity
+          - Material textures and room proportions
+          - Shadow patterns and depth
+        </analysis_requirements>
+
+        <prompt_generation>
+        Create ONE coherent, detailed prompt that:
+
+        1. CLEARLY STATES THE TRANSFORMATION:
+          - What specific changes to make
+          - Which elements to preserve unchanged
+          - The desired final aesthetic
+
+        2. PROVIDES OPERATIONAL SPECIFICS:
+          - Where exactly to apply changes
+          - How changes should blend with existing elements
+          - Quality and style expectations
+
+        3. INCLUDES QUALITY ANCHORS:
+          - Maintain photorealistic quality
+          - Ensure consistent lighting and shadows
+          - Keep proportions accurate
+          - Preserve the image's resolution and clarity
+        </prompt_generation>
+
+        <output_constraint>
+        Output ONLY the optimized prompt text.
+        - No preamble or explanation
+        - No markdown formatting (no \`, #, **, etc.)
+        - Single, coherent paragraph or well-structured instruction block
+        - CRITICAL: Maximum ${MAX_CUSTOM_PROMPT_LENGTH} characters (strict limit)
+        - Approximately 100-200 words
+        </output_constraint>
+      `;
+  }
+};
+
+/**
+ * Generate an optimized prompt using the Thinking model.
+ * This is exposed for the frontend to call separately before image generation.
+ *
+ * TODO: Currently accepts one image. Expand later to support multiple images
+ * for tasks like RECOLOR_WALL, ADD_TEXTURE, etc.
+ *
+ * @param task - The Gemini task configuration
+ * @param userPrompt - The user's original prompt/request
+ * @param imageBase64 - Base64 encoded image data
+ * @param imageMimeType - MIME type of the image
+ * @param signal - Optional AbortSignal for cancellation
+ * @returns Promise<string> - The optimized prompt text
+ */
+export const generateOptimizedPrompt = async (
+  task: GeminiTask,
+  userPrompt: string,
+  imageBase64: string,
+  imageMimeType: string,
+  signal?: AbortSignal
+): Promise<string> => {
+  const ai = getGeminiClient();
+
+  // Get task-aware thinking prompt
+  const thinkingPrompt = getThinkingPromptForTask(task, userPrompt);
+
+  // Check for early abort
+  if (signal?.aborted) {
+    const abortErr = new Error('Request aborted');
+    abortErr.name = 'AbortError';
+    throw abortErr;
   }
 
   try {
-    const storageRef = ref(storage, storageFilePath);
-    const bytes = await getBytes(storageRef);
-    const blob = new Blob([bytes], { type: imageData.mimeType });
+    const generateParams = {
+      model: GEMINI_TASKS.OPTIMIZE_PROMPT.model_code,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: imageBase64,
+              mimeType: imageMimeType,
+            },
+          },
+          { text: thinkingPrompt },
+        ],
+      },
+      config: {
+        responseModalities: [Modality.TEXT],
+        temperature: (task as { temperature?: number }).temperature ?? 0.4,
+      },
+      signal,
+    };
 
-    return await blobToBase64(blob);
+    const result = await ai.models.generateContent(generateParams as any);
+
+    let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (optimizedPrompt) {
+      // Clean up any markdown formatting
+      optimizedPrompt = optimizedPrompt.replace(/```(?:json|text|markdown)?\n?|\n?```/g, '');
+
+      // Remove common prefixes
+      optimizedPrompt = optimizedPrompt.replace(
+        /^(Here is|Here's|Here are|The optimized|Optimized|Prompt:)\s*/i,
+        ''
+      );
+
+      // Remove surrounding quotes if present
+      optimizedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
+
+      optimizedPrompt = optimizedPrompt.trim();
+
+      // Enforce character limit
+      if (optimizedPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+        console.warn(
+          `[Gemini] Optimized prompt exceeded ${MAX_CUSTOM_PROMPT_LENGTH} chars (${optimizedPrompt.length}), truncating...`
+        );
+        optimizedPrompt = optimizedPrompt.substring(0, MAX_CUSTOM_PROMPT_LENGTH).trim();
+      }
+
+      console.log('[Gemini] Generated Optimized Prompt:', optimizedPrompt);
+      return optimizedPrompt;
+    }
+
+    // Return original prompt if optimization failed
+    return userPrompt;
   } catch (error) {
-    console.error(`Failed to fetch image from Storage path: ${storageFilePath}`, error);
-    throw new Error(
-      GEMINI_ERRORS.FAILED_TO_FETCH_IMAGE(error instanceof Error ? error.message : String(error))
-    );
+    // Propagate abort errors
+    if (error && (error as Error).name === 'AbortError') {
+      throw error;
+    }
+    console.warn('[Gemini] Prompt optimization failed:', error);
+    // Fall back to original prompt on error
+    return userPrompt;
   }
 };
 
@@ -54,7 +294,7 @@ export const generateRecoloredImage = async (
   signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
-    base64String: await getBase64FromImageData(userId, imageData),
+    base64String: await getBase64FromImageData(storage, imageData),
     mimeType: imageData.mimeType,
   };
 
@@ -64,6 +304,7 @@ export const generateRecoloredImage = async (
     customPrompt,
     userId,
     signal,
+    aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
   });
 };
 
@@ -77,7 +318,7 @@ export const generateRetexturedImage = async (
   signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
-    base64String: await getBase64FromImageData(userId, imageData),
+    base64String: await getBase64FromImageData(storage, imageData),
     mimeType: imageData.mimeType,
   };
 
@@ -95,6 +336,7 @@ export const generateRetexturedImage = async (
     userId,
     textureImage,
     signal,
+    aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
   });
 };
 
@@ -108,7 +350,7 @@ export const generateItemPlacedImage = async (
   signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
-    base64String: await getBase64FromImageData(userId, imageData),
+    base64String: await getBase64FromImageData(storage, imageData),
     mimeType: imageData.mimeType,
   };
 
@@ -126,14 +368,19 @@ export const generateItemPlacedImage = async (
     userId,
     itemImage,
     signal,
+    aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
   });
 };
+
+// Note: Prompt optimization is now handled separately via generateOptimizedPrompt.
+// Magic tasks use the default MAGIC_PROMPT or user-provided prompt directly.
 
 export const generateCustomPromptImage = async (
   userId: string,
   targetImageOrAsset: ImageData | Color | Texture | Item,
   customPrompt: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  taskOverride?: GeminiTask
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   let image: { base64String: string; mimeType: string };
 
@@ -163,10 +410,14 @@ export const generateCustomPromptImage = async (
     // It's ImageData
     const imgData = targetImageOrAsset as ImageData;
     image = {
-      base64String: await getBase64FromImageData(userId, imgData),
+      base64String: await getBase64FromImageData(storage, imgData),
       mimeType: imgData.mimeType,
     };
   }
+
+  // Determine Aspect Ratio
+  const ratio = (targetImageOrAsset as Texture | Item | ImageData).aspect_ratio;
+  const aspectRatio = getGeminiAspectRatio(ratio);
 
   // Determine asset type for name suggestion
   let assetType = 'image';
@@ -190,7 +441,8 @@ export const generateCustomPromptImage = async (
     signal,
   };
 
-  return processImageWithTask(GEMINI_TASKS.CUSTOM_PROMPT, image, options);
+  const task = taskOverride || GEMINI_TASKS.CUSTOM_PROMPT;
+  return processImageWithTask(task, image, { ...options, aspectRatio });
 };
 
 /**
@@ -200,19 +452,20 @@ export const generateNameSuggestion = async (
   customPrompt: string,
   assetType: string
 ): Promise<string | undefined> => {
-  if (!process.env.API_KEY) return undefined;
-
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = 'gemini-1.5-flash'; // Fast text model
+    const ai = getGeminiClient();
+    const model = FAST_TEXT_MODEL; // Fast text model
     const prompt = getNameSuggestionPrompt(customPrompt, assetType);
 
     const result = await ai.models.generateContent({
       model,
-      contents: {
-        parts: [{ text: prompt }],
-      },
-    });
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
+        },
+      ],
+    } as any);
 
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
     return text?.trim();
@@ -221,18 +474,6 @@ export const generateNameSuggestion = async (
     return undefined;
   }
 };
-
-/**
- * Fetch image from URL and convert to base64
- */
-async function fetchImageAsBase64(url: string, signal?: AbortSignal): Promise<string> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new Error(GEMINI_ERRORS.FAILED_TO_FETCH_FROM_URL(response.statusText));
-  }
-  const blob = await response.blob();
-  return await blobToBase64(blob);
-}
 
 /**
  * Generic image processing function with task-based prompt selection
@@ -249,7 +490,6 @@ export const processImageWithTask = async (
   },
   options: {
     customPrompt?: string;
-    model?: string;
     colorName?: string;
     colorHex?: string;
     textureName?: string;
@@ -265,17 +505,20 @@ export const processImageWithTask = async (
     };
     signal?: AbortSignal;
     responseModalities?: Modality[];
+    aspectRatio?: string;
   } = {}
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
-  if (!process.env.API_KEY) {
-    throw new Error(GEMINI_ERRORS.API_KEY_NOT_SET);
-  }
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getGeminiClient();
 
   const prompt = getPromptByTask(task, options);
-  // Priority: options.model > task.model_code > defaultModel
-  const model = options.model ?? task.model_code ?? defaultModel;
+
+  // Note: optimizePromptWithThinking is no longer called here.
+  // Prompt optimization is now handled separately via generateOptimizedPrompt.
+  // Magic tasks use the default MAGIC_PROMPT or user-provided prompt directly.
+
+  // Priority: options.model > task.model_code > FAST_IMAGE_MODEL
+  // Use the model specified in task if available, especially for high-fidelity tasks like Remove Clutter
+  const model = task.model_code || FAST_IMAGE_MODEL;
 
   try {
     // Build parts array
@@ -329,6 +572,10 @@ export const processImageWithTask = async (
       },
       config: {
         responseModalities: options.responseModalities || [Modality.IMAGE],
+        // Temperature is configured in geminiTask definition
+        temperature: (task as { temperature?: number }).temperature ?? 1.0,
+        aspectRatio: options.aspectRatio, // Pass converted aspect ratio (e.g., '16:9')
+        imageSize: '2K', // Enforce 2K resolution as requested
       },
       signal: options.signal,
     } as const;
@@ -404,6 +651,15 @@ export const processImageWithTask = async (
     }
 
     if (!generatedImagePart || !generatedImagePart.inlineData) {
+      // If we have text but no image, the model might have refused or failed.
+      const textContent = candidates
+        .map((p) => p.text)
+        .filter(Boolean)
+        .join('\n');
+      if (textContent) {
+        console.warn('[Gemini] Received text only (no image):', textContent);
+        throw new Error(`Gemini refused to generate image: ${textContent.slice(0, 200)}...`);
+      }
       throw new Error(GEMINI_ERRORS.NO_IMAGE_DATA_RECEIVED);
     }
 
@@ -411,6 +667,13 @@ export const processImageWithTask = async (
     const newImageMimeType: string = generatedImagePart.inlineData.mimeType ?? 'image/png';
 
     if (!newImageBase64) {
+      const textContent = candidates
+        .map((p) => p.text)
+        .filter(Boolean)
+        .join('\n');
+      if (textContent) {
+        throw new Error(`Received empty image data. Model text: ${textContent.slice(0, 200)}...`);
+      }
       throw new Error(GEMINI_ERRORS.NO_BASE64_DATA_RECEIVED);
     }
 
@@ -451,17 +714,13 @@ export const processColorAdjustment = async (
   customPrompt: string,
   signal?: AbortSignal
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
-  if (!process.env.API_KEY) {
-    throw new Error(GEMINI_ERRORS.API_KEY_NOT_SET);
-  }
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getGeminiClient();
   const task = GEMINI_TASKS.COLOR_ADJUSTMENT;
   const prompt = getPromptByTask(task, {
     colorHex: color.hex,
     customPrompt,
   });
-  const model = task.model_code || 'gemini-2.5-flash';
+  const model = task.model_code || FAST_TEXT_MODEL;
 
   try {
     const generateParams = {
@@ -520,18 +779,139 @@ export const processColorAdjustment = async (
 };
 
 /**
- * Convert Blob to Base64 string
+ * Use a Thinking model to analyze the image and optimize the prompt before generation.
+ * This simulates the "Thinking Mode" workflow.
  */
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      // Extract base64 string without data URL prefix
-      const base64 = result.split(',')[1];
-      resolve(base64);
+const optimizePromptWithThinking = async (
+  originalPrompt: string,
+  imageBase64: string,
+  imageMimeType: string,
+  task: GeminiTask
+): Promise<string> => {
+  try {
+    const ai = getGeminiClient();
+
+    // Structured thinking prompt based on prompt engineering best practices
+    // For REMOVE_CLUTTER task: focus on creating a clean, show-home aesthetic
+    const thinkingPrompt = `<role>
+      You are an expert interior designer and prompt engineer specializing in photorealistic interior design transformation for image generation.
+      </role>
+
+      <context>
+      CURRENT TASK: ${task.label_name}
+      TARGET OUTPUT: Generate an optimized, detailed prompt that instructs an image generation AI to create a cleaner, more organized version of the interior space while strictly following the user instructions.
+      </context>
+
+      <analysis_requirements>
+      Analyze the provided interior photo and user instructions:
+
+      1. FIXED ELEMENTS (must preserve 100%):
+        - Architectural structure (walls, floors, ceilings, doors, windows, trim, molding)
+        - Main furniture pieces (sofas, beds, tables, chairs)
+        - Built-in fixtures (shelves, cabinets, fixtures permanently attached)
+        - Lighting fixtures and light sources
+
+      2. CLUTTER TARGETS (identify but frame positively):
+        - Small personal items on surfaces (books, decorations, toys, papers)
+        - Loose items on floors, tables, counters
+        - Visible disorder or disorganization
+        - Unnecessary items that reduce visual cleanliness
+
+      3. VISUAL PROPERTIES TO MAINTAIN:
+        - Camera angle, perspective, framing (exactly the same viewpoint)
+        - Lighting direction, intensity, color temperature
+        - Material textures (fabric, wood, stone, paint finishes)
+        - Room proportions and spatial relationships
+        - Shadow patterns and depth
+
+      4. DESIRED OUTCOME STATE:
+        - Spacious, organized appearance
+        - Pristine, professional show-home quality
+        - All surfaces clean and organized
+        - Minimal visual distractions
+      </analysis_requirements>
+
+      <prompt_generation>
+      Create ONE coherent, detailed prompt with these characteristics:
+
+      STRUCTURE YOUR PROMPT AROUND PRESERVATION (what to keep):
+      - Start with: "Generate this room BUT organized/clean"
+      - Explicitly list architectural and furniture elements to preserve
+      - Describe the desired clean aesthetic
+
+      BE SPECIFIC ABOUT REPLACEMENTS (not removals):
+      - Instead of "remove clutter", say "make surfaces clear and organized"
+      - Instead of "delete items", say "create an organized, minimalist arrangement"
+      - Describe what empty/organized surfaces should look like
+      - Fill empty spaces with organized arrangements if needed
+
+      OPERATIONAL SPECIFICS:
+      - Specify which surfaces should be cleared (counters, tables, floors)
+      - Indicate that storage should look organized but closed
+      - Request that any visible items be arranged neatly and purposefully
+      - Ensure spacing between objects for visual clarity
+
+      QUALITY ANCHORS:
+      - Maintain photorealistic quality with consistent lighting
+      - Ensure shadows and depth stay natural and logical
+      - Keep color palette and ambient tone consistent
+      - Verify proportions and scaling remain accurate
+      </prompt_generation>
+
+      <output_constraint>
+      Output ONLY the optimized prompt text.
+      - No preamble or explanation
+      - No markdown formatting (no \`, #, **, etc.)
+      - Single, coherent paragraph or well-structured instruction block
+      - Approximately 150-250 words for clarity and specificity
+      </output_constraint>
+    `;
+
+    const generateParams = {
+      model: DEFAULT_THINKING_MODEL,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: imageBase64,
+              mimeType: imageMimeType,
+            },
+          },
+          { text: thinkingPrompt },
+        ],
+      },
+      config: {
+        responseModalities: [Modality.TEXT],
+        temperature: task.temperature,
+      },
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+
+    const result = await ai.models.generateContent(generateParams as any);
+
+    let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (optimizedPrompt) {
+      // Clean up any markdown formatting
+      optimizedPrompt = optimizedPrompt.replace(/```(?:json|text|markdown)?\n?|\n?```/g, '');
+
+      // Remove common prefixes
+      optimizedPrompt = optimizedPrompt.replace(
+        /^(Here is|Here's|Here are|The optimized|Optimized|Prompt:)\s*/i,
+        ''
+      );
+
+      // Remove surrounding quotes if present
+      optimizedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
+
+      optimizedPrompt = optimizedPrompt.trim();
+      console.log('[Gemini] Extended Thinking Mode Optimized Prompt:', optimizedPrompt);
+      return optimizedPrompt;
+    }
+
+    return originalPrompt;
+  } catch (error) {
+    console.warn('[Gemini] Extended Thinking Mode failed, falling back to original prompt:', error);
+    // Fall back to original prompt on error
+    return originalPrompt;
+  }
+};
