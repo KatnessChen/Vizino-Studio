@@ -5,6 +5,7 @@ import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
 import {
   FAST_TEXT_MODEL,
   FAST_IMAGE_MODEL,
+  PRO_IMAGE_MODEL,
   DEFAULT_THINKING_MODEL,
   getGeminiClient,
 } from './geminiConfig';
@@ -44,10 +45,29 @@ export { GEMINI_TASKS };
 export type { GeminiTask };
 
 /**
+ * Additional context for prompt optimization
+ */
+interface OptimizePromptContext {
+  // For ADD_TEXTURE task
+  textureImage?: { base64: string; mimeType: string };
+  textureName?: string;
+  // For ADD_HOME_ITEM task
+  itemImage?: { base64: string; mimeType: string };
+  itemName?: string;
+  // For RECOLOR_WALL task
+  colorName?: string;
+  colorHex?: string;
+}
+
+/**
  * Task-aware thinking prompt templates
  * Each task type has a customized analysis and generation strategy
  */
-const getThinkingPromptForTask = (task: GeminiTask, userPrompt: string): string => {
+const getThinkingPromptForTask = (
+  task: GeminiTask,
+  userPrompt: string,
+  context?: OptimizePromptContext
+): string => {
   const baseStructure = `<role>
     You are an expert interior designer and prompt engineer specializing in photorealistic interior design transformation for image generation.
     </role>
@@ -61,6 +81,147 @@ const getThinkingPromptForTask = (task: GeminiTask, userPrompt: string): string 
 
   // Task-specific analysis and generation instructions
   switch (task.task_name) {
+    case GEMINI_TASKS.RECOLOR_WALL.task_name:
+      return `${baseStructure}
+
+        <asset_context>
+        SELECTED COLOR: ${context?.colorName || 'Not specified'} (${context?.colorHex || 'N/A'})
+        </asset_context>
+
+        <analysis_requirements>
+        Analyze the provided interior photo:
+
+        1. IDENTIFY WALLS TO RECOLOR:
+          - Which walls are visible and paintable
+          - Current wall colors and finishes
+          - Areas that should receive the new color
+
+        2. ELEMENTS TO PRESERVE:
+          - Furniture, fixtures, and decorations
+          - Flooring, ceiling, and trim
+          - Lighting and shadows
+          - All non-wall surfaces
+
+        3. COLOR APPLICATION:
+          - How the selected color (${context?.colorName || 'new color'}) will look
+          - How it will interact with existing lighting
+          - Maintaining realistic paint finish appearance
+        </analysis_requirements>
+
+        <prompt_generation>
+        Create ONE coherent prompt that:
+        - Specifies painting walls with ${context?.colorName || 'the new color'} (${context?.colorHex || ''})
+        - Describes which walls to paint
+        - Maintains all furniture and fixtures unchanged
+        - Preserves realistic lighting and shadows
+        - Keeps paint finish natural (matte, satin, etc.)
+        </prompt_generation>
+
+        <output_constraint>
+        Output ONLY the optimized prompt text.
+        - No preamble or explanation
+        - No markdown formatting
+        - CRITICAL: Maximum ${MAX_CUSTOM_PROMPT_LENGTH} characters
+        </output_constraint>
+      `;
+
+    case GEMINI_TASKS.ADD_TEXTURE.task_name:
+      return `${baseStructure}
+
+        <asset_context>
+        TEXTURE TO APPLY: ${context?.textureName || 'See second image'}
+        NOTE: The SECOND image provided shows the texture/material to apply.
+        </asset_context>
+
+        <analysis_requirements>
+        You are provided with TWO images:
+        1. FIRST IMAGE: The interior room to transform
+        2. SECOND IMAGE: The texture/material to apply (${context?.textureName || 'texture sample'})
+
+        Analyze both images:
+
+        1. FROM THE ROOM IMAGE:
+          - Identify surfaces suitable for the texture (walls, floors, etc.)
+          - Note current materials and finishes
+          - Identify elements to preserve unchanged
+
+        2. FROM THE TEXTURE IMAGE:
+          - Observe the pattern, color, and material properties
+          - Note the texture's scale and repeat pattern
+          - Understand the material type (wood, stone, fabric, etc.)
+
+        3. INTEGRATION PLANNING:
+          - How the texture will wrap onto surfaces
+          - Proper scaling for realistic appearance
+          - Lighting interaction with the new material
+        </analysis_requirements>
+
+        <prompt_generation>
+        Create ONE coherent prompt that:
+        - Describes applying the ${context?.textureName || 'provided texture'} to appropriate surfaces
+        - Specifies which surfaces receive the texture
+        - Maintains proper texture scaling and perspective
+        - Preserves furniture and other elements
+        - Ensures realistic lighting on the new material
+        </prompt_generation>
+
+        <output_constraint>
+        Output ONLY the optimized prompt text.
+        - No preamble or explanation
+        - No markdown formatting
+        - CRITICAL: Maximum ${MAX_CUSTOM_PROMPT_LENGTH} characters
+        </output_constraint>
+      `;
+
+    case GEMINI_TASKS.ADD_HOME_ITEM.task_name:
+      return `${baseStructure}
+
+        <asset_context>
+        ITEM TO ADD: ${context?.itemName || 'See second image'}
+        NOTE: The SECOND image provided shows the item/object to add to the room.
+        </asset_context>
+
+        <analysis_requirements>
+        You are provided with TWO images:
+        1. FIRST IMAGE: The interior room where the item will be placed
+        2. SECOND IMAGE: The item/object to add (${context?.itemName || 'furniture/decor item'})
+
+        Analyze both images:
+
+        1. FROM THE ROOM IMAGE:
+          - Available floor space or surfaces for placement
+          - Room style and aesthetic
+          - Existing furniture and layout
+          - Lighting conditions
+
+        2. FROM THE ITEM IMAGE:
+          - Item type, style, and approximate dimensions
+          - Material and color properties
+          - How it should appear in the room context
+
+        3. PLACEMENT PLANNING:
+          - Best location for the item
+          - Proper scale relative to the room
+          - Integration with existing furniture arrangement
+        </analysis_requirements>
+
+        <prompt_generation>
+        Create ONE coherent prompt that:
+        - Describes adding the ${context?.itemName || 'provided item'} to the room
+        - Specifies the ideal placement location
+        - Maintains proper scale and perspective
+        - Ensures the item matches the room's lighting
+        - Preserves all existing furniture and elements
+        </prompt_generation>
+
+        <output_constraint>
+        Output ONLY the optimized prompt text.
+        - No preamble or explanation
+        - No markdown formatting
+        - CRITICAL: Maximum ${MAX_CUSTOM_PROMPT_LENGTH} characters
+        </output_constraint>
+      `;
+
     case GEMINI_TASKS.REMOVE_CLUTTER.task_name:
       return `${baseStructure}
 
@@ -191,14 +352,12 @@ const getThinkingPromptForTask = (task: GeminiTask, userPrompt: string): string 
  * Generate an optimized prompt using the Thinking model.
  * This is exposed for the frontend to call separately before image generation.
  *
- * TODO: Currently accepts one image. Expand later to support multiple images
- * for tasks like RECOLOR_WALL, ADD_TEXTURE, etc.
- *
  * @param task - The Gemini task configuration
  * @param userPrompt - The user's original prompt/request
- * @param imageBase64 - Base64 encoded image data
- * @param imageMimeType - MIME type of the image
+ * @param imageBase64 - Base64 encoded main image data
+ * @param imageMimeType - MIME type of the main image
  * @param signal - Optional AbortSignal for cancellation
+ * @param additionalContext - Optional context for task-specific assets (texture, item, color)
  * @returns Promise<string> - The optimized prompt text
  */
 export const generateOptimizedPrompt = async (
@@ -206,12 +365,13 @@ export const generateOptimizedPrompt = async (
   userPrompt: string,
   imageBase64: string,
   imageMimeType: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  additionalContext?: OptimizePromptContext
 ): Promise<string> => {
   const ai = getGeminiClient();
 
-  // Get task-aware thinking prompt
-  const thinkingPrompt = getThinkingPromptForTask(task, userPrompt);
+  // Get task-aware thinking prompt with context
+  const thinkingPrompt = getThinkingPromptForTask(task, userPrompt, additionalContext);
 
   // Check for early abort
   if (signal?.aborted) {
@@ -221,18 +381,43 @@ export const generateOptimizedPrompt = async (
   }
 
   try {
+    // Build parts array - main image first
+    const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [
+      {
+        inlineData: {
+          data: imageBase64,
+          mimeType: imageMimeType,
+        },
+      },
+    ];
+
+    // Add texture image if provided (for ADD_TEXTURE task)
+    if (additionalContext?.textureImage) {
+      parts.push({
+        inlineData: {
+          data: additionalContext.textureImage.base64,
+          mimeType: additionalContext.textureImage.mimeType,
+        },
+      });
+    }
+
+    // Add item image if provided (for ADD_HOME_ITEM task)
+    if (additionalContext?.itemImage) {
+      parts.push({
+        inlineData: {
+          data: additionalContext.itemImage.base64,
+          mimeType: additionalContext.itemImage.mimeType,
+        },
+      });
+    }
+
+    // Add the thinking prompt as the last part
+    parts.push({ text: thinkingPrompt });
+
     const generateParams = {
       model: GEMINI_TASKS.OPTIMIZE_PROMPT.model_code,
       contents: {
-        parts: [
-          {
-            inlineData: {
-              data: imageBase64,
-              mimeType: imageMimeType,
-            },
-          },
-          { text: thinkingPrompt },
-        ],
+        parts,
       },
       config: {
         responseModalities: [Modality.TEXT],
@@ -291,7 +476,8 @@ export const generateRecoloredImage = async (
   colorName: string,
   colorHex: string,
   customPrompt?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  thinkingMode?: boolean
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(storage, imageData),
@@ -305,6 +491,7 @@ export const generateRecoloredImage = async (
     userId,
     signal,
     aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
+    modelOverride: thinkingMode ? PRO_IMAGE_MODEL : undefined,
   });
 };
 
@@ -315,7 +502,8 @@ export const generateRetexturedImage = async (
   textureMimeType: string,
   textureName: string,
   customPrompt?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  thinkingMode?: boolean
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(storage, imageData),
@@ -337,6 +525,7 @@ export const generateRetexturedImage = async (
     textureImage,
     signal,
     aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
+    modelOverride: thinkingMode ? PRO_IMAGE_MODEL : undefined,
   });
 };
 
@@ -347,7 +536,8 @@ export const generateItemPlacedImage = async (
   itemMimeType: string,
   itemName: string,
   customPrompt?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  thinkingMode?: boolean
 ): Promise<{ base64: string; mimeType: string }> => {
   const image = {
     base64String: await getBase64FromImageData(storage, imageData),
@@ -369,6 +559,7 @@ export const generateItemPlacedImage = async (
     itemImage,
     signal,
     aspectRatio: getGeminiAspectRatio(imageData.aspect_ratio),
+    modelOverride: thinkingMode ? PRO_IMAGE_MODEL : undefined,
   });
 };
 
@@ -380,7 +571,8 @@ export const generateCustomPromptImage = async (
   targetImageOrAsset: ImageData | Color | Texture | Item,
   customPrompt: string,
   signal?: AbortSignal,
-  taskOverride?: GeminiTask
+  taskOverride?: GeminiTask,
+  thinkingMode?: boolean
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   let image: { base64String: string; mimeType: string };
 
@@ -439,6 +631,7 @@ export const generateCustomPromptImage = async (
     customPrompt: (customPrompt || '') + promptSuffix,
     responseModalities: [Modality.TEXT, Modality.IMAGE],
     signal,
+    modelOverride: thinkingMode ? PRO_IMAGE_MODEL : undefined,
   };
 
   const task = taskOverride || GEMINI_TASKS.CUSTOM_PROMPT;
@@ -506,6 +699,7 @@ export const processImageWithTask = async (
     signal?: AbortSignal;
     responseModalities?: Modality[];
     aspectRatio?: string;
+    modelOverride?: string;
   } = {}
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   const ai = getGeminiClient();
@@ -516,9 +710,9 @@ export const processImageWithTask = async (
   // Prompt optimization is now handled separately via generateOptimizedPrompt.
   // Magic tasks use the default MAGIC_PROMPT or user-provided prompt directly.
 
-  // Priority: options.model > task.model_code > FAST_IMAGE_MODEL
-  // Use the model specified in task if available, especially for high-fidelity tasks like Remove Clutter
-  const model = task.model_code || FAST_IMAGE_MODEL;
+  // Priority: options.modelOverride > task.model_code > FAST_IMAGE_MODEL
+  // modelOverride is used when Thinking Mode is enabled to switch to PRO_IMAGE_MODEL
+  const model = options.modelOverride || task.model_code || FAST_IMAGE_MODEL;
 
   try {
     // Build parts array

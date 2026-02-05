@@ -2,7 +2,6 @@ import { MAGIC_PROMPT } from './prompts';
 import {
   FAST_TEXT_MODEL,
   FAST_IMAGE_MODEL,
-  PRO_IMAGE_MODEL,
   DEFAULT_THINKING_MODEL,
 } from './geminiConfig';
 
@@ -46,7 +45,7 @@ export const GEMINI_TASKS = {
     task_name: 'remove_clutter',
     label_name: 'Remove Clutter',
     customPromptRequired: false,
-    model_code: PRO_IMAGE_MODEL, // Use Pro model for better instruction following and fidelity
+    model_code: FAST_IMAGE_MODEL,
     useThinkingMode: true,
     temperature: 0.4,
     defaultPrompt: MAGIC_PROMPT.REMOVE_CLUTTER,
@@ -118,4 +117,23 @@ export const hasDefaultPrompt = (
  */
 export const getTaskEntry = (taskName: GeminiTaskName) => {
   return Object.entries(GEMINI_TASKS).find(([, task]) => task.task_name === taskName);
+};
+
+/**
+ * Check if Thinking Mode is available for a given task.
+ * Thinking Mode allows using PRO_IMAGE_MODEL instead of FAST_IMAGE_MODEL.
+ * Available for tasks that:
+ * - Use FAST_IMAGE_MODEL as their default model
+ * - Are NOT COLOR_ADJUSTMENT (uses FAST_TEXT_MODEL)
+ * - Are NOT OPTIMIZE_PROMPT (uses DEFAULT_THINKING_MODEL)
+ * @param taskName - The task_name to check
+ * @returns true if Thinking Mode can be enabled, false otherwise
+ */
+export const isThinkingModeAvailable = (taskName: string | null): boolean => {
+  if (!taskName) return false;
+  const task = getTask(taskName);
+  if (!task) return false;
+  
+  // Thinking mode is only available for tasks using FAST_IMAGE_MODEL
+  return task.model_code === FAST_IMAGE_MODEL;
 };

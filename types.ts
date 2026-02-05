@@ -119,6 +119,8 @@ export interface User {
   photoURL: string | null;
   usage: {
     [key in GeminiTaskName]: number;
+  } & {
+    thinking_mode?: number;
   };
   lastLoginAt: Date;
 }
