@@ -22,14 +22,17 @@ const convertFirestoreUser = (data: DocumentData): User => {
 /**
  * Initialize usage object with all Gemini tasks set to 0
  */
-const initializeUsage = (): { [key in GeminiTaskName]: number } => {
-  const usage: Partial<{ [key in GeminiTaskName]: number }> = {};
+export const initializeUsage = (): { [key: string]: number } => {
+  const usage: { [key: string]: number } = {};
 
   Object.values(GEMINI_TASKS).forEach((task) => {
     usage[task.task_name] = 0;
   });
 
-  return usage as { [key in GeminiTaskName]: number };
+  // Include special usage keys
+  usage['thinking_mode'] = 0;
+
+  return usage;
 };
 
 /**

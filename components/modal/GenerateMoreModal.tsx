@@ -24,6 +24,7 @@ import {
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
+import VPointsIcon from '@/components/icons/VPointsIcon';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { Timestamp } from 'firebase/firestore';
 import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
@@ -74,6 +75,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { guestIndexedDB } from '@/utils/guestIndexedDB';
 import { addGuestImage, setShowLoginRequiredModal } from '@/stores/guestStore';
+import { useCreditCheck } from '@/hooks/useCreditCheck';
+import { getCreditCost } from '@/utils/creditUtils';
+import CreditExhaustedModal from './CreditExhaustedModal';
 
 export interface GenerateMoreModalRef {
   triggerGenerate: () => Promise<void>;
@@ -101,6 +105,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const { adminSettings, isAuthenticated } = useAuth();
     // Get guest context
     const { guestSessionId, isGuestMode, hasGeneratedImage, markImageGenerated } = useGuest();
+    // Get credit check for authenticated users
+    const {
+      hasExceeded: hasCreditExceeded,
+      totalCredits,
+      showCreditExhaustedModal,
+      setShowCreditExhaustedModal,
+    } = useCreditCheck({ userId });
     // Get active project and space from Redux store
     const activeProjectId = useSelector(selectActiveProjectId);
     const activeSpaceId = useSelector(selectActiveSpaceId);
@@ -357,6 +368,12 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         return;
       }
 
+      // Check credit limit for authenticated users
+      if (isAuthenticated && hasCreditExceeded) {
+        setShowCreditExhaustedModal(true);
+        return;
+      }
+
       // Check operation limit first
       const operationLimitCheck = checkOperationLimit(
         sourceImage,
@@ -480,6 +497,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       onGenerateClick,
       processImage,
       isAuthenticated,
+      hasCreditExceeded,
+      setShowCreditExhaustedModal,
       activeProjectId,
       fetchPrompts,
       setErrorMessage,
@@ -540,6 +559,12 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
      * Calls generateOptimizedPrompt to get an AI-optimized version of the user's prompt
      */
     const handleHelpMeWrite = useCallback(async () => {
+      // Check credit limit for authenticated users
+      if (isAuthenticated && hasCreditExceeded) {
+        setShowCreditExhaustedModal(true);
+        return;
+      }
+
       // Validate: require user to start writing first
       if (!customPrompt.trim()) {
         message.warning('Start writing your prompt first!');
@@ -668,6 +693,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         setIsOptimizingPrompt(false);
       }
     }, [
+      isAuthenticated,
+      hasCreditExceeded,
+      setShowCreditExhaustedModal,
       customPrompt,
       sourceImage,
       sourceAsset,
@@ -1224,15 +1252,20 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   </Tooltip>
                 )}
                 <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
-                  <Button
-                    key="generate"
-                    type="primary"
-                    onClick={handleGenerate}
-                    disabled={isGenerateDisabled || isOptimizingPrompt}
-                    data-tour="modal-generate-button"
-                  >
-                    Generate
-                  </Button>
+                    <Button
+                      key="generate"
+                      type="primary"
+                      onClick={handleGenerate}
+                      disabled={isGenerateDisabled || isOptimizingPrompt}
+                      data-tour="modal-generate-button"
+                      className="flex items-center gap-1.5"
+                    >
+                      Generate
+                      <div className="flex items-center bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        {getCreditCost(activeTaskName, thinkingMode)}
+                        <VPointsIcon size={20} className="ml-1 opacity-90" />
+                      </div>
+                    </Button>
                 </Tooltip>
               </div>
             </div>
@@ -1512,7 +1545,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                           <Tooltip title="Let AI optimize your prompt">
                             <Button
                               type={customPrompt.trim() ? 'primary' : 'default'}
-                              size="small"
                               icon={
                                 isOptimizingPrompt ? <LoadingOutlined spin /> : <EditOutlined />
                               }
@@ -1527,8 +1559,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                               }
                             >
                               {isOptimizingPrompt ? 'Optimizing...' : 'Help me write'}
-
-                              <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-sm" />
+                              <div className="ml-1.5 flex items-center bg-gray-100/50 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-600">
+                                {getCreditCost('optimize_prompt', false)}
+                                <VPointsIcon size={20} className="ml-1 opacity-70" />
+                              </div>
                             </Button>
                           </Tooltip>
                         </div>
@@ -1702,6 +1736,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             {defaultPrompt}
           </div>
         </Drawer>
+
+        {/* Credit Exhausted Modal */}
+        <CreditExhaustedModal
+          isOpen={showCreditExhaustedModal}
+          onClose={() => setShowCreditExhaustedModal(false)}
+          totalCredits={totalCredits}
+        />
       </>
     );
   }

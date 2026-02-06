@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import { Box, Typography, Stack, Divider } from '@mui/material';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { Button } from 'antd';
 import GoogleLoginButton from './button/GoogleLoginButton';
 import LogoutButton from './button/LogoutButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { clearGuestState } from '@/stores/guestStore';
 import { resetTaskState } from '@/stores/taskStore';
+import { useCreditCheck } from '@/hooks/useCreditCheck';
+import { ROUTES } from '@/constants/routes';
+import VPointsProgressBar from './VPointsProgressBar';
 
 const AuthPanel: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { clearGuestSession } = useGuest();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { totalCredits, usagePercentage } = useCreditCheck({
+    userId: user?.uid,
+  });
 
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +125,28 @@ const AuthPanel: React.FC = () => {
               <Typography variant="body1">{user?.email}</Typography>
             </Box>
           </Stack>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* V Points Usage Component */}
+          <Box sx={{ mb: 3 }}>
+            <VPointsProgressBar
+              totalCredits={totalCredits}
+              usagePercentage={usagePercentage}
+              showTitle={true}
+              showDetails={true}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+              <Button
+                type="link"
+                size="small"
+                onClick={() => navigate(ROUTES.USER_PROFILE)}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                View Details
+              </Button>
+            </Box>
+          </Box>
 
           <Divider sx={{ my: 3 }} />
 

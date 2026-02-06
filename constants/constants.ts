@@ -86,3 +86,30 @@ export const ASSET_ITEM = 'item' as const;
 export const ASSET_TYPES = [ASSET_IMAGE, ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM] as const;
 export type CustomPromptAssetType = (typeof ASSET_TYPES)[number];
 export type AssetType = (typeof ASSET_TYPES)[number];
+
+// ============================================================================
+// V Points (Credit System) Constants
+// ============================================================================
+
+/**
+ * Default credit limit for free users (V points)
+ */
+export const DEFAULT_CREDIT_LIMIT = 100;
+
+/**
+ * Credit multipliers for each task type
+ * thinking_mode and optimize_prompt cost 4x, all others cost 1x
+ */
+export const CREDIT_MULTIPLIERS: Record<string, number> = {
+  // High-cost tasks (4x)
+  thinking_mode: 4,
+  optimize_prompt: 4,
+  // Standard tasks (1x)
+  recolor_wall: 1,
+  add_texture: 1,
+  add_home_item: 1,
+  custom_prompt: 1,
+  color_adjustment: 1,
+  remove_clutter: 1,
+  brighten_space: 1,
+} as const;

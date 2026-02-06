@@ -80,6 +80,48 @@ const AdminSettingPage: React.FC = () => {
               />
             </div>
 
+            {/* Mock V Points Limit Reached Switch */}
+            <div className="flex items-center justify-between py-3 border-t">
+              <div>
+                <div className="font-medium text-gray-900">Mock V Points Limit Reached</div>
+                <div className="text-sm text-gray-500">
+                  Enable to simulate V points limit reached scenario
+                </div>
+              </div>
+              <Switch
+                checked={formSettings.mock_credit_limit_reached}
+                onChange={(checked) =>
+                  setFormSettings({
+                    ...formSettings,
+                    mock_credit_limit_reached: checked,
+                    // If turning on mock limit, turn off bypass
+                    bypass_credit_limit: checked ? false : formSettings.bypass_credit_limit,
+                  })
+                }
+              />
+            </div>
+
+            {/* Bypass Credit Limit Switch */}
+            <div className="flex items-center justify-between py-3 border-t">
+              <div>
+                <div className="font-medium text-gray-900">Bypass V Points Limit</div>
+                <div className="text-sm text-gray-500">
+                  Show credit usage but allow generation even if limit is exceeded
+                </div>
+              </div>
+              <Switch
+                checked={formSettings.bypass_credit_limit}
+                onChange={(checked) =>
+                  setFormSettings({
+                    ...formSettings,
+                    bypass_credit_limit: checked,
+                    // If turning on bypass, turn off mock limit
+                    mock_credit_limit_reached: checked ? false : formSettings.mock_credit_limit_reached,
+                  })
+                }
+              />
+            </div>
+
             <div className="border-t pt-4 mt-6 space-y-3">
               {/* Save Button */}
               <Button type="primary" block disabled={!isDirty} onClick={handleSave}>
