@@ -18,7 +18,7 @@ const AuthPanel: React.FC = () => {
   const { clearGuestSession } = useGuest();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { totalCredits, usagePercentage } = useCreditCheck({
+  const { totalCredits, usagePercentage, hasEnabledOwnKey } = useCreditCheck({
     userId: user?.uid,
   });
 
@@ -128,25 +128,27 @@ const AuthPanel: React.FC = () => {
 
           <Divider sx={{ my: 3 }} />
 
-          {/* V Points Usage Component */}
-          <Box sx={{ mb: 3 }}>
-            <VPointsProgressBar
-              totalCredits={totalCredits}
-              usagePercentage={usagePercentage}
-              showTitle={true}
-              showDetails={true}
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-              <Button
-                type="link"
-                size="small"
-                onClick={() => navigate(ROUTES.USER_PROFILE)}
-                style={{ padding: 0, height: 'auto' }}
-              >
-                View Details
-              </Button>
+          {/* V Points Usage Component - Hidden if user has enabled their own API key */}
+          {!hasEnabledOwnKey && (
+            <Box sx={{ mb: 3 }}>
+              <VPointsProgressBar
+                totalCredits={totalCredits}
+                usagePercentage={usagePercentage}
+                showTitle={true}
+                showDetails={true}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => navigate(ROUTES.USER_PROFILE)}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  View Details
+                </Button>
+              </Box>
             </Box>
-          </Box>
+          )}
 
           <Divider sx={{ my: 3 }} />
 

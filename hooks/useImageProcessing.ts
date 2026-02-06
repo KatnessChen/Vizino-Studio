@@ -55,6 +55,9 @@ export const useImageProcessing = ({
 }: UseImageProcessingProps) => {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorAction, setErrorAction] = useState<{ label: string; action: () => void } | null>(
+    null
+  );
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Use userId if available, otherwise use guestSessionId for guest mode
@@ -66,6 +69,7 @@ export const useImageProcessing = ({
       abortControllerRef.current = null;
       setIsProcessingImage(false);
       setErrorMessage(null);
+      setErrorAction(null);
     }
   }, []);
 
@@ -216,9 +220,23 @@ export const useImageProcessing = ({
 
         if (apiError && typeof apiError === 'object' && 'error' in apiError) {
           const errorObj = apiError as {
-            error?: { status?: string; code?: number; details?: unknown[] };
+            error?: { status?: string; code?: number; message?: string; details?: unknown[] };
           };
-          if (errorObj.error?.status === 'RESOURCE_EXHAUSTED' || errorObj.error?.code === 429) {
+          if (errorObj.error?.status === 'INVALID_ARGUMENT' && errorObj.error?.code === 400) {
+            // Check if it's an API key validation error
+            if (errorObj.error?.message?.includes('API key')) {
+              displayMessage = `Your Gemini API key is invalid or expired. Please check your API key in Settings and try again.`;
+              setErrorAction({
+                label: 'Go to Settings',
+                action: () => {
+                  window.location.href = '/user_profile';
+                },
+              });
+            }
+          } else if (
+            errorObj.error?.status === 'RESOURCE_EXHAUSTED' ||
+            errorObj.error?.code === 429
+          ) {
             const rateLimitDocsLink =
               (Array.isArray(errorObj.error.details) &&
                 errorObj.error.details[1] &&
@@ -245,7 +263,15 @@ export const useImageProcessing = ({
         return null;
       }
     },
-    [effectiveUserId, selectedTaskName, selectedColor, selectedTexture, selectedItem, userId, thinkingMode]
+    [
+      effectiveUserId,
+      selectedTaskName,
+      selectedColor,
+      selectedTexture,
+      selectedItem,
+      userId,
+      thinkingMode,
+    ]
   );
 
   return {
@@ -253,6 +279,8 @@ export const useImageProcessing = ({
     isProcessingImage,
     errorMessage,
     setErrorMessage,
+    errorAction,
+    setErrorAction,
     cancelProcessing,
   };
 };

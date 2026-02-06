@@ -123,6 +123,10 @@ export interface User {
     thinking_mode?: number;
   };
   lastLoginAt: Date;
+  apiKey?: {
+    geminiKey?: string; // Encrypted API Key
+    isActive: boolean;  // User choice to use custom key or not
+  };
 }
 
 // ============================================================================

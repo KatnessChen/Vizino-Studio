@@ -61,7 +61,7 @@ const VPointsProgressBar: React.FC<VPointsProgressBarProps> = ({
             percent={Math.min(usagePercentage, 100)}
             status={getProgressStatus()}
             strokeColor={getStrokeColor(usagePercentage)}
-            size={10}
+            strokeWidth={10}
             showInfo={false}
           />
         </div>

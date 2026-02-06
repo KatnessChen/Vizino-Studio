@@ -425,7 +425,9 @@ export const generateOptimizedPrompt = async (
       signal,
     };
 
-    const result = await ai.models.generateContent(generateParams as unknown as Parameters<typeof ai.models.generateContent>[0]);
+    const result = await ai.models.generateContent(
+      generateParams as unknown as Parameters<typeof ai.models.generateContent>[0]
+    );
 
     let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 

@@ -1,11 +1,9 @@
 import React from 'react';
 import { Modal, Button, Typography } from 'antd';
-import { WarningOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { DEFAULT_CREDIT_LIMIT } from '@/constants/constants';
 import VPointsProgressBar from '@/components/VPointsProgressBar';
-import VPointsIcon from '@/components/icons/VPointsIcon';
 
 interface CreditExhaustedModalProps {
   isOpen: boolean;

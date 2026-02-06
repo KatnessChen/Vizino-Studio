@@ -44,6 +44,10 @@ interface UseCreditCheckResult {
   canProceed: boolean;
   /** Normalized usage data (includes all expected keys with defaults) */
   usage: UsageData;
+  /** Credit limit (defaults to DEFAULT_CREDIT_LIMIT) */
+  limit: number;
+  /** Whether user has enabled their own Gemini API key */
+  hasEnabledOwnKey: boolean;
   /** Refresh user data */
   refresh: () => Promise<void>;
 }
@@ -93,33 +97,39 @@ export const useCreditCheck = ({
   const realTotalCredits = calculateTotalCredits(usage);
   // If mock is enabled, assume usage is at least limit (unless it's already higher)
   const totalCredits = isMockLimitReached ? Math.max(realTotalCredits, limit) : realTotalCredits;
-  
+
   const remainingCredits = limit - totalCredits;
   const usagePercentage = Math.round((totalCredits / limit) * 100);
-  
+
   // Exceeded check:
   // 1. Naturally exceeded OR Mocked exceeded
   // 2. AND Bypass is NOT enabled
   const realExceeded = hasExceededLimit(usage, limit);
-  
-  // Logic: 
+
+  // Logic:
   // If Bypass is ON: hasExceeded is FALSE (never blocked)
   // If Mock is ON: hasExceeded is TRUE (unless bypassed)
   // Otherwise: Real check
-  const hasExceeded = isBypassEnabled ? false : (realExceeded || isMockLimitReached);
-  
+  // AND if user has their own key enabled, they are also not blocked (treated same as bypass effectively, but we track stats)
+  const hasEnabledOwnKey = userData?.apiKey?.geminiKey && userData?.apiKey?.isActive;
+
+  const hasExceeded =
+    isBypassEnabled || hasEnabledOwnKey ? false : realExceeded || isMockLimitReached;
+
   const canProceed = !hasExceeded;
 
   return {
-    isLoading,
+    limit,
     totalCredits,
     remainingCredits,
     usagePercentage,
     hasExceeded,
+    canProceed,
+    isLoading,
+    usage: usage || {},
+    hasEnabledOwnKey: !!hasEnabledOwnKey, // Explicitly return this status
     showCreditExhaustedModal: showModal,
     setShowCreditExhaustedModal: setShowModal,
-    canProceed,
-    usage,
     refresh: fetchUserData,
   };
 };

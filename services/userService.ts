@@ -1,9 +1,8 @@
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, DocumentData } from 'firebase/firestore';
 import { db } from './firestoreService';
 import { User } from '@/types';
 import { GEMINI_TASKS, GeminiTaskName } from './gemini/geminiTasks';
 
-import { DocumentData } from 'firebase/firestore';
 
 /**
  * Convert Firestore User document to User interface
@@ -16,6 +15,10 @@ const convertFirestoreUser = (data: DocumentData): User => {
     photoURL: data.photoURL,
     usage: data.usage,
     lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
+    apiKey: data.apiKey ? {
+      geminiKey: data.apiKey.geminiKey,
+      isActive: data.apiKey.isActive ?? true,
+    } : undefined,
   };
 };
 
@@ -132,4 +135,126 @@ export const incrementTaskUsage = async (
     console.error('Failed to increment usage:', error);
     throw error;
   }
+};
+
+/**
+ * Toggle the active status of the user's custom API key
+ * @param uid - User ID
+ * @param isActive - New active status
+ */
+export const toggleUserAiKeyStatus = async (
+  uid: string,
+  isActive: boolean
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    
+    await setDoc(
+      userRef,
+      {
+        apiKey: {
+          isActive,
+        },
+      },
+      { merge: true }
+    );
+    console.log(`User API Key status updated for: ${uid}, Active: ${isActive}`);
+  } catch (error) {
+    console.error('Failed to update user API Key status:', error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// Encryption / Decryption Helpers (Client-side)
+// ============================================================================
+
+const SECRET_KEY = import.meta.env.VITE_USER_API_KEY_SECRET || 'default-dev-secret';
+
+/**
+ * Simple XOR encryption for client-side storage
+ * Note: This is not high-security but prevents plain text storage in Firestore
+ */
+const xorCipher = (text: string): string => {
+  const textChars = text.split('');
+  const keyChars = SECRET_KEY.split('');
+  
+  return textChars
+    .map((char, index) => {
+      const charCode = char.charCodeAt(0);
+      const keyCode = keyChars[index % keyChars.length].charCodeAt(0);
+      return String.fromCharCode(charCode ^ keyCode);
+    })
+    .join('');
+};
+
+/**
+ * Encrypts the API key before sending to Firestore
+ */
+const encryptKey = (apiKey: string): string => {
+  if (!apiKey) return '';
+  try {
+    // 1. XOR
+    const xored = xorCipher(apiKey);
+    // 2. Base64 encode to ensure safe string storage
+    return btoa(xored);
+  } catch (e) {
+    console.error('Encryption failed:', e);
+    return '';
+  }
+};
+
+/**
+ * Decrypts the API key from Firestore
+ */
+const decryptKey = (encryptedKey: string): string => {
+  if (!encryptedKey) return '';
+  try {
+    // 1. Base64 decode
+    const xored = atob(encryptedKey);
+    // 2. XOR (symmetric)
+    return xorCipher(xored);
+  } catch (e) {
+    console.error('Decryption failed:', e);
+    return '';
+  }
+};
+
+/**
+ * Update user's custom Gemini API Key
+ */
+export const updateUserAiKey = async (
+  uid: string,
+  apiKey: string,
+  isActive: boolean
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    
+    // Encrypt the key before saving
+    // If apiKey is empty strings (removing), we store empty string
+    const encryptedKey = apiKey ? encryptKey(apiKey) : '';
+
+    await setDoc(
+      userRef,
+      {
+        apiKey: {
+          geminiKey: encryptedKey,
+          isActive,
+        },
+      },
+      { merge: true }
+    );
+    console.log(`User API Key updated for: ${uid}, Active: ${isActive}`);
+  } catch (error) {
+    console.error('Failed to update user API Key:', error);
+    throw error;
+  }
+};
+
+/**
+ * Decrypt user's API key for use in the application
+ */
+export const decryptUserApiKey = (encryptedKey: string): string => {
+  return decryptKey(encryptedKey);
 };

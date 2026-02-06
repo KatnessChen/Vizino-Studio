@@ -31,15 +31,31 @@ export const DEFAULT_THINKING_MODEL = 'gemini-2.5-pro';
  */
 export const getGeminiClient = (() => {
   let instance: GoogleGenAI | null = null;
+  let currentKey: string | null = null;
 
-  return () => {
-    if (!instance) {
-      const apiKey = process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || '';
-      if (!apiKey) {
-        console.warn('[GeminiConfig] API Key not found in environment variables.');
+  return (apiKey?: string) => {
+    // If a specific key is requested and it's different from current,
+    // OR if no instance exists yet
+    if ((apiKey && apiKey !== currentKey) || !instance) {
+      const keyToUse = apiKey || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+      
+      if (!keyToUse) {
+        console.warn('[GeminiConfig] API Key not found.');
       }
-      instance = new GoogleGenAI({ apiKey });
+      
+      instance = new GoogleGenAI({ apiKey: keyToUse });
+      currentKey = apiKey || null; // Track if we are using a custom key
+      console.log(`[GeminiConfig] Client initialized with ${apiKey ? 'custom' : 'default'} key.`);
     }
     return instance;
   };
 })();
+
+/**
+ * Initialize or update the Gemini client with a specific API key.
+ * If apiKey is provided, it switches to that key.
+ * If apiKey is undefined, it attempts to revert to the default environment key (logic handled in getGeminiClient).
+ */
+export const initializeGeminiClient = (apiKey?: string) => {
+  getGeminiClient(apiKey);
+};

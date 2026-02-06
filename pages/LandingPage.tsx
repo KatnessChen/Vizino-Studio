@@ -409,13 +409,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
   // Error message state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorAction, setErrorAction] = useState<{ label: string; action: () => void } | null>(
+    null
+  );
 
   // Show error message when errorMessage changes
   useEffect(() => {
     if (errorMessage) {
-      message.error(errorMessage);
+      if (errorAction) {
+        message.error({
+          content: (
+            <div className="flex items-center justify-between gap-4">
+              <span>{errorMessage}</span>
+              <button
+                onClick={errorAction.action}
+                className="ml-auto whitespace-nowrap px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+              >
+                {errorAction.label}
+              </button>
+            </div>
+          ),
+          duration: 0, // Keep message visible until dismissed
+        });
+      } else {
+        message.error(errorMessage);
+      }
     }
-  }, [errorMessage]);
+  }, [errorMessage, errorAction]);
 
   // Pre-select demo image and default color for guest mode
   useEffect(() => {
@@ -1203,7 +1223,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     return null;
   }, [activeProjectId, activeSpaceId, projects.length, isGuestMode]);
 
-
   return (
     <div className="flex bg-gray-50">
       <AsideSection />
@@ -1728,6 +1747,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             // handleGenerateMoreSuccess(); // If this existed, call it. But simple close is likely enough based on current store logic that updates optimistic.
           }}
           onCancel={() => dispatch(setIsGenerateModalOpen(false))}
+          onError={setErrorMessage}
+          onErrorAction={setErrorAction}
           assetType={customPromptAssetType}
           onGenerateClick={() => {
             // Close the tour when generate button is clicked

@@ -94,7 +94,7 @@ export type AssetType = (typeof ASSET_TYPES)[number];
 /**
  * Default credit limit for free users (V points)
  */
-export const DEFAULT_CREDIT_LIMIT = 100;
+export const DEFAULT_CREDIT_LIMIT = 1000;
 
 /**
  * Credit multipliers for each task type

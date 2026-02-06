@@ -90,13 +90,26 @@ interface GenerateMoreModalProps {
   userId: string | undefined;
   onSuccess: () => void; // Called after successful save to refresh images
   onCancel: () => void;
+  onError?: (message: string) => void;
+  onErrorAction?: (action: { label: string; action: () => void } | null) => void;
   onGenerateClick?: () => void; // Called when generate button is clicked
   assetType?: string;
 }
 
 const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProps>(
   (
-    { isOpen, sourceImage, sourceAsset, userId, onSuccess, onCancel, onGenerateClick, assetType },
+    {
+      isOpen,
+      sourceImage,
+      sourceAsset,
+      userId,
+      onSuccess,
+      onCancel,
+      onError,
+      onErrorAction,
+      onGenerateClick,
+      assetType,
+    },
     ref
   ) => {
     // Get dispatch from Redux
@@ -111,6 +124,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       totalCredits,
       showCreditExhaustedModal,
       setShowCreditExhaustedModal,
+      hasEnabledOwnKey,
     } = useCreditCheck({ userId });
     // Get active project and space from Redux store
     const activeProjectId = useSelector(selectActiveProjectId);
@@ -305,18 +319,24 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const isCustomPromptRequiredForTask = isCustomPromptRequired(activeTaskName);
 
     // Use image processing hook
-    const { processImage, isProcessingImage, errorMessage, setErrorMessage, cancelProcessing } =
-      useImageProcessing({
-        userId,
-        guestSessionId,
-        selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
-        thinkingMode,
-        options: {
-          selectedColor,
-          selectedTexture,
-          selectedItem,
-        },
-      });
+    const {
+      processImage,
+      isProcessingImage,
+      errorMessage,
+      setErrorMessage,
+      errorAction,
+      cancelProcessing,
+    } = useImageProcessing({
+      userId,
+      guestSessionId,
+      selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
+      thinkingMode,
+      options: {
+        selectedColor,
+        selectedTexture,
+        selectedItem,
+      },
+    });
 
     // Get generate button state
     const {
@@ -360,6 +380,16 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         setValidationError(null);
       }
     }, [selectedColor]);
+
+    // Propagate error message and action to parent
+    useEffect(() => {
+      if (onError && errorMessage) {
+        onError(errorMessage);
+      }
+      if (onErrorAction) {
+        onErrorAction(errorAction);
+      }
+    }, [errorMessage, errorAction, onError, onErrorAction]);
 
     const handleGenerate = useCallback(async () => {
       // If guest has already generated, show login modal
@@ -1252,20 +1282,22 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   </Tooltip>
                 )}
                 <Tooltip title={isGenerateDisabled ? disableReason : ''} key="generate-tooltip">
-                    <Button
-                      key="generate"
-                      type="primary"
-                      onClick={handleGenerate}
-                      disabled={isGenerateDisabled || isOptimizingPrompt}
-                      data-tour="modal-generate-button"
-                      className="flex items-center gap-1.5"
-                    >
-                      Generate
+                  <Button
+                    key="generate"
+                    type="primary"
+                    onClick={handleGenerate}
+                    disabled={isGenerateDisabled || isOptimizingPrompt}
+                    data-tour="modal-generate-button"
+                    className="flex items-center gap-1.5"
+                  >
+                    Generate
+                    {!hasEnabledOwnKey && (
                       <div className="flex items-center bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">
                         {getCreditCost(activeTaskName, thinkingMode)}
                         <VPointsIcon size={20} className="ml-1 opacity-90" />
                       </div>
-                    </Button>
+                    )}
+                  </Button>
                 </Tooltip>
               </div>
             </div>
@@ -1559,10 +1591,12 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                               }
                             >
                               {isOptimizingPrompt ? 'Optimizing...' : 'Help me write'}
-                              <div className="ml-1.5 flex items-center bg-gray-100/50 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-600">
-                                {getCreditCost('optimize_prompt', false)}
-                                <VPointsIcon size={20} className="ml-1 opacity-70" />
-                              </div>
+                              {!hasEnabledOwnKey && (
+                                <div className="ml-1.5 flex items-center bg-gray-100/50 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-600">
+                                  {getCreditCost('optimize_prompt', false)}
+                                  <VPointsIcon size={20} className="ml-1 opacity-70" />
+                                </div>
+                              )}
                             </Button>
                           </Tooltip>
                         </div>
