@@ -153,8 +153,6 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
       }
     };
 
-
-
     loadAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, effectiveProjectId, assetType]);
@@ -265,18 +263,16 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
     async (reorderedIds: string[]): Promise<void> => {
       // Basic validation
       if (!isReady || !effectiveProjectId) return;
-      
+
       // Determine collection name
       let collectionName: 'custom_textures' | 'custom_items' | null = null;
       if (isTexture) collectionName = 'custom_textures';
       if (isItem) collectionName = 'custom_items';
-      
-      if (!collectionName) return; 
+
+      if (!collectionName) return;
 
       // Get current assets for this type
-      const currentAssets = isTexture 
-         ? projectAssets?.customTextures 
-         : projectAssets?.customItems;
+      const currentAssets = isTexture ? projectAssets?.customTextures : projectAssets?.customItems;
 
       if (!currentAssets || currentAssets.length === 0) return;
 
@@ -286,12 +282,12 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
       // contextId in adapter is essentially the userId (or guest ID)
       dispatch(
         reorderAssetsWithDebounce(
-            adapter.contextId, // userId
-            effectiveProjectId,
-            null, // spaceId for project-level
-            collectionName,
-            reorderedIds,
-            currentAssets as Array<Asset>
+          adapter.contextId, // userId
+          effectiveProjectId,
+          null, // spaceId for project-level
+          collectionName,
+          reorderedIds,
+          isTexture ? (currentAssets as Texture[]) : (currentAssets as Item[])
         )
       );
     },

@@ -125,7 +125,7 @@ export const reorderAssetsWithDebounce =
       // For custom assets, we don't have atomic reorder actions, so we just set the full list
       // Creating the new sorted list
       const assetMap = new Map(allAssets.map((a) => [a.id, a as Texture]));
-      
+
       // Create shallow copies to avoid mutating read-only Redux state
       const newSortedAssets = reorderedIds
         .map((id) => {
@@ -133,21 +133,20 @@ export const reorderAssetsWithDebounce =
           return asset ? { ...asset } : null;
         })
         .filter((a): a is Texture => !!a);
-      
+
       // Update orders in the new list to match the calculated updates (optimistic)
-      updates.forEach(u => {
-        const asset = newSortedAssets.find(a => a.id === u.id);
+      updates.forEach((u) => {
+        const asset = newSortedAssets.find((a) => a.id === u.id);
         if (asset) asset.order = u.order;
       });
 
       // Preserve any assets that weren't in reorderedIds (append them)
       // Filter to check for any missing assets (if needed for future validation)
       // Simplified missing check:
-      const processedIds = new Set(newSortedAssets.map(a => a.id));
-      const remainingAssets = (allAssets as Texture[]).filter(a => !processedIds.has(a.id));
-      
-      if(remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
+      const processedIds = new Set(newSortedAssets.map((a) => a.id));
+      const remainingAssets = (allAssets as Texture[]).filter((a) => !processedIds.has(a.id));
 
+      if (remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
 
       dispatch(setCustomTextures({ projectId, textures: newSortedAssets }));
 
@@ -155,7 +154,7 @@ export const reorderAssetsWithDebounce =
       rollbackAction = (d) => d(setCustomTextures({ projectId, textures: allAssets as Texture[] }));
     } else if (collectionName === 'custom_items') {
       const assetMap = new Map(allAssets.map((a) => [a.id, a as Item]));
-      
+
       // Create shallow copies
       const newSortedAssets = reorderedIds
         .map((id) => {
@@ -164,15 +163,15 @@ export const reorderAssetsWithDebounce =
         })
         .filter((a): a is Item => !!a);
 
-      updates.forEach(u => {
-        const asset = newSortedAssets.find(a => a.id === u.id);
+      updates.forEach((u) => {
+        const asset = newSortedAssets.find((a) => a.id === u.id);
         if (asset) asset.order = u.order;
       });
 
-      const processedIds = new Set(newSortedAssets.map(a => a.id));
-      const remainingAssets = (allAssets as Item[]).filter(a => !processedIds.has(a.id));
-      
-      if(remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
+      const processedIds = new Set(newSortedAssets.map((a) => a.id));
+      const remainingAssets = (allAssets as Item[]).filter((a) => !processedIds.has(a.id));
+
+      if (remainingAssets.length > 0) newSortedAssets.push(...remainingAssets);
 
       dispatch(setCustomItems({ projectId, items: newSortedAssets }));
 
@@ -204,13 +203,4 @@ export const reorderImagesWithDebounce = (
   spaceId: string,
   reorderedImageIds: string[],
   allImages: ImageData[]
-) =>
-  reorderAssetsWithDebounce(
-    userId,
-    projectId,
-    spaceId,
-    'images',
-    reorderedImageIds,
-    allImages
-  );
-
+) => reorderAssetsWithDebounce(userId, projectId, spaceId, 'images', reorderedImageIds, allImages);

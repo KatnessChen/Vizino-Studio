@@ -3,7 +3,6 @@ import { db } from './firestoreService';
 import { User } from '@/types';
 import { GEMINI_TASKS, GeminiTaskName } from './gemini/geminiTasks';
 
-
 /**
  * Convert Firestore User document to User interface
  */
@@ -15,10 +14,12 @@ const convertFirestoreUser = (data: DocumentData): User => {
     photoURL: data.photoURL,
     usage: data.usage,
     lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
-    apiKey: data.apiKey ? {
-      geminiKey: data.apiKey.geminiKey,
-      isActive: data.apiKey.isActive ?? true,
-    } : undefined,
+    apiKey: data.apiKey
+      ? {
+          geminiKey: data.apiKey.geminiKey,
+          isActive: data.apiKey.isActive ?? true,
+        }
+      : undefined,
   };
 };
 
@@ -142,13 +143,10 @@ export const incrementTaskUsage = async (
  * @param uid - User ID
  * @param isActive - New active status
  */
-export const toggleUserAiKeyStatus = async (
-  uid: string,
-  isActive: boolean
-): Promise<void> => {
+export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Promise<void> => {
   try {
     const userRef = doc(db, 'users', uid);
-    
+
     await setDoc(
       userRef,
       {
@@ -178,7 +176,7 @@ const SECRET_KEY = import.meta.env.VITE_USER_API_KEY_SECRET || 'default-dev-secr
 const xorCipher = (text: string): string => {
   const textChars = text.split('');
   const keyChars = SECRET_KEY.split('');
-  
+
   return textChars
     .map((char, index) => {
       const charCode = char.charCodeAt(0);
@@ -230,7 +228,7 @@ export const updateUserAiKey = async (
 ): Promise<void> => {
   try {
     const userRef = doc(db, 'users', uid);
-    
+
     // Encrypt the key before saving
     // If apiKey is empty strings (removing), we store empty string
     const encryptedKey = apiKey ? encryptKey(apiKey) : '';
