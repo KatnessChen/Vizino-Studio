@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
 import { App as AntdApp } from 'antd';
-
 import { Provider } from 'react-redux';
 import '@/styles/main.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -19,7 +18,7 @@ import LoginRequiredModal from './components/modal/LoginRequiredModal';
 import { GuestOnboardingTourRef } from './components/GuestOnboardingTour';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AntdStaticHelper } from './utils/antd';
-
+import GeminiClientManager from './components/GeminiClientManager';
 
 // Main Layout Component - allows both authenticated and guest users
 const MainLayout: React.FC = () => {
@@ -38,10 +37,8 @@ const MainLayout: React.FC = () => {
   return (
     <ErrorBoundary level="page">
       <div className="h-screen flex flex-col overflow-hidden">
-
         <Header />
         <div className="flex-1 overflow-hidden">
-
           <div className="app-viewport">
             <Routes>
               <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
@@ -99,6 +96,7 @@ const AppContent: React.FC = () => {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
+      <GeminiClientManager />
       <Router>
         <Routes>
           {/* Group protected routes under the shared layout */}
@@ -106,7 +104,7 @@ const AppContent: React.FC = () => {
             <Route path={ROUTES.ADMIN_SETTING} element={<AdminSettingPage />} />
             <Route path={ROUTES.USER_PROFILE} element={<UserProfilePage />} />
           </Route>
-          
+
           <Route path="/*" element={<MainLayout />} />
         </Routes>
         <SpeedInsights />
@@ -129,7 +127,6 @@ const App: React.FC = () => {
         </Provider>
       </AntdApp>
     </ErrorBoundary>
-
   );
 };
 
