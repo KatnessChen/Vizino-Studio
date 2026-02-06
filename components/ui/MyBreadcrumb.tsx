@@ -51,7 +51,7 @@ import {
   setLoadColorsError,
   setLoadTexturesError,
 } from '@/stores/customAssetsStore';
-import { setSelectedColor, setSelectedTexture } from '@/stores/taskStore';
+import { setSelectedAssets } from '@/stores/taskStore';
 import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { selectHasGeneratedImage } from '@/stores/guestStore';
 import { generateRoute } from '@/constants/routes';
@@ -131,8 +131,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
       dispatch(setActiveSpaceId(firstSpace ? firstSpace.id : null));
       onProjectSelected?.(projectId);
 
-      dispatch(setSelectedColor(null));
-      dispatch(setSelectedTexture(null));
+      dispatch(setSelectedAssets([]));
 
       // Reset task-related state when switching projects
       dispatch(resetTaskState());
@@ -567,7 +566,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             {/* Guest Mode Badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
               <span className="text-sm">💫</span>
-              <span className="text-indigo-700 font-bold text-xs tracking-wide uppercase">
+              <span className="text-indigo-700 font-bold text-xs uppercase">
+
                 Guest Mode
               </span>
             </div>

@@ -105,6 +105,9 @@ devDependencies:
   globals:
     specifier: ^16.5.0
     version: 16.5.0
+  husky:
+    specifier: ^8.0.0
+    version: 8.0.0
   jsdom:
     specifier: ^27.4.0
     version: 27.4.0
@@ -4212,6 +4215,12 @@ packages:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  /husky@8.0.0:
+    resolution: {integrity: sha512-4qbE/5dzNDNxFEkX9MNRPKl5+omTXQzdILCUWiqG/lWIAioiM5vln265/l6I2Zx8gpW8l1ukZwGQeCFbBZ6+6w==}
+    engines: {node: '>=14'}
+    hasBin: true
+    dev: true
 
   /idb@7.1.1:
     resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}

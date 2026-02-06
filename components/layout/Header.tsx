@@ -48,7 +48,8 @@ const Header: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center cursor-pointer" onClick={() => navigate(ROUTES.HOME)}>
               <div className="text-xl text-white">Vizino AI</div>
-              <div className="text-white/80 font-medium text-xs mt-1.5 ml-3 tracking-wide uppercase">
+              <div className="text-white/80 font-medium text-xs mt-1.5 ml-3 tracking-tight uppercase">
+
                 Precise AI Design
               </div>
             </div>
@@ -60,8 +61,9 @@ const Header: React.FC = () => {
               <Button
                 type="link"
                 onClick={() => navigate(ROUTES.ADMIN_SETTING)}
-                style={{ color: 'rgba(255,255,255,0.75)' }}
+                className="!text-white/75"
               >
+
                 Admin Settings
               </Button>
             )}
@@ -88,12 +90,12 @@ const Header: React.FC = () => {
       {isAuthPanelOpen && (
         <div
           ref={authPanelRef}
-          className="absolute right-6 bg-white rounded-lg shadow-xl border border-gray-200"
-          style={{ top: 48, width: 400, maxWidth: '90vw', zIndex: 1000 }}
+          className="absolute right-6 top-12 w-[400px] max-w-[90vw] z-[1000] bg-white rounded-lg shadow-xl border border-gray-200"
         >
           <AuthPanel />
         </div>
       )}
+
     </>
   );
 };

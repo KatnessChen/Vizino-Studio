@@ -1,4 +1,4 @@
-import { Input, Checkbox, Typography } from 'antd';
+import { Input, Checkbox, Typography, Tag } from 'antd';
 import { GeminiTaskName, GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 
 const MAX_IMAGE_NAME_LENGTH = 50;
@@ -26,6 +26,11 @@ interface CustomizeImageNameFormProps {
   suffixItemName?: boolean;
   onSuffixItemNameChange?: (value: boolean) => void;
   showTitle?: boolean;
+
+  hideSuffixMimeType?: boolean;
+  description?: string;
+  onDescriptionChange?: (value: string) => void;
+  aiSuggestedName?: string;
 }
 
 const CustomizeImageNameForm: React.FC<CustomizeImageNameFormProps> = ({
@@ -50,6 +55,10 @@ const CustomizeImageNameForm: React.FC<CustomizeImageNameFormProps> = ({
   suffixItemName = false,
   onSuffixItemNameChange,
   showTitle = false,
+  hideSuffixMimeType = false,
+  description,
+  onDescriptionChange,
+  aiSuggestedName,
 }) => {
   return (
     <div>
@@ -61,9 +70,10 @@ const CustomizeImageNameForm: React.FC<CustomizeImageNameFormProps> = ({
 
       {/* Base Name Input */}
       <div style={{ marginBottom: 16 }}>
-        <Typography.Text strong style={{ display: 'block', marginBottom: 4 }}>
-          Base Name
-        </Typography.Text>
+        <div className="flex gap-2 mb-2">
+          <Typography.Text strong>Base Name</Typography.Text>
+          {aiSuggestedName && baseName === aiSuggestedName && <Tag>AI Suggested</Tag>}
+        </div>
         <Input
           value={baseName}
           onChange={(e) => onBaseNameChange(e.target.value)}
@@ -77,6 +87,22 @@ const CustomizeImageNameForm: React.FC<CustomizeImageNameFormProps> = ({
           </Typography.Text>
         )}
       </div>
+
+      {/* Description Input */}
+      {onDescriptionChange && (
+        <div style={{ marginBottom: 16 }}>
+          <Typography.Text strong style={{ display: 'block', marginBottom: 4 }}>
+            Description
+          </Typography.Text>
+          <Input.TextArea
+            value={description || ''}
+            onChange={(e) => onDescriptionChange(e.target.value)}
+            placeholder="Enter image description"
+            rows={3}
+            autoSize={{ minRows: 2, maxRows: 6 }}
+          />
+        </div>
+      )}
 
       {/* Checkbox Options */}
       <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -92,12 +118,14 @@ const CustomizeImageNameForm: React.FC<CustomizeImageNameFormProps> = ({
         >
           Suffix with timestamp
         </Checkbox>
-        <Checkbox
-          checked={suffixMimeType}
-          onChange={(e) => onSuffixMimeTypeChange(e.target.checked)}
-        >
-          Suffix with file extension
-        </Checkbox>
+        {!hideSuffixMimeType && (
+          <Checkbox
+            checked={suffixMimeType}
+            onChange={(e) => onSuffixMimeTypeChange(e.target.checked)}
+          >
+            Suffix with file extension
+          </Checkbox>
+        )}
         {taskName === GEMINI_TASKS.RECOLOR_WALL.task_name && colorName && (
           <Checkbox
             checked={suffixColorName}

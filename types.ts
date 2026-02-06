@@ -1,9 +1,12 @@
 import { Timestamp } from 'firebase/firestore';
 import { GeminiTaskName } from './services/gemini/geminiTasks';
+import { ASSET_IMAGE, ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
 
-export interface ImageData {
+export interface AppImageData {
   id: string;
   name: string;
+
+  assetType: typeof ASSET_IMAGE;
 
   // The space this image belongs to
   spaceId: string | null;
@@ -39,6 +42,9 @@ export interface ImageData {
   updatedAt: Timestamp;
 }
 
+// Type alias to avoid conflict with DOM ImageData
+export type ImageData = AppImageData;
+
 /**
  * Record of an image operations
  */
@@ -63,40 +69,40 @@ export interface ImageOperation {
    */
   options: {
     /**
-      * The ID of the color used, if applicable (e.g., "HC-170").
-      */
+     * The ID of the color used, if applicable (e.g., "HC-170").
+     */
     colorId: string | null;
 
     /**
-      * A snapshot of the color's details at the time of the operation.
-      * This is to preserve the color information even if the original color definition changes later.
-      */
+     * A snapshot of the color's details at the time of the operation.
+     * This is to preserve the color information even if the original color definition changes later.
+     */
     colorSnapshot: {
       name: string;
       hex: string;
     } | null;
 
     /**
-      * The ID of the texture used, if applicable.
-      */
+     * The ID of the texture used, if applicable.
+     */
     textureId: string | null;
 
     /**
-      * A snapshot of the texture's details at the time of the operation.
-      */
+     * A snapshot of the texture's details at the time of the operation.
+     */
     textureSnapshot: {
       name: string;
       url: string; // The URL of the texture image at that time
     } | null;
 
     /**
-      * The ID of the item used, if applicable.
-      */
+     * The ID of the item used, if applicable.
+     */
     itemId: string | null;
 
     /**
-      * A snapshot of the item's details at the time of the operation.
-      */
+     * A snapshot of the item's details at the time of the operation.
+     */
     itemSnapshot: {
       name: string;
       url: string; // The URL of the item image at that time
@@ -113,8 +119,14 @@ export interface User {
   photoURL: string | null;
   usage: {
     [key in GeminiTaskName]: number;
+  } & {
+    thinking_mode?: number;
   };
   lastLoginAt: Date;
+  apiKey?: {
+    geminiKey?: string; // Encrypted API Key
+    isActive: boolean;  // User choice to use custom key or not
+  };
 }
 
 // ============================================================================
@@ -195,15 +207,19 @@ export interface Color {
   id: string;
   name: string;
   hex: string;
+  assetType: typeof ASSET_COLOR;
   description?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
 }
 
 export interface Texture {
   id: string;
   name: string;
   textureImageDownloadUrl: string;
+  imageDownloadUrl?: string; // For compatibility with ImageData
+  assetType: typeof ASSET_TEXTURE;
   description?: string;
   base64?: string;
   mimeType?: string;
@@ -212,12 +228,22 @@ export interface Texture {
   aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
+  // For ImageData compatibility
+  spaceId?: string | null;
+  parentImageId?: string | null;
+  storageFilePath?: string;
+  order?: number | null;
+  isDeleted?: boolean;
+  deletedAt?: Timestamp | null;
 }
 
 export interface Item {
   id: string;
   name: string;
   itemImageDownloadUrl: string;
+  imageDownloadUrl?: string; // For compatibility with ImageData
+  assetType: typeof ASSET_ITEM;
   description?: string;
   base64?: string;
   mimeType?: string;
@@ -226,7 +252,17 @@ export interface Item {
   aspect_ratio?: number | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  evolutionChain?: ImageOperation[];
+  // For ImageData compatibility
+  spaceId?: string | null;
+  parentImageId?: string | null;
+  storageFilePath?: string;
+  order?: number | null;
+  isDeleted?: boolean;
+  deletedAt?: Timestamp | null;
 }
+
+export type Asset = Color | Texture | Item;
 
 /**
  * Custom Prompt document structure in Firestore.

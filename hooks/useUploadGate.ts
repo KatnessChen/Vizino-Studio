@@ -9,8 +9,14 @@ import {
   setShowLoginRequiredModal,
 } from '@/stores/guestStore';
 import { ImageData, ImageOperation } from '@/types';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
 
-export type PendingUploadType = 'image' | 'color' | 'texture' | 'item' | 'generated';
+export type PendingUploadType =
+  | 'image'
+  | typeof ASSET_COLOR
+  | typeof ASSET_TEXTURE
+  | typeof ASSET_ITEM
+  | 'generated';
 
 interface PendingGeneratedImageSave {
   base64: string;
@@ -52,7 +58,7 @@ export function useUploadGate() {
    * @returns true if upload is allowed, false if blocked (login modal shown)
    */
   const gateUpload = useCallback(
-    (type: PendingUploadType, data: any): boolean => {
+    (type: PendingUploadType, data: unknown): boolean => {
       if (!shouldRequireLogin()) {
         return true; // Allow upload
       }

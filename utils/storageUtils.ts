@@ -2,13 +2,17 @@
  * Admin Settings stored in localStorage
  */
 export interface AdminSettings {
-  mock_limit_reached: boolean;
+  mock_limit_reached: boolean; // Existing operation limit mock
+  mock_credit_limit_reached: boolean; // New: Mock V points limit reached
+  bypass_credit_limit: boolean; // New: Bypass V points limit checks
 }
 
 const ADMIN_SETTINGS_KEY = 'admin_settings';
 
 const DEFAULT_SETTINGS: AdminSettings = {
   mock_limit_reached: false,
+  mock_credit_limit_reached: false,
+  bypass_credit_limit: false,
 };
 
 /**

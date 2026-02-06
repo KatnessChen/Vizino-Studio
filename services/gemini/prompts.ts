@@ -1,22 +1,9 @@
+import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
+
 /**
  * Centralized prompt templates for Gemini API requests
  * Organized by task type for easy expansion
  */
-
-import { GeminiTask, GEMINI_TASKS } from './geminiTasks';
-
-// ═══════════════════════════════════════════════════════════
-// SHARED CONSTANTS
-// ═══════════════════════════════════════════════════════════
-
-const DIMENSION_REQUIREMENT = `
-  ⚠️ CRITICAL OUTPUT DIMENSIONS: The generated image MUST have the EXACT same pixel dimensions and aspect ratio as the SECOND IMAGE (interior photo).
-  - If SECOND IMAGE is 1920x1080 (16:9), output MUST be exactly 1920x1080 (16:9)
-  - If SECOND IMAGE is 1024x1024 (1:1), output MUST be exactly 1024x1024 (1:1)
-  - NEVER change the aspect ratio or dimensions - maintain pixel-perfect match
-  - Scale all content to fit within the exact original dimensions
-  - NO cropping, padding, or dimension changes allowed
-`;
 
 // ═══════════════════════════════════════════════════════════
 // PROMPTS
@@ -47,7 +34,7 @@ export const getRecolorTaskDefaultPrompt = (
       : ''
   }
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic recolored image where ALL walls display ${colorName} (${colorHex}) with maximum visual distinction from the original.${DIMENSION_REQUIREMENT}
+  Deliver: A high-quality, photorealistic recolored image where ALL walls display ${colorName} (${colorHex}) with maximum visual distinction from the original.
 `;
 
 export const getAddTextureDefaultPrompt = (
@@ -77,13 +64,11 @@ export const getAddTextureDefaultPrompt = (
   ${customPrompt || ''}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic image where the wall surface(s) display the ${textureName} texture (sampled from the first image) applied seamlessly and professionally, following the user's scope or defaulting to all walls.${DIMENSION_REQUIREMENT}
+  Deliver: A high-quality, photorealistic image where the wall surface(s) display the ${textureName} texture (sampled from the first image) applied seamlessly and professionally, following the user's scope or defaulting to all walls.
 `;
 
 export const getAddObjectDefaultPrompt = (itemName: string, customPrompt: string | undefined) => `
   You are an expert interior designer and professional image editor specializing in seamlessly placing objects, characters, or elements into interior spaces.
-
-  ⚠️ CRITICAL OUTPUT REQUIREMENT: The generated image MUST have the EXACT same pixel dimensions and aspect ratio as the SECOND IMAGE (interior photo). Maintain pixel-perfect dimensions - no changes allowed.
 
   You will receive TWO images:
   1. FIRST IMAGE: A specific element (${itemName})
@@ -109,18 +94,20 @@ export const getAddObjectDefaultPrompt = (itemName: string, customPrompt: string
   ${customPrompt || ''}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.${DIMENSION_REQUIREMENT}
+  Deliver: A high-quality, photorealistic image where the ${itemName} (from the first image) has been seamlessly placed into the interior space with realistic scale, perspective, lighting, and shadows. The item should look like it was photographed as part of the original room, not artificially added.
 `;
 
-export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
+export const getUseCustomPromptDefaultPrompt = (customPrompt: string, assetContext?: string) => `
   You are an expert interior designer and professional image editor with advanced capabilities in transforming interior spaces.
 
-  Your task is to modify the provided interior photo according to the user's custom instructions below.
+  Your task is to process the provided input image according to the user's custom instructions below.
+
+  ${assetContext ? `INPUT CONTEXT:\n  ${assetContext}` : 'The provided image is an interior photo to be modified.'}
 
   CRITICAL QUALITY STANDARDS:
   1. Maintain photorealistic quality and natural appearance
   2. Preserve proper lighting, shadows, and perspective
-  3. Ensure all modifications blend seamlessly with the original environment
+  3. Ensure all modifications blend seamlessly
   4. Keep architectural elements and proportions realistic
   5. Maintain image resolution and clarity
   6. Apply changes only as specified in the user instructions
@@ -130,7 +117,24 @@ export const getUseCustomPromptDefaultPrompt = (customPrompt: string) => `
   ${customPrompt}
 
   FINAL OUTPUT REQUIREMENT:
-  Deliver: A high-quality, photorealistic modified image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.${DIMENSION_REQUIREMENT}
+  Deliver: A high-quality, photorealistic image that accurately fulfills the user's instructions while maintaining professional interior design standards and visual coherence.
+`;
+
+export const getColorAdjustmentDefaultPrompt = (colorHex: string, customPrompt: string) => `
+  You are a color theory expert and a digital design assistant.
+
+  Your task is to take a base color (HEX: ${colorHex}) and modify it according to the user's instructions.
+
+  INPUT COLOR: ${colorHex}
+  USER INSTRUCTION: "${customPrompt}"
+
+  CRITICAL OUTPUT REQUIREMENT:
+  1. Return ONLY a valid 6-digit HEX color code for the new color.
+  2. The output must be valid JSON in the following format:
+     { "hex": "#RRGGBB", "name": "Suggested Color Name" }
+  3. Include a creative name for the new color in the "name" field.
+  3. Do not include any explanation, markdown formatting, or text outside the JSON object.
+  4. Ensure the resulting color logically follows the user's request (e.g. "lighter", "darker", "more vibrant", "pastel version").
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -174,14 +178,65 @@ export const getPromptByTask = (
       }
       return getAddObjectDefaultPrompt(itemName, customPrompt);
 
-    case GEMINI_TASKS.CUSTOM_PROMPT.task_name:
+    case GEMINI_TASKS.CUSTOM_PROMPT.task_name: {
       if (!customPrompt) {
         throw new Error('customPrompt is required for CUSTOM_PROMPT task');
       }
-      return getUseCustomPromptDefaultPrompt(customPrompt);
+
+      let assetContext = undefined;
+      if (colorName && colorHex) {
+        assetContext = `The provided image is a solid color reference: ${colorName} (${colorHex}). Use this color as the primary reference for the generation as requested.`;
+      } else if (textureName) {
+        assetContext = `The provided image is a texture reference: ${textureName}. Use this texture as the primary material reference.`;
+      } else if (itemName) {
+        assetContext = `The provided image is an object/item reference: ${itemName}. Use this object as the primary element reference.`;
+      }
+
+      return getUseCustomPromptDefaultPrompt(customPrompt, assetContext);
+    }
+
+    case GEMINI_TASKS.COLOR_ADJUSTMENT.task_name:
+      if (!colorHex) {
+        throw new Error('colorHex is required for COLOR_ADJUSTMENT task');
+      }
+      if (!customPrompt) {
+        throw new Error('customPrompt is required for COLOR_ADJUSTMENT task');
+      }
+      return getColorAdjustmentDefaultPrompt(colorHex, customPrompt);
+
+    case GEMINI_TASKS.REMOVE_CLUTTER.task_name: {
+      // Use custom prompt if provided, otherwise use default magic prompt
+      return customPrompt || MAGIC_PROMPT.REMOVE_CLUTTER;
+    }
 
     default:
       // Exhaustive check - all task types should be handled above
       return getUseCustomPromptDefaultPrompt('Unsupported task type');
   }
+};
+
+// Prompt for suggesting a name based on description
+export const getNameSuggestionPrompt = (customPrompt: string, assetType: string = 'image') => {
+  return `
+    Based on this user description for generating a new ${assetType}:
+    "${customPrompt}"
+
+    Suggest a creative, short, and descriptive name (max 5 words) for the resulting ${assetType}.
+    Return ONLY the name as a plain string. No quotes, no markdown, no JSON.
+  `;
+};
+
+// ═══════════════════════════════════════════════════════════
+// MAGIC PROMPT TEXTS
+// ═══════════════════════════════════════════════════════════
+
+export const MAGIC_PROMPT = {
+  REMOVE_CLUTTER:
+    'Act as a professional interior cleaner and organizer. Identify and remove all clutter, small personal items, trash, loose papers, toys, and unnecessary objects from surfaces like tables, floors, and counters. Keep the main furniture and architectural elements intact. The goal is to create a pristine, show-home ready appearance where the space looks spacious, tidy, and organized. Fill in the background where items are removed with appropriate textures and lighting to match the surroundings seamlessly.',
+  BRIGHTEN_SPACE:
+    'Act as a professional lighting designer and photographer. Enhancing the ambient lighting of the room. Significantly increase the brightness and exposure to eliminate dark shadows and gloomy areas. Use natural daylight simulation to creating a bright, airy, and well-lit atmosphere. Adjust the white balance to be neutral and fresh, avoiding yellow or blue casts. The room should feel inviting, spacious, and filled with soft, diffused light.',
+  MODERN_STYLE:
+    'Act as a lead interior designer specializing in modern aesthetics. Transform this room into a sleek, Modern style space. Use a neutral color palette with whites, greys, and blacks. Replace existing furniture with minimalist, straight-line designs. Incorporate materials like glass, steel, and matte finishes. Simplify the decor to emphasize open space and clean lines. Ensure the lighting is contemporary and architectural.',
+  INDUSTRIAL_STYLE:
+    'Act as an interior designer specializing in Industrial Chic. Transform this room to reflect an industrial design aesthetic. Incorporate raw materials such as exposed brick walls, concrete flooring, and distressed wood. Use metal accents in black or rust finishes for furniture and fixtures. Expose architectural elements like beams or ductwork if possible. Use a moody but warm lighting scheme with Edison bulbs or metal pendant lights. The atmosphere should be raw, edgy, and sophisticated.',
 };

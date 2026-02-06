@@ -3,18 +3,19 @@ import { Modal, Button, Typography } from 'antd';
 import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
 import { ImageData } from '@/types';
 import { imageCache, formatTimestamp } from '@/utils';
-import { getMetadata, ref as storageRef } from 'firebase/storage';
-import { storage } from '@/services/firestoreService';
 
-interface ViewMoreDisplayModalProps {
+interface GenerationHistoryModalProps {
   isOpen: boolean;
   image: ImageData;
   onClose: () => void;
 }
 
-const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, image, onClose }) => {
+const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
+  isOpen,
+  image,
+  onClose,
+}) => {
   const [imageSources, setImageSources] = useState<Record<string, string>>({});
-  const [fileSizeMB, setFileSizeMB] = useState<string | null>(null);
 
   const hasEvolutionChain = image.evolutionChain && image.evolutionChain.length > 0;
 
@@ -32,7 +33,7 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
             sources[image.imageDownloadUrl] = `data:${image.mimeType};base64,${base64}`;
           }
         } catch (error) {
-          console.warn('[ViewMoreDisplayModal] Failed to load current image from cache:', error);
+          console.warn('[GenerationHistoryModal] Failed to load current image from cache:', error);
         }
       }
 
@@ -44,64 +45,24 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
               const base64 = await imageCache.get(operation.imageDownloadUrl);
               if (base64) {
                 // Use operation's mimeType if available, fallback to image.mimeType, then default to image/jpeg
-                const mimeType = (operation as any).mimeType || image.mimeType || 'image/jpeg';
+                const mimeType = image.mimeType || 'image/jpeg';
                 sources[operation.imageDownloadUrl] = `data:${mimeType};base64,${base64}`;
               }
             } catch (error) {
-              console.warn('[ViewMoreDisplayModal] Failed to load source image from cache:', error);
+              console.warn(
+                '[GenerationHistoryModal] Failed to load source image from cache:',
+                error
+              );
             }
           }
         }
       }
 
       setImageSources(sources);
-
-      // Determine file size (MB)
-      try {
-        // 1) If dimensions are present, estimate size using 3 bytes per pixel (RGB)
-        if (typeof image.width === 'number' && typeof image.height === 'number') {
-          const estimatedBytes = image.width * image.height * 3; // rough RGB estimate
-          setFileSizeMB(bytesToMBString(estimatedBytes));
-          return;
-        }
-
-        // 2) Prefer storageFilePath if available (actual size)
-        if (image.storageFilePath) {
-          const metadata = await getMetadata(storageRef(storage, image.storageFilePath));
-          if (metadata && typeof metadata.size === 'number') {
-            setFileSizeMB(bytesToMBString(metadata.size));
-            return;
-          }
-        }
-
-        // 3) Fallback: if imageDownloadUrl is data URI, compute from base64
-        if (image.imageDownloadUrl && image.imageDownloadUrl.startsWith('data:')) {
-          const parts = image.imageDownloadUrl.split('base64,');
-          if (parts.length === 2) {
-            const base64Str = parts[1];
-            const bytes = base64ToBytes(base64Str);
-            setFileSizeMB(bytesToMBString(bytes));
-            return;
-          }
-        }
-
-        // Unknown size
-        setFileSizeMB(null);
-      } catch (err) {
-        console.warn('[ViewMoreDisplayModal] Failed to determine file size:', err);
-        setFileSizeMB(null);
-      }
     };
 
     loadImages();
   }, [isOpen, image, hasEvolutionChain]);
-
-  // Helpers
-  const bytesToMBString = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  const base64ToBytes = (b64: string) => {
-    const padding = (b64.match(/=+$/) || [''])[0].length;
-    return Math.round((b64.length * 3) / 4 - padding);
-  };
 
   return (
     <Modal
@@ -109,93 +70,21 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
       onCancel={onClose}
       title={
         <Typography.Title level={4} style={{ margin: 0 }}>
-          Image Information
+          {'Generation History'}
         </Typography.Title>
       }
-      width={800}
+      width="60vw"
       centered
       footer={[
         <Button key="close" onClick={onClose} type="primary">
           Close
         </Button>,
       ]}
+      style={{ minWidth: '500px' }}
     >
-      {/* Content */}
       <div className="space-y-6">
-        {/* Section A: Basic Image Information */}
-        <div className="space-y-3 mt-6">
-          <div className="space-y-2">
-            {/* Image Name */}
-            <div className="flex items-start">
-              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                Image Name:
-              </span>
-              <span className="text-sm text-gray-800">{image.name}</span>
-            </div>
-
-            {/* File Type */}
-            <div className="flex items-start">
-              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                File Type:
-              </span>
-              <span className="text-sm text-gray-800">{image.mimeType || '-'}</span>
-            </div>
-
-            {/* Dimensions */}
-            <div className="flex items-start">
-              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                Dimensions:
-              </span>
-              <span className="text-sm text-gray-800">
-                {image.width && image.height ? `W${image.width} × H${image.height} pixels` : '-'}
-              </span>
-            </div>
-
-            {/* File Size */}
-            <div className="flex items-start">
-              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                File Size:
-              </span>
-              <span className="text-sm text-gray-800">{fileSizeMB ?? '-'}</span>
-            </div>
-
-            {/* Description */}
-            {image.description && (
-              <div className="flex items-start">
-                <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                  Description:
-                </span>
-                <span className="text-sm text-gray-800">{image.description}</span>
-              </div>
-            )}
-
-            {/* Created/Generation Time */}
-            <div className="flex items-start">
-              <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                {hasEvolutionChain ? 'Generation Time:' : 'Created Time:'}
-              </span>
-              <span className="text-sm text-gray-800">{formatTimestamp(image.createdAt)}</span>
-            </div>
-
-            {/* Update Time */}
-            {image.updatedAt && image.updatedAt !== image.createdAt && (
-              <div className="flex items-start">
-                <span className="text-sm font-medium text-gray-600 w-32 flex-shrink-0">
-                  Last Updated:
-                </span>
-                <span className="text-sm text-gray-800">{formatTimestamp(image.updatedAt)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section B: Evolution Chain */}
-        {hasEvolutionChain && (
+        {hasEvolutionChain ? (
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
-              Generation History
-            </h3>
-
             {image.evolutionChain.map((operation, index) => (
               <React.Fragment key={index}>
                 <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
@@ -213,28 +102,46 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                   </div>
 
                   <div className="flex flex-col md:flex-row">
-                    {/* Left Column - Target Image (60%) */}
-                    {operation.imageDownloadUrl && (
-                      <div className="md:w-[60%] p-4 bg-gray-100">
-                        <div className="space-y-2">
+                    {/* Left Column - Target Image or Color (50%) */}
+                    {operation.imageDownloadUrl ? (
+                      <div className="md:w-[50%] p-4 bg-gray-100 flex items-center justify-center">
+                        <div className="w-full max-w-[400px]">
                           <img
                             src={
                               imageSources[operation.imageDownloadUrl] || operation.imageDownloadUrl
                             }
                             alt="Target image"
-                            className="w-full object-contain rounded-md border border-gray-200 bg-white"
+                            className="w-full h-auto object-contain rounded-md border border-gray-200 bg-white"
                           />
                         </div>
                       </div>
-                    )}
+                    ) : operation.options?.colorSnapshot?.hex ? (
+                      <div className="md:w-[50%] p-4 bg-gray-100 flex items-center justify-center">
+                        <div
+                          className="w-full h-64 rounded-md border-2 border-gray-200 shadow-sm flex flex-col items-center justify-center text-white"
+                          style={{ backgroundColor: operation.options.colorSnapshot.hex }}
+                        >
+                          <span className="text-sm font-bold drop-shadow-md">
+                            {operation.options.colorSnapshot.name}
+                          </span>
+                          <span className="text-xs opacity-90 drop-shadow-md font-mono">
+                            {operation.options.colorSnapshot.hex}
+                          </span>
+                        </div>
+                      </div>
+                    ) : operation.options?.colorSnapshot?.hex ? (
+                      <div className="md:w-[50%] p-4 bg-gray-100 flex items-center justify-center">
+                        <div
+                          className="w-full h-64 rounded-md border-2 border-gray-200 shadow-sm"
+                          style={{ backgroundColor: operation.options?.colorSnapshot?.hex }}
+                        />
+                      </div>
+                    ) : null}
 
-                    {/* Right Column - Details (40%) */}
+                    {/* Right Column - Details (50%) */}
                     <div
-                      className={`${
-                        operation.imageDownloadUrl ? 'md:w-[40%]' : 'w-full'
-                      } p-4 space-y-3`}
+                      className={`${operation.imageDownloadUrl || operation.options?.colorSnapshot?.hex ? 'md:w-[50%]' : 'w-full'} p-4 space-y-3`}
                     >
-                      {/* 1. Custom Prompt */}
                       {operation.customPrompt && (
                         <div className="space-y-1">
                           <div className="text-xs font-medium text-gray-600 mb-2">
@@ -246,23 +153,19 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                         </div>
                       )}
 
-                      {/* 2. Options */}
-                      {(operation.options.colorSnapshot ||
-                        operation.options.textureSnapshot ||
-                        operation.options.itemSnapshot) && (
+                      {((operation.options?.colorSnapshot && operation.imageDownloadUrl) ||
+                        (operation.options?.textureSnapshot && !operation.customPrompt) ||
+                        (operation.options?.itemSnapshot && !operation.customPrompt)) && (
                         <div className="space-y-2">
                           <div className="text-xs font-medium text-gray-600 mb-2">Options:</div>
                           <div className="bg-white rounded p-3 space-y-2 border border-gray-200">
-                            {/* Color Option */}
-                            {operation.options.colorSnapshot && (
+                            {operation.options?.colorSnapshot && operation.imageDownloadUrl && (
                               <div className="space-y-1">
                                 <span className="text-xs text-gray-600">New Color:</span>
                                 <div className="flex items-center gap-2">
                                   <div
                                     className="w-6 h-6 rounded border-2 border-gray-200 shadow-sm flex-shrink-0"
-                                    style={{
-                                      backgroundColor: operation.options.colorSnapshot.hex,
-                                    }}
+                                    style={{ backgroundColor: operation.options.colorSnapshot.hex }}
                                   />
                                   <div className="flex flex-col min-w-0">
                                     <span className="text-sm font-medium text-gray-800 truncate">
@@ -276,18 +179,17 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                               </div>
                             )}
 
-                            {/* Texture Option */}
-                            {operation.options.textureSnapshot && (
+                            {operation.options?.textureSnapshot && !operation.customPrompt && (
                               <div className="space-y-1">
                                 <span className="text-xs text-gray-600">Add Texture:</span>
                                 <div className="flex items-center gap-2">
-                                  {operation.options.textureSnapshot.url && (
+                                  {operation.options.textureSnapshot.url ? (
                                     <img
                                       src={operation.options.textureSnapshot.url}
                                       alt={operation.options.textureSnapshot.name}
                                       className="w-8 h-8 object-cover rounded border border-gray-200"
                                     />
-                                  )}
+                                  ) : null}
                                   <span className="text-sm font-medium text-gray-800">
                                     {operation.options.textureSnapshot.name}
                                   </span>
@@ -295,18 +197,17 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                               </div>
                             )}
 
-                            {/* Item Option */}
-                            {operation.options.itemSnapshot && (
+                            {operation.options?.itemSnapshot && !operation.customPrompt && (
                               <div className="space-y-1">
                                 <div className="text-xs text-gray-600 mb-2">Add Object:</div>
                                 <div className="flex items-center gap-2">
-                                  {operation.options.itemSnapshot.url && (
+                                  {operation.options.itemSnapshot.url ? (
                                     <img
                                       src={operation.options.itemSnapshot.url}
                                       alt={operation.options.itemSnapshot.name}
-                                      className="w-8 h-8 object-cover rounded border border-gray-200"
+                                      className="w-24 h-24 object-cover rounded border border-gray-200"
                                     />
-                                  )}
+                                  ) : null}
                                   <span className="text-sm font-medium text-gray-800">
                                     {operation.options.itemSnapshot.name}
                                   </span>
@@ -320,14 +221,13 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                   </div>
                 </div>
 
-                {/* Arrow between generations and current image */}
                 <div className="flex justify-center py-2">
                   <ArrowDownwardIcon sx={{ fontSize: 32, color: '#9ca3af' }} />
                 </div>
               </React.Fragment>
             ))}
 
-            {/* Section C: Current Image */}
+            {/* Current Image */}
             <div className="space-y-3">
               <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                 <div className="flex justify-between items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
@@ -341,23 +241,24 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
                   )}
                 </div>
                 <div className="p-4">
-                  <img
-                    src={imageSources[image.imageDownloadUrl] || image.imageDownloadUrl}
-                    alt={image.name}
-                    className="w-full object-contain rounded-md border border-gray-200 bg-white"
-                  />
+                  {image.imageDownloadUrl ? (
+                    <img
+                      src={imageSources[image.imageDownloadUrl] || image.imageDownloadUrl}
+                      alt={image.name}
+                      className="w-full object-contain rounded-md border border-gray-200 bg-white"
+                    />
+                  ) : (
+                    <div className="w-full h-24 flex items-center justify-center bg-gray-100 rounded border border-dashed text-gray-400">
+                      No Image Available
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* No Evolution Chain Message */}
-        {!hasEvolutionChain && (
+        ) : (
           <div className="bg-gray-50 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 italic">
-              This is an original image with no processing history.
-            </p>
+            <p className="text-sm text-gray-500 italic">This asset has no generation history.</p>
           </div>
         )}
       </div>
@@ -365,4 +266,4 @@ const ViewMoreDisplayModal: React.FC<ViewMoreDisplayModalProps> = ({ isOpen, ima
   );
 };
 
-export default ViewMoreDisplayModal;
+export default GenerationHistoryModal;

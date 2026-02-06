@@ -1,5 +1,7 @@
 import React from 'react';
-import { Modal, Typography, Button, message } from 'antd';
+import { Modal, Typography, Button } from 'antd';
+import { message } from '@/utils/antd';
+
 import { useSelector, useDispatch } from 'react-redux';
 import GoogleLoginButton from '@/components/button/GoogleLoginButton';
 import { useAuth } from '@/contexts/AuthContext';

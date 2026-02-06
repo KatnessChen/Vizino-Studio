@@ -39,24 +39,31 @@ export const useGenerateButtonState = ({
   // If guest has used generation, they should login
   if (guestHasUsedGeneration) {
     disableReason = 'Login to generate more images';
-  } else if (!hasSelectedImage) {
-    disableReason = 'Please select an image.';
-  } else if (isProcessingImage) {
-    disableReason = 'Processing image...';
-  } else if (isSavingImage) {
-    disableReason = 'Saving image...';
-  } else if (!canAddOperation) {
-    disableReason = 'Generation limit reached for this image.';
-  } else if (!activeTaskName) {
-    disableReason = 'Please select a goal.';
-  } else if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
-    disableReason = 'Please select a color to generate image.';
-  } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
-    disableReason = 'Please select a texture to generate image.';
-  } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
-    disableReason = 'Please select an object to generate image.';
-  } else if (isCustomPromptRequired && !customPrompt.trim()) {
-    disableReason = 'Please enter a custom prompt.';
+  } else {
+    // Validation Logic
+    const isCustomPrompt = activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name;
+    const hasAsset = selectedColor || selectedTexture || selectedItem;
+    const hasValidSource = hasSelectedImage || (isCustomPrompt && hasAsset);
+
+    if (!hasValidSource) {
+      disableReason = isCustomPrompt ? 'Please select an image or asset.' : 'Please select an image.';
+    } else if (isProcessingImage) {
+      disableReason = 'Processing image...';
+    } else if (isSavingImage) {
+      disableReason = 'Saving image...';
+    } else if (!canAddOperation) { 
+      disableReason = 'Generation limit reached for this source.';
+    } else if (!activeTaskName) {
+      disableReason = 'Please select a goal.';
+    } else if (activeTaskName === GEMINI_TASKS.RECOLOR_WALL.task_name && !selectedColor) {
+      disableReason = 'Please select a color to generate image.';
+    } else if (activeTaskName === GEMINI_TASKS.ADD_TEXTURE.task_name && !selectedTexture) {
+      disableReason = 'Please select a texture to generate image.';
+    } else if (activeTaskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && !selectedItem) {
+      disableReason = 'Please select an object to generate image.';
+    } else if (isCustomPromptRequired && !customPrompt.trim()) {
+      disableReason = 'Please enter a custom prompt.';
+    }
   }
 
   const isDisabled = disableReason !== '';

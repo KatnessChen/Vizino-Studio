@@ -12,7 +12,11 @@ interface SortableAssetCardProps {
   onViewExpand: () => void;
   onViewDetails: () => void;
   onRename?: () => void;
+  onDelete?: () => void;
   onCopy?: () => void;
+  renderPreview?: () => React.ReactNode;
+  showViewButton?: boolean;
+  editLabel?: string;
 }
 
 const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
@@ -23,7 +27,11 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
   onViewExpand,
   onViewDetails,
   onRename,
+  onDelete,
   onCopy,
+  renderPreview,
+  showViewButton,
+  editLabel,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: asset.id,
@@ -46,7 +54,11 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
         onViewExpand={onViewExpand}
         onViewDetails={onViewDetails}
         onRename={onRename}
+        onDelete={onDelete}
         onCopy={onCopy}
+        renderPreview={renderPreview}
+        showViewButton={showViewButton}
+        editLabel={editLabel}
       />
     </div>
   );

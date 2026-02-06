@@ -12,13 +12,19 @@ const MAX_IMAGE_NAME_LENGTH = 50;
 interface ConfirmImageUpdateModalProps {
   isOpen: boolean;
   originalImage: ImageData;
-  generatedImage: { base64: string; mimeType: string } | null;
-  onConfirm: (imageData: { base64: string; mimeType: string }, customName: string) => void;
+  generatedImage: { base64: string; mimeType: string; hex?: string; name?: string } | null;
+  onConfirm: (
+    imageData: { base64: string; mimeType: string; hex?: string },
+    customName: string,
+    description: string
+  ) => void;
   onCancel: () => void;
   taskName: GeminiTaskName;
   colorName?: string;
   textureName?: string;
   itemName?: string;
+  originalHex?: string;
+  defaultDescription?: string;
 }
 
 const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
@@ -31,9 +37,22 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
   colorName,
   textureName,
   itemName,
+  originalHex,
+  defaultDescription = '',
 }) => {
+  const isColorMode = taskName === 'color_adjustment' || !!originalHex;
   // Cached image state for original image
   const [cachedImageSrc, setCachedImageSrc] = useState<string | null>(null);
+
+  // Description state
+  const [description, setDescription] = useState<string>(defaultDescription);
+
+  // Update description when defaultDescription changes (e.g. re-open)
+  useEffect(() => {
+    if (isOpen) {
+      setDescription(defaultDescription);
+    }
+  }, [defaultDescription, isOpen]);
 
   // Image naming states
   const [baseName, setBaseName] = useState<string>('');
@@ -46,9 +65,14 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
   const [nameError, setNameError] = useState<string>('');
 
   // Initialize base name (remove extension from original image name)
+  // Initialize base name
   useEffect(() => {
-    setBaseName(removeExtension(originalImage.name));
-  }, [originalImage.name]);
+    if (generatedImage?.name) {
+      setBaseName(generatedImage.name);
+    } else {
+      setBaseName(removeExtension(originalImage.name));
+    }
+  }, [originalImage.name, generatedImage]);
 
   // Load cached base64 on mount
   useEffect(() => {
@@ -136,7 +160,7 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
   // Handle confirm
   const handleConfirm = () => {
     if (nameError || !generatedImage) return;
-    onConfirm(generatedImage, finalName);
+    onConfirm(generatedImage, finalName, description);
   };
 
   if (!generatedImage || !originalImage) return null;
@@ -146,26 +170,20 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
       title={
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
-            Generation complete.
+            Generation Review
           </Typography.Title>
         </div>
       }
       open={isOpen}
       onCancel={onCancel}
-      width="90vw"
-      style={{ top: 20, maxWidth: 1600 }}
+      width={isColorMode ? 800 : '90vw'}
+      style={isColorMode ? {} : { top: 20, maxWidth: 1600 }}
       zIndex={1500}
       footer={[
-        <Button key="cancel" onClick={onCancel} size="large">
+        <Button key="cancel" onClick={onCancel}>
           Refine
         </Button>,
-        <Button
-          key="confirm"
-          type="primary"
-          onClick={handleConfirm}
-          disabled={!!nameError}
-          size="large"
-        >
+        <Button key="confirm" type="primary" onClick={handleConfirm} disabled={!!nameError}>
           Save
         </Button>,
       ]}
@@ -175,12 +193,17 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
         style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}
         data-tour="result-preview"
       >
-        {/* Original Image */}
+        {/* Original Image/Color */}
         <div
-          style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', minHeight: 400 }}
+          style={{
+            flex: '1 1 300px',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: isColorMode ? 300 : 400,
+          }}
         >
           <Typography.Title level={5} style={{ marginBottom: 12 }}>
-            Original Image
+            {isColorMode ? 'Original Color' : 'Original Image'}
           </Typography.Title>
           <div
             style={{
@@ -191,22 +214,67 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              position: 'relative',
             }}
           >
-            <img
-              src={cachedImageSrc || originalImage.imageDownloadUrl}
-              alt="Original"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
+            {originalHex ? (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: originalHex,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    marginTop: 'auto',
+                    marginBottom: 16,
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Typography.Title level={4} copyable style={{ margin: 0 }}>
+                    {originalHex.toUpperCase()}
+                  </Typography.Title>
+                  {colorName && (
+                    <Typography.Text
+                      style={{ fontSize: 13, color: '#666', fontWeight: 500, marginTop: 4 }}
+                    >
+                      {colorName}
+                    </Typography.Text>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <img
+                src={cachedImageSrc || originalImage.imageDownloadUrl}
+                alt="Original"
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              />
+            )}
           </div>
         </div>
 
-        {/* Recolored Image */}
+        {/* Generated Image/Color */}
         <div
-          style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', minHeight: 400 }}
+          style={{
+            flex: '1 1 300px',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: isColorMode ? 300 : 400,
+          }}
         >
           <Typography.Title level={5} style={{ marginBottom: 12 }}>
-            Generated Image
+            {isColorMode ? 'Generated Color' : 'Generated Image'}
           </Typography.Title>
           <div
             style={{
@@ -217,13 +285,52 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              position: 'relative',
             }}
           >
-            <img
-              src={`data:${generatedImage.mimeType};base64,${generatedImage.base64}`}
-              alt="Generated Image"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
+            {generatedImage.hex ? (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: generatedImage.hex,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    marginTop: 'auto',
+                    marginBottom: 16,
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Typography.Title level={4} copyable style={{ margin: 0 }}>
+                    {generatedImage.hex.toUpperCase()}
+                  </Typography.Title>
+                  {generatedImage.name && (
+                    <Typography.Text style={{ fontSize: 13, color: '#666', fontWeight: 500 }}>
+                      {generatedImage.name}
+                    </Typography.Text>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <img
+                src={`data:${generatedImage.mimeType};base64,${generatedImage.base64}`}
+                alt="Generated Image"
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -236,8 +343,10 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           onPrefixTimestampChange={setPrefixTimestamp}
           suffixTimestamp={suffixTimestamp}
           onSuffixTimestampChange={setSuffixTimestamp}
-          suffixMimeType={suffixMimeType}
+          suffixMimeType={isColorMode ? false : suffixMimeType}
+          // Force hide mismatch if needed, or pass prop to hide
           onSuffixMimeTypeChange={setSuffixMimeType}
+          hideSuffixMimeType={isColorMode}
           finalName={finalName}
           nameError={nameError}
           taskName={taskName}
@@ -250,6 +359,9 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           onSuffixTextureNameChange={setSuffixTextureName}
           suffixItemName={suffixItemName}
           onSuffixItemNameChange={setSuffixItemName}
+          description={description}
+          onDescriptionChange={setDescription}
+          aiSuggestedName={generatedImage?.name}
         />
       </div>
     </Modal>

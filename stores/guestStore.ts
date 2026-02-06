@@ -9,7 +9,7 @@ const GUEST_GREETING_KEY = 'guest_has_seen_greeting';
  */
 interface PendingUpload {
   type: 'image' | 'color' | 'texture' | 'item' | 'generated';
-  data: any;
+  data: unknown;
 }
 
 /**
@@ -149,10 +149,7 @@ export const guestStore = createSlice({
     /**
      * Set pending generated image save data
      */
-    setPendingGeneratedImageSave(
-      state,
-      action: PayloadAction<PendingGeneratedImageSave | null>
-    ) {
+    setPendingGeneratedImageSave(state, action: PayloadAction<PendingGeneratedImageSave | null>) {
       state.pendingGeneratedImageSave = action.payload;
     },
 

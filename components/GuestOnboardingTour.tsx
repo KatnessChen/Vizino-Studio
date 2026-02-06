@@ -15,8 +15,7 @@ import { Tour, TourProps, ConfigProvider } from 'antd';
 import { useDispatch } from 'react-redux';
 import { useGuest } from '@/contexts/GuestContext';
 import { Color } from '@/types';
-import { setSourceImage, setIsGenerateModalOpen, setSelectedColor } from '@/stores/taskStore';
-import { setSelectedOriginalImageIds } from '@/stores/imageStore';
+import { setSourceImage, setIsGenerateModalOpen, setSelectedAssets } from '@/stores/taskStore';
 import { getDemoImages, getDefaultDemoImageId } from '@/constants/demoImages';
 import { PRESET_COLOR } from '@/constants/constants';
 import { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
@@ -50,7 +49,7 @@ const GuestOnboardingTour = forwardRef<GuestOnboardingTourRef, GuestOnboardingTo
       if (open) {
         const random = PRESET_COLOR[Math.floor(Math.random() * PRESET_COLOR.length)];
         setTourSelectedColor(random);
-        dispatch(setSelectedColor(random));
+        dispatch(setSelectedAssets([random]));
       }
     }, [open, dispatch]);
 

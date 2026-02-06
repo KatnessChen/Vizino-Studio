@@ -1,15 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { GeminiTaskName } from '@/services/gemini/geminiTasks';
-import { Color, Texture, Item, ImageData } from '@/types';
+import { ImageData, Asset } from '@/types';
 
 interface TaskState {
   // Task selection
   selectedTaskNames: GeminiTaskName[];
 
   // Task-specific options
-  selectedColor: Color | null;
-  selectedTexture: Texture | null;
-  selectedItem: Item | null;
+  selectedAssets: Asset[];
 
   // Generate modal state
   isGenerateModalOpen: boolean;
@@ -19,9 +17,7 @@ interface TaskState {
 
 const initialState: TaskState = {
   selectedTaskNames: [],
-  selectedColor: null,
-  selectedTexture: null,
-  selectedItem: null,
+  selectedAssets: [],
   isGenerateModalOpen: false,
   sourceImage: null,
   customPrompt: undefined,
@@ -37,16 +33,8 @@ const taskSlice = createSlice({
     },
 
     // Task option actions
-    setSelectedColor: (state, action: PayloadAction<Color | null>) => {
-      state.selectedColor = action.payload;
-    },
-
-    setSelectedTexture: (state, action: PayloadAction<Texture | null>) => {
-      state.selectedTexture = action.payload;
-    },
-
-    setSelectedItem: (state, action: PayloadAction<Item | null>) => {
-      state.selectedItem = action.payload;
+    setSelectedAssets: (state, action: PayloadAction<Asset[]>) => {
+      state.selectedAssets = action.payload;
     },
 
     // Generate modal actions
@@ -65,9 +53,7 @@ const taskSlice = createSlice({
     // Reset all task-related state
     resetTaskState: (state) => {
       state.selectedTaskNames = [];
-      state.selectedColor = null;
-      state.selectedTexture = null;
-      state.selectedItem = null;
+      state.selectedAssets = [];
       state.isGenerateModalOpen = false;
       state.sourceImage = null;
       state.customPrompt = undefined;
@@ -77,9 +63,7 @@ const taskSlice = createSlice({
 
 export const {
   setSelectedTaskNames,
-  setSelectedColor,
-  setSelectedTexture,
-  setSelectedItem,
+  setSelectedAssets,
   setIsGenerateModalOpen,
   setSourceImage,
   setCustomPrompt,
@@ -88,9 +72,7 @@ export const {
 
 // Selectors
 export const selectSelectedTaskNames = (state: { task: TaskState }) => state.task.selectedTaskNames;
-export const selectSelectedColor = (state: { task: TaskState }) => state.task.selectedColor;
-export const selectSelectedTexture = (state: { task: TaskState }) => state.task.selectedTexture;
-export const selectSelectedItem = (state: { task: TaskState }) => state.task.selectedItem;
+export const selectSelectedAssets = (state: { task: TaskState }) => state.task.selectedAssets;
 export const selectIsGenerateModalOpen = (state: { task: TaskState }) =>
   state.task.isGenerateModalOpen;
 export const selectSourceImage = (state: { task: TaskState }) => state.task.sourceImage;

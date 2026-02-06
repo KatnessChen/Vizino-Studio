@@ -8,12 +8,11 @@
 import {
   StorageAdapter,
   CreateImageParams,
-  CreateAssetParams,
-  CreateColorParams,
 } from './storageAdapter';
 import { ImageData, Color, Texture, Item, CustomPrompt } from '@/types';
 import { guestIndexedDB } from '@/utils/guestIndexedDB';
 import { Timestamp } from 'firebase/firestore';
+import { ASSET_IMAGE } from '@/constants/constants';
 
 const GUEST_PROJECT_ID = 'guest-project';
 const GUEST_SPACE_ID = 'guest-space';
@@ -77,6 +76,7 @@ export class GuestStorageAdapter implements StorageAdapter {
         ...(imageMetadata.aspect_ratio !== undefined && {
           aspect_ratio: imageMetadata.aspect_ratio,
         }),
+        assetType: ASSET_IMAGE,
       };
 
       // Save to IndexedDB with base64 data
@@ -109,7 +109,7 @@ export class GuestStorageAdapter implements StorageAdapter {
   }
 
   // ============ Colors ============
-  async addColor(_params: CreateColorParams): Promise<Color> {
+  async addColor(): Promise<Color> {
     throw new Error('Guests cannot add custom colors. Please use preset colors.');
   }
 
@@ -117,12 +117,16 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests use preset colors only
   }
 
-  async deleteColor(_colorId: string): Promise<void> {
+  async updateColor(): Promise<void> {
+    throw new Error('Guests cannot update colors');
+  }
+
+  async deleteColor(): Promise<void> {
     throw new Error('Guests cannot delete colors');
   }
 
   // ============ Textures ============
-  async addTexture(_params: CreateAssetParams): Promise<Texture> {
+  async addTexture(): Promise<Texture> {
     throw new Error('Guests cannot add custom textures. Please log in to add textures.');
   }
 
@@ -130,12 +134,20 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests cannot add textures
   }
 
-  async deleteTexture(_textureId: string): Promise<void> {
+  async updateTexture(): Promise<void> {
+    throw new Error('Guests cannot update textures');
+  }
+
+  async deleteTexture(): Promise<void> {
     throw new Error('Guests cannot delete textures');
   }
 
+  async reorderTextures(): Promise<void> {
+    throw new Error('Guests cannot reorder textures');
+  }
+
   // ============ Items ============
-  async addItem(_params: CreateAssetParams): Promise<Item> {
+  async addItem(): Promise<Item> {
     throw new Error('Guests cannot add custom items. Please log in to add items.');
   }
 
@@ -143,16 +155,24 @@ export class GuestStorageAdapter implements StorageAdapter {
     return []; // Guests cannot add items
   }
 
-  async deleteItem(_itemId: string): Promise<void> {
+  async updateItem(): Promise<void> {
+    throw new Error('Guests cannot update items');
+  }
+
+  async deleteItem(): Promise<void> {
     throw new Error('Guests cannot delete items');
   }
 
+  async reorderItems(): Promise<void> {
+    throw new Error('Guests cannot reorder items');
+  }
+
   // ============ Custom Prompts ============
-  async saveCustomPrompt(_taskName: string, _prompt: string): Promise<CustomPrompt> {
+  async saveCustomPrompt(): Promise<CustomPrompt> {
     throw new Error('Guests cannot save custom prompts');
   }
 
-  async fetchCustomPrompts(_taskName: string): Promise<CustomPrompt[]> {
+  async fetchCustomPrompts(): Promise<CustomPrompt[]> {
     return [];
   }
 }
