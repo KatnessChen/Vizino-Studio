@@ -20,10 +20,10 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disable
       if (result.success) {
         onSuccess?.();
       } else {
-        onError?.(result.error);
+        onError?.(result.error || 'Failed to sign out');
       }
-    } catch (error: any) {
-      const errorMessage = error.message || 'Failed to sign out';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
       onError?.(errorMessage);
       console.error('Logout error:', error);
     } finally {
@@ -37,12 +37,6 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disable
       disabled={disabled || loading}
       onClick={handleLogout}
       icon={loading ? <LoadingOutlined spin /> : <LogoutOutlined />}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-      }}
     >
       {loading ? 'Signing out...' : 'Sign out'}
     </Button>

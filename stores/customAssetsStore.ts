@@ -6,9 +6,11 @@ interface ProjectCustomAssets {
   customColors: Color[];
   isLoadingColors: boolean;
   loadColorsError: string | null;
+
   customTextures: Texture[];
   isLoadingTextures: boolean;
   loadTexturesError: string | null;
+
   customItems: Item[];
   isLoadingItems: boolean;
   loadItemsError: string | null;

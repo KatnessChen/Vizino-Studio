@@ -25,7 +25,7 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
 
   return (
     <Modal
-      title={`Copy Image${numberOfImages > 1 ? 's' : ''}`}
+      title={`Duplicate Image${numberOfImages > 1 ? 's' : ''}`}
       open={isOpen}
       onCancel={onCancel}
       footer={[
@@ -33,15 +33,15 @@ const CopyImageModal: React.FC<CopyImageModalProps> = ({
           Cancel
         </Button>,
         <Button key="copy" type="primary" onClick={handleConfirm} loading={isLoading}>
-          Copy
+          Duplicate
         </Button>,
       ]}
       width={500}
     >
       <p>
         {numberOfImages > 1
-          ? `${numberOfImages} images will be copied.`
-          : `The selected image will be copied.`}
+          ? `${numberOfImages} images will be duplicated.`
+          : `The selected image will be duplicated.`}
       </p>
     </Modal>
   );

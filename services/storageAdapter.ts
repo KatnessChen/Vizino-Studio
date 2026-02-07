@@ -42,6 +42,7 @@ export interface CreateAssetParams {
   width?: number;
   height?: number;
   aspect_ratio?: number;
+  evolutionChain?: ImageOperation[];
 }
 
 /**
@@ -51,6 +52,7 @@ export interface CreateColorParams {
   name: string;
   hex: string;
   description?: string;
+  evolutionChain?: ImageOperation[];
 }
 
 /**
@@ -76,17 +78,22 @@ export interface StorageAdapter {
   // ============ Colors ============
   addColor(params: CreateColorParams): Promise<Color>;
   fetchColors(): Promise<Color[]>;
+  updateColor(colorId: string, updates: { name?: string; description?: string }): Promise<void>;
   deleteColor(colorId: string): Promise<void>;
 
   // ============ Textures ============
   addTexture(params: CreateAssetParams): Promise<Texture>;
   fetchTextures(): Promise<Texture[]>;
+  updateTexture(textureId: string, updates: { name?: string; description?: string }): Promise<void>;
   deleteTexture(textureId: string): Promise<void>;
+  reorderTextures(updates: Array<{ textureId: string; order: number }>): Promise<void>;
 
   // ============ Items ============
   addItem(params: CreateAssetParams): Promise<Item>;
   fetchItems(): Promise<Item[]>;
+  updateItem(itemId: string, updates: { name?: string; description?: string }): Promise<void>;
   deleteItem(itemId: string): Promise<void>;
+  reorderItems(updates: Array<{ itemId: string; order: number }>): Promise<void>;
 
   // ============ Custom Prompts ============
   saveCustomPrompt(taskName: string, prompt: string): Promise<CustomPrompt>;
@@ -115,6 +122,9 @@ export class NoOpStorageAdapter implements StorageAdapter {
   async fetchColors(): Promise<Color[]> {
     return [];
   }
+  async updateColor(): Promise<void> {
+    throw new Error('No storage context available');
+  }
   async deleteColor(): Promise<void> {
     throw new Error('No storage context available');
   }
@@ -124,7 +134,13 @@ export class NoOpStorageAdapter implements StorageAdapter {
   async fetchTextures(): Promise<Texture[]> {
     return [];
   }
+  async updateTexture(): Promise<void> {
+    throw new Error('No storage context available');
+  }
   async deleteTexture(): Promise<void> {
+    throw new Error('No storage context available');
+  }
+  async reorderTextures(): Promise<void> {
     throw new Error('No storage context available');
   }
   async addItem(): Promise<Item> {
@@ -133,7 +149,13 @@ export class NoOpStorageAdapter implements StorageAdapter {
   async fetchItems(): Promise<Item[]> {
     return [];
   }
+  async updateItem(): Promise<void> {
+    throw new Error('No storage context available');
+  }
   async deleteItem(): Promise<void> {
+    throw new Error('No storage context available');
+  }
+  async reorderItems(): Promise<void> {
     throw new Error('No storage context available');
   }
   async saveCustomPrompt(): Promise<CustomPrompt> {

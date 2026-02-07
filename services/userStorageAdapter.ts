@@ -17,15 +17,19 @@ import {
   fetchSpaceImages,
   addColor,
   fetchColors,
+  updateColor,
   deleteColor,
   addTexture,
   fetchTextures,
   deleteTexture,
+  updateTexture,
   addItem,
   fetchItems,
   deleteItem,
+  updateItem,
   saveCustomPrompt,
   fetchAllCustomPrompts,
+  batchUpdateImagesOrder,
 } from './firestoreService';
 
 export class UserStorageAdapter implements StorageAdapter {
@@ -92,6 +96,14 @@ export class UserStorageAdapter implements StorageAdapter {
     return deleteColor(this.contextId, projectId, colorId);
   }
 
+  async updateColor(
+    colorId: string,
+    updates: { name?: string; description?: string }
+  ): Promise<void> {
+    const projectId = this.requireProject();
+    return updateColor(this.contextId, projectId, colorId, updates);
+  }
+
   // ============ Textures ============
   async addTexture(params: CreateAssetParams): Promise<Texture> {
     const projectId = this.requireProject();
@@ -108,6 +120,29 @@ export class UserStorageAdapter implements StorageAdapter {
     return deleteTexture(this.contextId, projectId, textureId);
   }
 
+  async updateTexture(
+    textureId: string,
+    updates: { name?: string; description?: string }
+  ): Promise<void> {
+    const projectId = this.requireProject();
+    return updateTexture(this.contextId, projectId, textureId, updates);
+  }
+
+  async reorderTextures(updates: Array<{ textureId: string; order: number }>): Promise<void> {
+    const projectId = this.requireProject();
+    const normalizedUpdates = updates.map(({ textureId, order }) => ({
+      id: textureId,
+      order,
+    }));
+    return batchUpdateImagesOrder(
+      this.contextId,
+      projectId,
+      null,
+      normalizedUpdates,
+      'custom_textures'
+    );
+  }
+
   // ============ Items ============
   async addItem(params: CreateAssetParams): Promise<Item> {
     const projectId = this.requireProject();
@@ -122,6 +157,23 @@ export class UserStorageAdapter implements StorageAdapter {
   async deleteItem(itemId: string): Promise<void> {
     const projectId = this.requireProject();
     return deleteItem(this.contextId, projectId, itemId);
+  }
+
+  async updateItem(itemId: string, updates: { name?: string; description?: string }): Promise<void> {
+    const projectId = this.requireProject();
+    return updateItem(this.contextId, projectId, itemId, updates);
+  }
+
+  async reorderItems(updates: Array<{ itemId: string; order: number }>): Promise<void> {
+    const projectId = this.requireProject();
+    const normalizedUpdates = updates.map(({ itemId, order }) => ({ id: itemId, order }));
+    return batchUpdateImagesOrder(
+      this.contextId,
+      projectId,
+      null,
+      normalizedUpdates,
+      'custom_items'
+    );
   }
 
   // ============ Custom Prompts ============

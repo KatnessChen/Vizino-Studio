@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Timestamp } from 'firebase/firestore';
-import { Project } from '@/types';
+import { Project, Space, ImageData } from '@/types';
 
 interface ProjectState {
   projects: Project[];
@@ -46,7 +46,7 @@ export const projectStore = createSlice({
     },
 
     // Spaces actions
-    addSpace: (state, action: PayloadAction<{ projectId: string; space: any }>) => {
+    addSpace: (state, action: PayloadAction<{ projectId: string; space: Space }>) => {
       const project = state.projects.find((p) => p.id === action.payload.projectId);
       if (project) {
         project.spaces.push(action.payload.space);
@@ -54,7 +54,7 @@ export const projectStore = createSlice({
     },
     setSpaceImages: (
       state,
-      action: PayloadAction<{ projectId: string; spaceId: string; images: any[] }>
+      action: PayloadAction<{ projectId: string; spaceId: string; images: ImageData[] }>
     ) => {
       const project = state.projects.find((p) => p.id === action.payload.projectId);
       if (project) {
@@ -111,7 +111,7 @@ export const projectStore = createSlice({
       action: PayloadAction<{
         projectId: string;
         spaceId: string;
-        image: any;
+        image: ImageData;
       }>
     ) => {
       const project = state.projects.find((p) => p.id === action.payload.projectId);

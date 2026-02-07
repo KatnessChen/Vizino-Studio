@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Avatar, IconButton } from '@mui/material';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
-import AuthPanel from '../AuthPanel';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Header: React.FC = () => {
@@ -16,28 +15,9 @@ const Header: React.FC = () => {
   const isAdmins = email && ALLOWED_EMAILS.includes(email);
 
   const navigate = useNavigate();
-  const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false);
-  const authPanelRef = useRef<HTMLDivElement>(null);
 
-  const toggleAuthPopover = () => {
-    setIsAuthPanelOpen((isOpen) => !isOpen);
-  };
-
-  // Close AuthPanel when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (authPanelRef.current && !authPanelRef.current.contains(event.target as Node)) {
-        setIsAuthPanelOpen(false);
-      }
-    };
-
-    if (isAuthPanelOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [isAuthPanelOpen]);
+  // Clicking the Avatar should navigate directly to the User Profile
+  const goToUserProfile = () => navigate(ROUTES.USER_PROFILE);
 
   return (
     <>
@@ -48,7 +28,7 @@ const Header: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center cursor-pointer" onClick={() => navigate(ROUTES.HOME)}>
               <div className="text-xl text-white">Vizino AI</div>
-              <div className="text-white/80 font-medium text-xs mt-1.5 ml-3 tracking-wide uppercase">
+              <div className="text-white/80 font-medium text-xs mt-1.5 ml-3 tracking-tight uppercase">
                 Precise AI Design
               </div>
             </div>
@@ -60,13 +40,13 @@ const Header: React.FC = () => {
               <Button
                 type="link"
                 onClick={() => navigate(ROUTES.ADMIN_SETTING)}
-                style={{ color: 'rgba(255,255,255,0.75)' }}
+                className="!text-white/75"
               >
                 Admin Settings
               </Button>
             )}
             <IconButton
-              onClick={toggleAuthPopover}
+              onClick={goToUserProfile}
               sx={{
                 p: 0,
                 border: '2px solid rgba(255,255,255,0.3)',
@@ -84,16 +64,6 @@ const Header: React.FC = () => {
       </nav>
       {/* Spacer to prevent content from going under fixed header */}
       <div className="w-full" style={{ height: 'var(--header-height)' }} />
-      {/* Auth Panel Popover */}
-      {isAuthPanelOpen && (
-        <div
-          ref={authPanelRef}
-          className="absolute right-6 bg-white rounded-lg shadow-xl border border-gray-200"
-          style={{ top: 48, width: 400, maxWidth: '90vw', zIndex: 1000 }}
-        >
-          <AuthPanel />
-        </div>
-      )}
     </>
   );
 };

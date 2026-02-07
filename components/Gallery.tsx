@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { ImageData } from '@/types';
+import { ASSET_IMAGE } from '@/constants/constants';
 import {
   selectSelectedOriginalImageIds,
   selectSelectedUpdatedImageIds,
@@ -22,10 +23,10 @@ import { RootState } from '@/stores/store';
 import AssetCard from './ui/AssetCard';
 import SortableAssetCard from './ui/SortableAssetCard';
 import ImageDisplayModal from './modal/ImageDisplayModal';
-import ViewMoreDisplayModal from './modal/ViewMoreDisplayModal';
+import GenerationHistoryModal from './modal/GenerationHistoryModal';
 import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
-import { Card, Button, Tooltip, Skeleton, Segmented } from 'antd';
+import { Card, Button, Tooltip, Segmented } from 'antd';
 import { BarsOutlined, AppstoreOutlined, LockOutlined } from '@ant-design/icons';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
@@ -44,23 +45,23 @@ interface GalleryProps {
   images: ImageData[];
   selectedImageId?: string | null;
   selectedImageIds?: Set<string>;
-  onSelectImage?: (imageId: string) => void;
-  onSelectMultiple?: (imageId: string) => void;
-  onRenameImage?: (imageId: string, newName: string) => void;
+  onSelectImage?: (imageId: string, event?: React.MouseEvent) => void;
+  onSelectMultiple?: (imageId: string, event?: React.MouseEvent) => void;
+  onRenameImage?: (imageId: string, newName: string, description: string) => void;
   showDownloadButtons?: boolean;
   onRemoveImage?: (imageId: string) => void;
   showRemoveButtons?: boolean;
   emptyMessage: string;
   onUploadImage?: (
     file: File,
-    metadata?: {
-      width: number;
-      height: number;
-      aspect_ratio: number;
-      name?: string;
-      description?: string;
+    metadata: {
+      width?: number;
+      height?: number;
+      aspect_ratio?: number;
+      name: string;
+      description: string;
     }
-  ) => void;
+  ) => Promise<void>;
   onUploadError?: (message: string) => void;
   onBulkDelete?: () => void;
   onBulkDownload?: () => void;
@@ -74,7 +75,19 @@ interface GalleryProps {
   onReorder?: (newOrderedImageIds: string[]) => void;
   isLoading?: boolean;
   onSingleRename?: (imageId: string) => void;
+  onSingleDelete?: (imageId: string) => void;
   onSingleCopy?: (imageId: string) => void;
+  uploadButtonText?: string;
+  uploadModalTitle?: string;
+  batchUploadMode?: 'image' | 'asset';
+  assetType?: 'image' | 'texture' | 'item' | 'color';
+  existingNames?: Set<string>;
+  renderItemPreview?: (image: ImageData) => React.ReactNode;
+  showViewButton?: boolean;
+  detailModalTitle?: string;
+  editLabel?: string;
+  viewMoreModalTitle?: string;
+  showCompare?: boolean;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
@@ -92,9 +105,21 @@ const Gallery: React.FC<GalleryProps> = ({
   onBulkCopy,
   onBulkMove,
   onReorder,
+  onSelectImage,
   onSelectMultiple,
   onSingleRename,
+  onSingleDelete,
   onSingleCopy,
+  uploadButtonText = 'Images',
+  uploadModalTitle = 'Upload Images',
+  batchUploadMode = 'image',
+  assetType,
+  existingNames,
+  renderItemPreview,
+  showViewButton = true,
+  detailModalTitle,
+  editLabel = 'Edit',
+  showCompare = true,
 }) => {
   const dispatch = useDispatch();
   const { isGuestMode } = useGuest();
@@ -102,9 +127,11 @@ const Gallery: React.FC<GalleryProps> = ({
   const [showImageDisplayModal, setShowImageDisplayModal] = useState<boolean>(false);
   const [imageToDisplayInModal, setImageToDisplayInModal] = useState<ImageData | null>(null);
 
-  // State for ViewMoreDisplayModal
-  const [showViewMoreModal, setShowViewMoreModal] = useState<boolean>(false);
-  const [imageForViewMore, setImageForViewMore] = useState<ImageData | null>(null);
+  // State for GenerationHistoryModal
+  const [showGenerationHistoryModal, setShowGenerationHistoryModal] = useState<boolean>(false);
+  const [imageForGenerationHistory, setImageForGenerationHistory] = useState<ImageData | null>(
+    null
+  );
 
   // State for BatchUploadModal
   const [showBatchUploadModal, setShowBatchUploadModal] = useState<boolean>(false);
@@ -113,7 +140,6 @@ const Gallery: React.FC<GalleryProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Selection state for shift-click and drag selection
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionBox, setSelectionBox] = useState<{
@@ -147,14 +173,14 @@ const Gallery: React.FC<GalleryProps> = ({
     setImageToDisplayInModal(null);
   }, []);
 
-  const onViewMoreButtonClick = useCallback((imageData: ImageData) => {
-    setImageForViewMore(imageData);
-    setShowViewMoreModal(true);
+  const onViewGenerationHistoryClick = useCallback((imageData: ImageData) => {
+    setImageForGenerationHistory(imageData);
+    setShowGenerationHistoryModal(true);
   }, []);
 
-  const handleCloseViewMoreModal = useCallback(() => {
-    setShowViewMoreModal(false);
-    setImageForViewMore(null);
+  const handleCloseGenerationHistoryModal = useCallback(() => {
+    setShowGenerationHistoryModal(false);
+    setImageForGenerationHistory(null);
   }, []);
 
   // Calculate current image index
@@ -206,29 +232,17 @@ const Gallery: React.FC<GalleryProps> = ({
     setActiveId(null);
   }, []);
 
-  // Handle shift-click for range selection
   const handleCardClick = useCallback(
     (imageId: string, event?: React.MouseEvent) => {
-      const currentIndex = images.findIndex((img) => img.id === imageId);
-
-      if (event?.shiftKey && lastSelectedIndex !== null && onSelectMultiple) {
-        // Shift-click: select range
-        const start = Math.min(lastSelectedIndex, currentIndex);
-        const end = Math.max(lastSelectedIndex, currentIndex);
-
-        // Select all images in range
-        for (let i = start; i <= end; i++) {
-          if (!selectedImageIds.has(images[i].id)) {
-            onSelectMultiple(images[i].id);
-          }
-        }
+      if (event?.shiftKey) {
+        // Shift-click: multi-select toggle mode
+        onSelectMultiple?.(imageId, event);
       } else {
-        // Normal click
-        onSelectMultiple?.(imageId);
-        setLastSelectedIndex(currentIndex);
+        // Normal click: single-select mode
+        onSelectImage?.(imageId, event);
       }
     },
-    [images, lastSelectedIndex, onSelectMultiple, selectedImageIds]
+    [onSelectMultiple, onSelectImage]
   );
 
   // Drag selection handlers
@@ -333,33 +347,50 @@ const Gallery: React.FC<GalleryProps> = ({
   // In guest mode, use guestImages; otherwise use store images
   const allImages = isGuestMode ? guestImages : storeAllImages;
 
-  // Calculate total selected images across both original and generated
-  const totalSelectedImages = useMemo(() => {
+  // Calculate total selected items.
+  // For Image galleries (ASSET_IMAGE): use global count to enable cross-gallery comparison
+  // For other asset types (Texture/Item/Color): use local gallery selection only
+  const totalSelectedItems = useMemo(() => {
+    if (assetType === ASSET_IMAGE) {
+      // Images: count across both Original and Generated galleries
+      return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
+    } else if (assetType) {
+      // Other assets: count only within this gallery
+      return selectedImageIds?.size || 0;
+    }
+    // Fallback: use global count (backward compatibility)
     return selectedOriginalImageIds.size + selectedUpdatedImageIds.size;
-  }, [selectedOriginalImageIds, selectedUpdatedImageIds]);
+  }, [selectedImageIds, selectedOriginalImageIds, selectedUpdatedImageIds, assetType]);
 
-  // Get all selected image objects (both original and generated) for comparison modal
-  const allSelectedImagesForComparison = useMemo(() => {
-    const allSelectedImages: ImageData[] = [];
+  // Get all selected objects for comparison modal
+  const allSelectedItemsForComparison = useMemo(() => {
+    // For images (Original/Generated): use global Redux state to allow cross-gallery comparison
+    if (assetType === ASSET_IMAGE) {
+      const selected: ImageData[] = [];
+      const allSelectedIds = new Set([...selectedOriginalImageIds, ...selectedUpdatedImageIds]);
 
-    // Add selected original image IDs by finding them in all images
-    selectedOriginalImageIds.forEach((id) => {
-      const img = allImages.find((i) => i.id === id);
-      if (img) {
-        allSelectedImages.push(img);
-      }
-    });
+      allSelectedIds.forEach((id) => {
+        const img = allImages.find((i) => i.id === id);
+        if (img) selected.push(img);
+      });
 
-    // Add selected generated image IDs by finding them in all images
-    selectedUpdatedImageIds.forEach((id) => {
-      const img = allImages.find((i) => i.id === id);
-      if (img) {
-        allSelectedImages.push(img);
-      }
-    });
+      return selected;
+    }
 
-    return allSelectedImages;
-  }, [selectedOriginalImageIds, selectedUpdatedImageIds, allImages]);
+    // For other asset types (Texture/Item/Color): only compare items within this gallery
+    if (assetType && selectedImageIds && selectedImageIds.size > 0) {
+      return images.filter((img) => selectedImageIds.has(img.id));
+    }
+
+    return [];
+  }, [
+    selectedImageIds,
+    images,
+    selectedOriginalImageIds,
+    selectedUpdatedImageIds,
+    allImages,
+    assetType,
+  ]);
 
   // Calculate total image count (original + generated) for upload limit
   const totalImageCount = useMemo(() => {
@@ -377,6 +408,9 @@ const Gallery: React.FC<GalleryProps> = ({
 
   const iconStyle = {
     fontSize: '18px',
+    color: 'gray',
+    marginTop: '2px',
+    marginLeft: '2px',
   };
 
   // Handle batch file upload
@@ -413,27 +447,25 @@ const Gallery: React.FC<GalleryProps> = ({
   };
 
   const cardTitle = (
-    <div
-      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20 }}
-    >
-      <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{title}</h2>
+    <div className="flex justify-between items-center gap-5">
+      <h2 className="m-0 text-lg font-semibold">{title}</h2>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="flex items-center gap-3">
         {hasSelection && (
           <div
             style={{
               display: 'flex',
+              backgroundColor: '#f3f4f6',
               alignItems: 'center',
-              gap: '6px',
+              gap: 6,
               padding: '4px 8px 4px 16px',
-              backgroundColor: 'indigo',
-              borderRadius: '8px',
-              height: '32px',
-              color: '#ffffff',
+              borderRadius: 8,
+              height: 32,
+              color: 'black',
             }}
           >
             {/* Selection count */}
-            <span style={{ fontSize: '13px', fontWeight: 500 }}>
+            <span style={{ fontSize: 13, color: '#4b5563', fontWeight: 500, marginRight: 4 }}>
               {selectedImageIds.size} selected
             </span>
 
@@ -451,21 +483,15 @@ const Gallery: React.FC<GalleryProps> = ({
             )}
 
             {/* Divider */}
-            <div
-              style={{
-                width: '1px',
-                height: '18px',
-                backgroundColor: '#d0d0d0',
-                margin: '0 2px',
-              }}
-            />
+            <div style={{ width: 1, height: 18, backgroundColor: '#d1d5db', margin: '0 4px' }} />
 
             {/* Compare button */}
-            <ImagesComparingButton
-              totalSelectedPhotos={totalSelectedImages}
-              selectedPhotos={allSelectedImagesForComparison}
-              isToolbarMode={true}
-            />
+            {showCompare && (
+              <ImagesComparingButton
+                totalSelectedCount={totalSelectedItems}
+                selectedAssets={allSelectedItemsForComparison}
+              />
+            )}
 
             {/* Action icon buttons */}
             {onBulkDownload && (
@@ -481,7 +507,7 @@ const Gallery: React.FC<GalleryProps> = ({
             )}
 
             {onBulkCopy && (
-              <Tooltip title="Copy">
+              <Tooltip title="Duplicate">
                 <Button
                   type="text"
                   size="small"
@@ -517,21 +543,39 @@ const Gallery: React.FC<GalleryProps> = ({
           </div>
         )}
 
-        {/* Upload button (only show if upload is enabled) */}
-        {onUploadImage && onUploadError && (
+        {/* Upload button (show if upload handler is provided) */}
+        {onUploadImage && (
           <Button
             icon={<PlusOutlined />}
             onClick={() => {
               if (isGuestMode) {
                 dispatch(setShowLoginRequiredModal(true));
-              } else if (!isImageLimitReached) {
+                return;
+              }
+
+              // If a caller provided an onUploadImage handler with zero arguments
+              // we treat it as an intent to open a custom upload modal (e.g., Add Color)
+              if (onUploadImage) {
+                const fn = onUploadImage as (...args: unknown[]) => unknown;
+                if (fn.length === 0) {
+                  try {
+                    // Call with no args - handler should open its own modal
+                    fn();
+                    return;
+                  } catch (err) {
+                    console.warn('onUploadImage handler threw when invoked without args:', err);
+                  }
+                }
+              }
+
+              if (!isImageLimitReached) {
                 setShowBatchUploadModal(true);
               }
             }}
             disabled={isImageLimitReached && !isGuestMode}
-            style={isGuestMode ? { opacity: 0.6 } : undefined}
+            className={`!flex items-center gap-1.5 ${isGuestMode ? 'opacity-60' : ''}`}
           >
-            Images
+            {uploadButtonText}
             {isGuestMode && <LockOutlined />}
           </Button>
         )}
@@ -563,10 +607,14 @@ const Gallery: React.FC<GalleryProps> = ({
               : 'flex flex-col gap-4 p-6'
           }
         >
-          {/* Display 8 skeleton cards */}
+          {/* Display 8 full-card color placeholders */}
           {Array.from({ length: 8 }).map((_, index) => (
             <div key={`skeleton-${index}`} className={layoutMode === 'List' ? 'w-full' : ''}>
-              <Skeleton.Image active style={{ width: '100%' }} />
+              <div
+                className={`w-full ${layoutMode === 'List' ? 'min-h-[120px]' : 'min-h-[200px]'} rounded-md border-2 border-[#e5e7eb] bg-[#e5e7eb] overflow-hidden animate-pulse flex items-center justify-center`}
+              >
+                <div className="text-sm text-[#9ca3af]">Loading...</div>
+              </div>
             </div>
           ))}
         </div>
@@ -603,9 +651,13 @@ const Gallery: React.FC<GalleryProps> = ({
                   layout={layoutMode === 'List' ? 'list' : 'grid'}
                   onSelect={(e?: React.MouseEvent) => handleCardClick(image.id, e)}
                   onViewExpand={() => handleExpandPhotoImage(image)}
-                  onViewDetails={() => onViewMoreButtonClick(image)}
+                  onViewDetails={() => onViewGenerationHistoryClick(image)}
                   onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
+                  onDelete={onSingleDelete ? () => onSingleDelete(image.id) : undefined}
                   onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
+                  renderPreview={renderItemPreview ? () => renderItemPreview(image) : undefined}
+                  showViewButton={showViewButton}
+                  editLabel={editLabel}
                 />
               </div>
             ))}
@@ -635,29 +687,39 @@ const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <Card title={cardTitle} styles={{ body: { padding: 0 } }}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        {galleryContent}
-        <DragOverlay>
-          {activeImage ? (
-            <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
-              <AssetCard
-                asset={activeImage}
-                isSelected={selectedImageIds.has(activeImage.id)}
-                onSelect={() => {}}
-                onViewExpand={() => {}}
-                onViewDetails={() => {}}
-                layout={layoutMode === 'List' ? 'list' : 'grid'}
-              />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      {onReorder ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {galleryContent}
+          <DragOverlay>
+            {activeImage ? (
+              <div style={{ opacity: 0.8, transform: 'scale(1.05)' }}>
+                <AssetCard
+                  asset={activeImage}
+                  isSelected={selectedImageIds.has(activeImage.id)}
+                  onSelect={() => {}}
+                  onViewExpand={() => {}}
+                  onViewDetails={() => {}}
+                  layout={layoutMode === 'List' ? 'list' : 'grid'}
+                  renderPreview={
+                    activeImage && renderItemPreview
+                      ? () => renderItemPreview(activeImage)
+                      : undefined
+                  }
+                  showViewButton={showViewButton}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        galleryContent
+      )}
 
       {/* Image Display Modal */}
       {imageToDisplayInModal && (
@@ -669,15 +731,20 @@ const Gallery: React.FC<GalleryProps> = ({
           totalImages={images.length}
           onPrevious={handlePrevious}
           onNext={handleNext}
+          renderPreview={
+            renderItemPreview ? () => renderItemPreview(imageToDisplayInModal) : undefined
+          }
+          detailModalTitle={detailModalTitle}
+          onEdit={onSingleRename ? () => onSingleRename(imageToDisplayInModal.id) : undefined}
         />
       )}
 
       {/* View More Display Modal */}
-      {imageForViewMore && (
-        <ViewMoreDisplayModal
-          isOpen={showViewMoreModal}
-          image={imageForViewMore}
-          onClose={handleCloseViewMoreModal}
+      {imageForGenerationHistory && (
+        <GenerationHistoryModal
+          isOpen={showGenerationHistoryModal}
+          image={imageForGenerationHistory}
+          onClose={handleCloseGenerationHistoryModal}
         />
       )}
 
@@ -688,7 +755,10 @@ const Gallery: React.FC<GalleryProps> = ({
           onClose={() => setShowBatchUploadModal(false)}
           onUpload={handleBatchUpload}
           currentCount={totalImageCount}
-          title="Upload Images"
+          title={uploadModalTitle}
+          mode={batchUploadMode}
+          assetType={assetType}
+          existingNames={existingNames}
         />
       )}
     </Card>

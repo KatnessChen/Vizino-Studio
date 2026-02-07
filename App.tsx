@@ -1,20 +1,24 @@
 import React, { useRef } from 'react';
+import { App as AntdApp } from 'antd';
 import { Provider } from 'react-redux';
 import '@/styles/main.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GuestProvider } from './contexts/GuestContext';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { store } from './stores/store';
 import { ROUTES } from './constants/routes';
 import Header from './components/layout/Header';
 import LandingPage from './pages/LandingPage';
 import AdminSettingPage from './pages/AdminSettingPage';
+import UserProfilePage from './pages/UserProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginRequiredModal from './components/modal/LoginRequiredModal';
 import { GuestOnboardingTourRef } from './components/GuestOnboardingTour';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AntdStaticHelper } from './utils/antd';
+import GeminiClientManager from './components/GeminiClientManager';
 
 // Main Layout Component - allows both authenticated and guest users
 const MainLayout: React.FC = () => {
@@ -32,9 +36,9 @@ const MainLayout: React.FC = () => {
   // Allow both authenticated and guest users to access the main app
   return (
     <ErrorBoundary level="page">
-      <div className="h-screen flex flex-col overflow-scroll">
+      <div className="h-screen flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-scroll">
+        <div className="flex-1 overflow-hidden">
           <div className="app-viewport">
             <Routes>
               <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
@@ -51,8 +55,8 @@ const MainLayout: React.FC = () => {
   );
 };
 
-// Protected Admin Layout - requires authentication
-const ProtectedAdminLayout: React.FC = () => {
+// Protected Route Wrapper Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -64,18 +68,25 @@ const ProtectedAdminLayout: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.AUTH} replace />;
+    return <Navigate to={ROUTES.HOME} replace />;
   }
 
+  return <>{children}</>;
+};
+
+// Shared Layout for Protected Pages (Admin & Profile)
+const ProtectedPageLayout: React.FC = () => {
   return (
-    <ErrorBoundary level="page">
-      <div className="h-screen flex flex-col overflow-scroll">
-        <Header />
-        <div className="flex-1 overflow-scroll">
-          <AdminSettingPage />
+    <ProtectedRoute>
+      <ErrorBoundary level="page">
+        <div className="h-screen flex flex-col overflow-hidden">
+          <Header />
+          <div className="flex-1 overflow-auto">
+            <Outlet />
+          </div>
         </div>
-      </div>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </ProtectedRoute>
   );
 };
 
@@ -85,9 +96,15 @@ const AppContent: React.FC = () => {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
+      <GeminiClientManager />
       <Router>
         <Routes>
-          <Route path={ROUTES.ADMIN_SETTING} element={<ProtectedAdminLayout />} />
+          {/* Group protected routes under the shared layout */}
+          <Route element={<ProtectedPageLayout />}>
+            <Route path={ROUTES.ADMIN_SETTING} element={<AdminSettingPage />} />
+            <Route path={ROUTES.USER_PROFILE} element={<UserProfilePage />} />
+          </Route>
+
           <Route path="/*" element={<MainLayout />} />
         </Routes>
         <SpeedInsights />
@@ -99,13 +116,16 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary level="app">
-      <Provider store={store}>
-        <AuthProvider>
-          <GuestProvider>
-            <AppContent />
-          </GuestProvider>
-        </AuthProvider>
-      </Provider>
+      <AntdApp>
+        <AntdStaticHelper />
+        <Provider store={store}>
+          <AuthProvider>
+            <GuestProvider>
+              <AppContent />
+            </GuestProvider>
+          </AuthProvider>
+        </Provider>
+      </AntdApp>
     </ErrorBoundary>
   );
 };

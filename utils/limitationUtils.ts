@@ -1,4 +1,4 @@
-import { Project, Space, ImageData } from '@/types';
+import { Project, Space, ImageData, Color, Texture, Item } from '@/types';
 import {
   MAX_PROJECTS_PER_USER,
   MAX_SPACES_PER_PROJECT,
@@ -96,15 +96,15 @@ export const checkImageLimit = (
 };
 
 /**
- * Checks if an image can have more operations added to its evolution chain.
+ * Checks if an image or asset can have more operations added to its evolution chain.
  * Excludes soft-deleted images.
  *
- * @param image The image to check
+ * @param source The source image or asset to check
  * @param mockLimitReached If true, simulates limit reached scenario
  * @returns Object with canAdd boolean, remaining count, and max count
  */
 export const checkOperationLimit = (
-  image: ImageData | null,
+  source: ImageData | Color | Texture | Item | null,
   mockLimitReached: boolean = false
 ): { canAdd: boolean; remaining: number; max: number; current: number } => {
   // If mock_limit_reached is true, simulate limit reached
@@ -117,7 +117,7 @@ export const checkOperationLimit = (
     };
   }
 
-  if (!image) {
+  if (!source) {
     return {
       canAdd: true,
       remaining: MAX_OPERATIONS_PER_IMAGE,
@@ -126,7 +126,7 @@ export const checkOperationLimit = (
     };
   }
 
-  const currentOps = image.evolutionChain ? image.evolutionChain.length : 0;
+  const currentOps = source.evolutionChain ? source.evolutionChain.length : 0;
   const remaining = MAX_OPERATIONS_PER_IMAGE - currentOps;
 
   return {

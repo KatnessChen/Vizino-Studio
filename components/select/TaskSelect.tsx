@@ -4,7 +4,8 @@ import { Checkbox, Typography, Tooltip } from 'antd';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { LockOutlined } from '@ant-design/icons';
 import { GEMINI_TASKS, GeminiTaskName } from '@/services/gemini/geminiTasks';
-import { selectSelectedTaskNames, setSelectedTaskNames } from '@/stores/taskStore';
+import { selectSelectedTaskNames, setSelectedTaskNames, setSelectedAssets } from '@/stores/taskStore';
+import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
 import { setShowLoginRequiredModal } from '@/stores/guestStore';
 import { useGuest } from '@/contexts/GuestContext';
 
@@ -31,9 +32,12 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
   // Reset related state when tasks change
   const resetRelatedState = useCallback(() => {
-    onModalStateChange?.(false); // Close any open confirmation modal
-    onError?.(null); // Clear any error messages
-  }, [onModalStateChange, onError]);
+    dispatch(setSelectedAssets([]));
+    dispatch(setSelectedOriginalImageIds(new Set()));
+    dispatch(setSelectedUpdatedImageIds(new Set()));
+    onModalStateChange?.(false);
+    onError?.(null);
+  }, [dispatch, onModalStateChange, onError]);
 
   const tasks = [
     {
@@ -41,28 +45,32 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       label: GEMINI_TASKS.RECOLOR_WALL.label_name,
       icon: '🎨',
       guestAllowed: true,
-      description: 'Instantly transform your walls with a fresh coat of color from our curated palette.',
+      description:
+        'Select an image and a color. Let AI generate a new image with the selected color.',
     },
     {
       value: GEMINI_TASKS.ADD_TEXTURE.task_name,
       label: GEMINI_TASKS.ADD_TEXTURE.label_name,
       icon: '🧱',
       guestAllowed: false,
-      description: 'Elevate your surfaces with realistic textures like natural wood, elegant stone, or designer wallpaper.',
+      description:
+        'Select an image and a texture. Let AI generate a new image with the selected texture.',
     },
     {
       value: GEMINI_TASKS.ADD_HOME_ITEM.task_name,
       label: GEMINI_TASKS.ADD_HOME_ITEM.label_name,
       icon: '🛋️',
       guestAllowed: false,
-      description: 'Seamlessly integrate new furniture and décor into your space for a complete vision.',
+      description:
+        'Select an image and an object. Let AI generate a new image with the selected object.',
     },
     {
       value: GEMINI_TASKS.CUSTOM_PROMPT.task_name,
       label: GEMINI_TASKS.CUSTOM_PROMPT.label_name,
       icon: '💬',
       guestAllowed: false,
-      description: 'Describe your dream space and let AI bring your unique vision to life with precision.',
+      description:
+        'Select an image or any design material. Describe your idea by custom prompt. Let AI bring your unique vision to life.',
     },
   ];
 
@@ -105,7 +113,7 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
 
   return (
     <div className="space-y-2 px-6 pt-6">
-      <Typography.Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
+      <Typography.Title level={5} className="!m-0 !mb-2">
         Design Goal
       </Typography.Title>
 
@@ -173,7 +181,6 @@ const TaskSelect: React.FC<TaskSelectProps> = ({
       </div>
     </div>
   );
-
 };
 
 export default TaskSelect;

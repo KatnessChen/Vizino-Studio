@@ -79,8 +79,7 @@ class IndexedDBService {
           // Remove the 'url' property and return the cache entry
           const result = request.result;
           if (result) {
-            const { url, ...entry } = result;
-            resolve(entry);
+            resolve(result);
           } else {
             resolve(null);
           }

@@ -13,7 +13,9 @@ import {
   writeBatch,
   orderBy,
   where,
+  limit,
 } from 'firebase/firestore';
+import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { app } from '@/config/firebaseConfig';
 import {
@@ -49,34 +51,69 @@ export const storage = getStorage(app);
  * @param spaceId The ID of the space.
  * @returns The maximum order value, or 0 if no images exist.
  */
-async function getMaxImageOrder(
-  userId: string,
-  projectId: string,
-  spaceId: string
-): Promise<number> {
-  const imagesCollectionRef = collection(
-    db,
-    'users',
-    userId,
-    'projects',
-    projectId,
-    'spaces',
-    spaceId,
-    'images'
+/**
+ * Gets the maximum order value for assets (images, textures, items).
+ * Used to determine the order for newly created or duplicated assets.
+ *
+ * @param userId The ID of the user.
+ * @param projectId The ID of the project.
+ * @param spaceId The ID of the space (required for images, ignored for others).
+ * @param collectionName The name of the collection ('images', 'custom_textures', 'custom_items').
+ * @returns The maximum order value, or 0 if no assets exist.
+ */
+async function getMaxAssetOrder({
+  userId,
+  projectId,
+  spaceId,
+  collectionName = 'images',
+}: {
+  userId: string;
+  projectId: string;
+  spaceId?: string | null;
+  collectionName?: 'images' | 'custom_textures' | 'custom_items';
+}): Promise<number> {
+  let collectionRef;
+
+  if (collectionName === 'images') {
+    if (!spaceId) throw new Error('Space ID is required for image order calculation');
+    collectionRef = collection(
+      db,
+      'users',
+      userId,
+      'projects',
+      projectId,
+      'spaces',
+      spaceId,
+      'images'
+    );
+  } else {
+    collectionRef = collection(
+      db,
+      'users',
+      userId,
+      'projects',
+      projectId,
+      collectionName
+    );
+  }
+
+  // Optimize query: order by 'order' descending and limit to 1
+  const assetsQuery = query(
+    collectionRef,
+    orderBy('order', 'desc'),
+    limit(1)
   );
-  const imagesQuery = query(imagesCollectionRef, where('isDeleted', '==', false));
-  const imagesSnapshot = await getDocs(imagesQuery);
 
-  let maxOrder = 0;
-  imagesSnapshot.forEach((doc) => {
-    const imageData = doc.data() as ImageData;
-    if (imageData.order && imageData.order > maxOrder) {
-      maxOrder = imageData.order;
-    }
-  });
+  const snapshot = await getDocs(assetsQuery);
 
-  return maxOrder;
+  if (!snapshot.empty) {
+    const data = snapshot.docs[0].data();
+    return data.order || 0;
+  }
+
+  return 0;
 }
+
 
 /**
  * Creates a new project in Firestore for a user.
@@ -162,7 +199,13 @@ export async function fetchProjects(userId: string): Promise<Project[]> {
         createdAt:
           typeof spaceData.createdAt === 'string'
             ? spaceData.createdAt
-            : (spaceData.createdAt as any).toDate().toISOString(),
+            : spaceData.createdAt &&
+                typeof (spaceData.createdAt as Record<string, unknown>).toDate === 'function'
+              ? (spaceData.createdAt as { toDate(): Date }).toDate().toISOString()
+              : spaceData.createdAt &&
+                  ((spaceData.createdAt as unknown) instanceof Date ? true : false)
+                ? (spaceData.createdAt as Date).toISOString()
+                : String(spaceData.createdAt),
       };
 
       const projectSpaces = spacesByProject.get(spaceData.projectId) || [];
@@ -181,7 +224,13 @@ export async function fetchProjects(userId: string): Promise<Project[]> {
         createdAt:
           typeof projectData.createdAt === 'string'
             ? projectData.createdAt
-            : (projectData.createdAt as any).toDate().toISOString(),
+            : projectData.createdAt &&
+                typeof (projectData.createdAt as Record<string, unknown>).toDate === 'function'
+              ? (projectData.createdAt as { toDate(): Date }).toDate().toISOString()
+              : projectData.createdAt &&
+                  ((projectData.createdAt as unknown) instanceof Date ? true : false)
+                ? (projectData.createdAt as Date).toISOString()
+                : String(projectData.createdAt),
       };
     });
 
@@ -446,7 +495,14 @@ export async function fetchSpaceImages(
     const images: ImageData[] = imagesSnapshot.docs
       .map((imageDoc) => {
         const imageData = imageDoc.data();
-        return new FirestoreDataHandler(imageData).serializeTimestamps().value as ImageData;
+        const processedImage = new FirestoreDataHandler(imageData).serializeTimestamps()
+          .value as ImageData;
+
+        // Ensure assetType exists for backward compatibility
+        return {
+          ...processedImage,
+          assetType: processedImage.assetType || ASSET_IMAGE,
+        };
       })
       .filter((image) => !image.isDeleted);
 
@@ -541,7 +597,12 @@ export async function createImage(
     console.log('Image download URL obtained:', imageDownloadUrl);
 
     // Step 2: Calculate order value for the new image
-    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId,
+      spaceId,
+      collectionName: 'images',
+    });
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Step 3: Create the image document in Firestore with storage information
@@ -570,6 +631,7 @@ export async function createImage(
       width: imageMetadata.width ?? null,
       height: imageMetadata.height ?? null,
       aspect_ratio: imageMetadata.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     console.log({ newImageData });
@@ -609,28 +671,37 @@ export async function createImage(
 }
 
 /**
- * Updates an image's name in Firestore.
+ * Updates an image's metadata (name and description) in Firestore.
  *
  * @param userId The ID of the user.
  * @param projectId The ID of the project.
  * @param spaceId The ID of the space.
  * @param imageId The ID of the image to update.
- * @param newName The new name for the image.
+ * @param updates The updates to apply: { name?: string; description?: string }.
  */
-export async function updateImageName(
+export async function updateImageMetadata(
   userId: string,
   projectId: string,
   spaceId: string,
   imageId: string,
-  newName: string
+  updates: { name?: string; description?: string }
 ): Promise<void> {
   if (!userId || !projectId || !spaceId || !imageId) {
     throw new Error('User ID, Project ID, Space ID, and Image ID are required to update image.');
   }
 
-  if (!newName.trim()) {
-    throw new Error('Image name cannot be empty.');
+  const sanitizedUpdates: Partial<Pick<ImageData, 'name' | 'description' | 'updatedAt'>> = {};
+  if (updates.name !== undefined) {
+    if (!updates.name.trim()) {
+      throw new Error('Image name cannot be empty.');
+    }
+    sanitizedUpdates.name = updates.name.trim();
   }
+  if (updates.description !== undefined) {
+    sanitizedUpdates.description = updates.description.trim();
+  }
+
+  if (Object.keys(sanitizedUpdates).length === 0) return;
 
   try {
     const docRef = doc(
@@ -646,19 +717,38 @@ export async function updateImageName(
     );
 
     const now = new Date();
-    await updateDoc(docRef, {
-      name: newName.trim(),
-      updatedAt: Timestamp.fromDate(now),
-    });
+    sanitizedUpdates.updatedAt = Timestamp.fromDate(now);
 
-    console.log('Image name updated in Firestore:', imageId);
+    await updateDoc(docRef, sanitizedUpdates);
+
+    console.log('Image metadata updated in Firestore:', imageId);
   } catch (error) {
-    console.error('Failed to update image name:', error);
+    console.error('Failed to update image metadata:', error);
     if (error instanceof Error) {
-      throw new Error(`Failed to update image name: ${error.message}`);
+      throw new Error(`Failed to update image metadata: ${error.message}`);
     }
-    throw new Error('Failed to update image name in Firebase.');
+    throw new Error('Failed to update image metadata in Firebase.');
   }
+}
+
+/**
+ * Updates an image's name in Firestore.
+ *
+ * @param userId The ID of the user.
+ * @param projectId The ID of the project.
+ * @param spaceId The ID of the space.
+ * @param imageId The ID of the image to update.
+ * @param newName The new name for the image.
+ * @deprecated Use updateImageMetadata instead.
+ */
+export async function updateImageName(
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  imageId: string,
+  newName: string
+): Promise<void> {
+  return updateImageMetadata(userId, projectId, spaceId, imageId, { name: newName });
 }
 
 /**
@@ -803,7 +893,12 @@ export async function duplicateImage(
     const now = Timestamp.fromDate(new Date());
 
     // Get the maximum order for the new image
-    const maxOrder = await getMaxImageOrder(userId, projectId, spaceId);
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId,
+      spaceId,
+      collectionName: 'images',
+    });
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Create the new image document
@@ -825,6 +920,7 @@ export async function duplicateImage(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore
@@ -917,7 +1013,12 @@ export async function moveImageToSpace(
     const now = Timestamp.fromDate(new Date());
 
     // Get the maximum order for the target space
-    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId: targetProjectId,
+      spaceId: targetSpaceId,
+      collectionName: 'images',
+    });
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Create the new image document WITH generation history preserved
@@ -939,6 +1040,7 @@ export async function moveImageToSpace(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore in target space
@@ -1026,7 +1128,12 @@ export async function copyImageAsOriginal(
     const now = Timestamp.fromDate(new Date());
 
     // Get the maximum order for the target space
-    const maxOrder = await getMaxImageOrder(userId, targetProjectId, targetSpaceId);
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId: targetProjectId,
+      spaceId: targetSpaceId,
+      collectionName: 'images',
+    });
     const newImageOrder = maxOrder > 0 ? maxOrder + 1 : 1;
 
     // Create the new image document WITHOUT generation history (original)
@@ -1048,6 +1155,7 @@ export async function copyImageAsOriginal(
       width: sourceImageData.width ?? null,
       height: sourceImageData.height ?? null,
       aspect_ratio: sourceImageData.aspect_ratio ?? null,
+      assetType: ASSET_IMAGE,
     };
 
     // Write to Firestore in target space
@@ -1101,7 +1209,12 @@ export async function copyImageAsOriginal(
 export async function addColor(
   userId: string,
   projectId: string,
-  colorData: { name: string; hex: string; description?: string }
+  colorData: {
+    name: string;
+    hex: string;
+    description?: string;
+    evolutionChain?: ImageOperation[];
+  }
 ): Promise<Color> {
   if (!userId || !projectId) {
     throw new Error('User ID and Project ID are required');
@@ -1115,9 +1228,11 @@ export async function addColor(
       id: colorId,
       name: colorData.name.trim(),
       hex: colorData.hex.toUpperCase(),
+      assetType: ASSET_COLOR,
       description: colorData.description?.trim() || '',
       createdAt: now,
       updatedAt: now,
+      evolutionChain: colorData.evolutionChain || [],
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
@@ -1130,7 +1245,10 @@ export async function addColor(
       id: colorDoc.id,
       name: colorDoc.name,
       hex: colorDoc.hex,
+      assetType: colorDoc.assetType || ASSET_COLOR,
       description: colorDoc.description,
+      evolutionChain: new FirestoreDataHandler(colorDoc.evolutionChain || []).serializeTimestamps()
+        .value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add color:', error);
@@ -1165,7 +1283,10 @@ export async function fetchColors(userId: string, projectId: string): Promise<Co
         id: data.id,
         name: data.name,
         hex: data.hex,
+        assetType: data.assetType || ASSET_COLOR,
         description: data.description,
+        evolutionChain: new FirestoreDataHandler(data.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
   } catch (error) {
@@ -1198,7 +1319,9 @@ export async function updateColor(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
 
-    const updateData: any = {
+    const updateData: Partial<
+      Pick<Color, 'name' | 'hex' | 'description'> & { updatedAt: Timestamp }
+    > = {
       updatedAt: Timestamp.now(),
     };
 
@@ -1272,6 +1395,7 @@ export async function addTexture(
     width?: number;
     height?: number;
     aspect_ratio?: number;
+    evolutionChain?: ImageOperation[];
   }
 ): Promise<Texture> {
   if (!userId || !projectId) {
@@ -1298,16 +1422,26 @@ export async function addTexture(
     await uploadBytes(storageRef, textureData.file);
     const textureImageDownloadUrl = await getDownloadURL(storageRef);
 
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId,
+      collectionName: 'custom_textures',
+    });
+    const newOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
     const textureDoc: Texture = {
       id: textureId,
       name: textureData.name.trim(),
       textureImageDownloadUrl,
+      assetType: ASSET_TEXTURE,
       description: textureData.description?.trim() || '',
       width: textureData.width ?? null,
       height: textureData.height ?? null,
       aspect_ratio: textureData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
+      evolutionChain: textureData.evolutionChain || [],
+      order: newOrder,
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
@@ -1320,10 +1454,24 @@ export async function addTexture(
       id: textureDoc.id,
       name: textureDoc.name,
       textureImageDownloadUrl: textureDoc.textureImageDownloadUrl,
+      imageDownloadUrl: textureDoc.textureImageDownloadUrl,
+      assetType: textureDoc.assetType || ASSET_TEXTURE,
       description: textureDoc.description,
       width: textureDoc.width,
       height: textureDoc.height,
       aspect_ratio: textureDoc.aspect_ratio,
+      mimeType: textureDoc.mimeType || 'image/jpeg',
+      spaceId: '',
+      parentImageId: null,
+      storageFilePath: '',
+      order: textureDoc.order,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: textureDoc.createdAt || now,
+      updatedAt: textureDoc.updatedAt || now,
+      evolutionChain: new FirestoreDataHandler(
+        textureDoc.evolutionChain || []
+      ).serializeTimestamps().value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add texture:', error);
@@ -1353,15 +1501,28 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
     const snapshot = await getDocs(texturesQuery);
 
     const textures = snapshot.docs.map((doc) => {
-      const data = doc.data() as Texture;
+      const textureDoc = doc.data() as Texture;
       return {
-        id: data.id,
-        name: data.name,
-        textureImageDownloadUrl: data.textureImageDownloadUrl,
-        description: data.description,
-        width: data.width,
-        height: data.height,
-        aspect_ratio: data.aspect_ratio,
+        id: textureDoc.id,
+        name: textureDoc.name,
+        textureImageDownloadUrl: textureDoc.textureImageDownloadUrl,
+        imageDownloadUrl: textureDoc.textureImageDownloadUrl,
+        assetType: textureDoc.assetType || ASSET_TEXTURE,
+        description: textureDoc.description,
+        width: textureDoc.width,
+        height: textureDoc.height,
+        aspect_ratio: textureDoc.aspect_ratio,
+        mimeType: textureDoc.mimeType || 'image/jpeg',
+        spaceId: '',
+        parentImageId: null,
+        storageFilePath: '',
+        order: textureDoc.order,
+        isDeleted: false,
+        deletedAt: null,
+        createdAt: textureDoc.createdAt || Timestamp.now(),
+        updatedAt: textureDoc.updatedAt || Timestamp.now(),
+        evolutionChain: new FirestoreDataHandler(textureDoc.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
 
@@ -1399,7 +1560,7 @@ export async function updateTexture(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
 
-    const updateData: any = {
+    const updateData: Partial<Texture> = {
       updatedAt: Timestamp.now(),
     };
 
@@ -1526,6 +1687,7 @@ export async function addItem(
     width?: number;
     height?: number;
     aspect_ratio?: number;
+    evolutionChain?: ImageOperation[];
   }
 ): Promise<Item> {
   if (!userId || !projectId) {
@@ -1550,16 +1712,26 @@ export async function addItem(
     await uploadBytes(storageRef, itemData.file);
     const itemImageDownloadUrl = await getDownloadURL(storageRef);
 
+    const maxOrder = await getMaxAssetOrder({
+      userId,
+      projectId,
+      collectionName: 'custom_items',
+    });
+    const newOrder = maxOrder > 0 ? maxOrder + 1 : 1;
+
     const itemDoc: Item = {
       id: itemId,
       name: itemData.name.trim(),
       itemImageDownloadUrl,
+      assetType: ASSET_ITEM,
       description: itemData.description?.trim() || '',
       width: itemData.width ?? null,
       height: itemData.height ?? null,
       aspect_ratio: itemData.aspect_ratio ?? null,
       createdAt: now,
       updatedAt: now,
+      evolutionChain: itemData.evolutionChain || [],
+      order: newOrder,
     };
 
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
@@ -1572,10 +1744,23 @@ export async function addItem(
       id: itemDoc.id,
       name: itemDoc.name,
       itemImageDownloadUrl: itemDoc.itemImageDownloadUrl,
+      imageDownloadUrl: itemDoc.itemImageDownloadUrl,
+      assetType: itemDoc.assetType || ASSET_ITEM,
       description: itemDoc.description,
       width: itemDoc.width,
       height: itemDoc.height,
       aspect_ratio: itemDoc.aspect_ratio,
+      mimeType: itemDoc.mimeType || 'image/jpeg',
+      spaceId: '',
+      parentImageId: null,
+      storageFilePath: '',
+      order: itemDoc.order,
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: itemDoc.createdAt || now,
+      updatedAt: itemDoc.updatedAt || now,
+      evolutionChain: new FirestoreDataHandler(itemDoc.evolutionChain || []).serializeTimestamps()
+        .value as ImageOperation[],
     };
   } catch (error) {
     console.error('Failed to add item:', error);
@@ -1605,15 +1790,28 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
     const snapshot = await getDocs(itemsQuery);
 
     const items = snapshot.docs.map((doc) => {
-      const data = doc.data() as Item;
+      const itemDoc = doc.data() as Item;
       return {
-        id: data.id,
-        name: data.name,
-        itemImageDownloadUrl: data.itemImageDownloadUrl,
-        description: data.description,
-        width: data.width,
-        height: data.height,
-        aspect_ratio: data.aspect_ratio,
+        id: itemDoc.id,
+        name: itemDoc.name,
+        itemImageDownloadUrl: itemDoc.itemImageDownloadUrl,
+        imageDownloadUrl: itemDoc.itemImageDownloadUrl,
+        assetType: itemDoc.assetType || ASSET_ITEM,
+        description: itemDoc.description,
+        width: itemDoc.width,
+        height: itemDoc.height,
+        aspect_ratio: itemDoc.aspect_ratio,
+        mimeType: itemDoc.mimeType || 'image/jpeg',
+        spaceId: '',
+        parentImageId: null,
+        storageFilePath: '',
+        order: itemDoc.order,
+        isDeleted: false,
+        deletedAt: null,
+        createdAt: itemDoc.createdAt || Timestamp.now(),
+        updatedAt: itemDoc.updatedAt || Timestamp.now(),
+        evolutionChain: new FirestoreDataHandler(itemDoc.evolutionChain || []).serializeTimestamps()
+          .value as ImageOperation[],
       };
     });
 
@@ -1651,7 +1849,7 @@ export async function updateItem(
   try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
 
-    const updateData: any = {
+    const updateData: Partial<Item> = {
       updatedAt: Timestamp.now(),
     };
 
@@ -1812,56 +2010,88 @@ export async function fetchAllCustomPrompts(
 }
 
 /**
- * Batch update the order property of multiple images
+ * Batch update the order property of multiple images or assets
  * @param userId The ID of the user
  * @param projectId The ID of the project
- * @param spaceId The ID of the space
- * @param updates Array of {imageId, order} objects to update
+ * @param spaceId The ID of the space (optional for project-level assets)
+ * @param updates Array of {id, order} objects to update
+ * @param collectionName The name of the collection (default: 'images')
  */
 export async function batchUpdateImagesOrder(
   userId: string,
   projectId: string,
-  spaceId: string,
-  updates: Array<{ imageId: string; order: number }>
+  spaceId: string | null,
+  updates: Array<{ id: string; order: number }>,
+  collectionName: string = 'images'
 ): Promise<void> {
-  if (!userId || !projectId || !spaceId) {
-    throw new Error('User ID, Project ID, and Space ID are required.');
+  if (!userId || !projectId) {
+    throw new Error('User ID and Project ID are required.');
+  }
+
+  // If collection is 'images', spaceId is required
+  if (collectionName === 'images' && !spaceId) {
+    throw new Error('Space ID is required for image updates.');
   }
 
   if (!updates || updates.length === 0) {
     return; // Nothing to update
   }
 
+
   try {
-    const batch = writeBatch(db);
+    const CHUNK_SIZE = 450; // Safety margin below 500
     const now = Timestamp.fromDate(new Date());
 
-    for (const { imageId, order } of updates) {
-      const imageDocRef = doc(
-        db,
-        'users',
-        userId,
-        'projects',
-        projectId,
-        'spaces',
-        spaceId,
-        'images',
-        imageId
-      );
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
 
-      batch.update(imageDocRef, {
-        order,
-        updatedAt: now,
-      });
+      for (const { id, order } of chunk) {
+        let docRef;
+
+        if (collectionName === 'images' && spaceId) {
+          // Space-level images
+          docRef = doc(
+            db,
+            'users',
+            userId,
+            'projects',
+            projectId,
+            'spaces',
+            spaceId,
+            'images',
+            id
+          );
+        } else {
+          // Project-level assets (custom_textures, custom_items)
+          docRef = doc(
+            db,
+            'users',
+            userId,
+            'projects',
+            projectId,
+            collectionName,
+            id
+          );
+        }
+
+        batch.update(docRef, {
+          order,
+          updatedAt: now,
+        });
+      }
+      
+      await batch.commit();
     }
-
-    await batch.commit();
-    console.log(`Successfully updated order for ${updates.length} images`);
+    
+    console.log(`Successfully updated order for ${updates.length} items in ${collectionName}`);
   } catch (error) {
-    console.error('Failed to batch update images order:', error);
+    console.error(`Failed to batch update ${collectionName} order:`, error);
     if (error instanceof Error) {
-      throw new Error(`Failed to update images order: ${error.message}`);
+      throw new Error(`Failed to update ${collectionName} order: ${error.message}`);
     }
-    throw new Error('Failed to update images order in Firestore.');
+    throw new Error(`Failed to update ${collectionName} order in Firestore.`);
   }
 }
+
+

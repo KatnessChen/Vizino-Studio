@@ -7,9 +7,9 @@
  *     .value;
  */
 class FirestoreDataHandler {
-  data: any;
+  data: unknown;
 
-  constructor(data: any) {
+  constructor(data: unknown) {
     this.data = data;
   }
 
@@ -18,10 +18,15 @@ class FirestoreDataHandler {
    * Supports nested objects and arrays.
    */
   serializeTimestamps(): this {
-    const convert = (value: any): any => {
+    const convert = (value: unknown): unknown => {
       if (value == null) return value;
-      if (typeof value?.toDate === 'function') {
-        return value.toDate().toISOString();
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        'toDate' in value &&
+        typeof (value as Record<string, unknown>).toDate === 'function'
+      ) {
+        return (value as { toDate(): Date }).toDate().toISOString();
       }
       if (value instanceof Date) {
         return value.toISOString();
@@ -30,9 +35,10 @@ class FirestoreDataHandler {
         return value.map(convert);
       }
       if (typeof value === 'object') {
-        const result: any = {};
+        const result: Record<string, unknown> = {};
         for (const key in value) {
-          result[key] = convert(value[key]);
+          const objValue = value as Record<string, unknown>;
+          result[key] = convert(objValue[key]);
         }
         return result;
       }
