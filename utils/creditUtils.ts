@@ -3,9 +3,10 @@ import { GeminiTaskName } from '@/services/gemini/geminiTasks';
 
 /**
  * Usage data from Firestore user document
+ * New structure: { taskName: { onVPoints: number; onOwnKey: number } }
  */
 export interface UsageData {
-  [key: string]: number;
+  [key: string]: { onVPoints: number; onOwnKey: number };
 }
 
 /**
@@ -19,23 +20,36 @@ export const normalizeUsage = (usage?: UsageData): UsageData => {
 
   // Ensure all defined Gemini tasks are present
   Object.values(GEMINI_TASKS).forEach((task) => {
-    normalized[task.task_name] = 0;
+    normalized[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
   });
 
   // Include special usage keys
-  normalized['thinking_mode'] = 0;
+  normalized['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
 
   if (!usage) return normalized;
 
+  // Merge valid entries from usage, skipping corrupted ones
   for (const [k, v] of Object.entries(usage)) {
-    if (typeof v === 'number') normalized[k] = v;
+    // Only accept valid entries with proper structure
+    if (
+      v &&
+      typeof v === 'object' &&
+      'onVPoints' in v &&
+      'onOwnKey' in v &&
+      typeof (v as Record<string, unknown>).onVPoints === 'number' &&
+      typeof (v as Record<string, unknown>).onOwnKey === 'number'
+    ) {
+      normalized[k] = v as { onVPoints: number; onOwnKey: number };
+    } else if (v) {
+      console.warn(`[creditUtils] Skipping corrupted usage entry for "${k}":`, v);
+    }
   }
 
   return normalized;
 };
 
 /**
- * Calculate total V points consumed based on usage data
+ * Calculate total V points consumed based on usage data (only onVPoints)
  * Formula: thinking_mode × 4, optimize_prompt × 4, all others × 1
  *
  * @param usage - Usage data object from Firestore
@@ -46,12 +60,27 @@ export const calculateTotalCredits = (usage: UsageData | undefined): number => {
 
   let total = 0;
 
-  for (const [taskName, count] of Object.entries(usage)) {
-    const multiplier = CREDIT_MULTIPLIERS[taskName] ?? 1;
-    total += count * multiplier;
+  for (const [taskName, counts] of Object.entries(usage)) {
+    if (counts && typeof counts === 'object' && 'onVPoints' in counts) {
+      const multiplier = CREDIT_MULTIPLIERS[taskName] ?? 1;
+      total += (counts.onVPoints || 0) * multiplier;
+    }
   }
 
   return total;
+};
+
+/**
+ * Get total usage count (onVPoints + onOwnKey) for a specific task
+ *
+ * @param usage - Usage data object from Firestore
+ * @param taskName - Task name to get total count for
+ * @returns Total usage count (both V Points and own key)
+ */
+export const getTotalTaskUsage = (usage: UsageData | undefined, taskName: string): number => {
+  if (!usage || !usage[taskName]) return 0;
+  const counts = usage[taskName];
+  return (counts.onVPoints || 0) + (counts.onOwnKey || 0);
 };
 
 /**

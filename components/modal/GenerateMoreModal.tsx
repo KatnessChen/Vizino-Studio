@@ -331,6 +331,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       guestSessionId,
       selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
       thinkingMode,
+      hasEnabledOwnKey,
       options: {
         selectedColor,
         selectedTexture,

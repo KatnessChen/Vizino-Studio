@@ -12,11 +12,34 @@ import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Runtime type guard for usage data shape
+ * Checks if data contains at least some valid entries (not all must be valid)
  */
 const isValidUsageData = (usage: unknown): usage is UsageData => {
-  if (!usage) return false;
-  if (typeof usage !== 'object') return false;
-  return Object.values(usage as Record<string, unknown>).every((v) => typeof v === 'number');
+  if (!usage) {
+    console.warn('[useCreditCheck] Usage data is falsy');
+    return false;
+  }
+  if (typeof usage !== 'object') {
+    console.warn('[useCreditCheck] Usage data is not an object:', typeof usage);
+    return false;
+  }
+
+  // Check if at least one entry is valid (not requiring ALL to be valid)
+  const hasValidEntry = Object.entries(usage as Record<string, unknown>).some(([, v]) => {
+    return (
+      v &&
+      typeof v === 'object' &&
+      'onVPoints' in v &&
+      'onOwnKey' in v &&
+      typeof (v as Record<string, unknown>).onVPoints === 'number' &&
+      typeof (v as Record<string, unknown>).onOwnKey === 'number'
+    );
+  });
+
+  if (!hasValidEntry) {
+    console.warn('[useCreditCheck] Usage data has no valid entries');
+  }
+  return hasValidEntry;
 };
 
 interface UseCreditCheckOptions {

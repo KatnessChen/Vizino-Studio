@@ -38,11 +38,11 @@ export const getGeminiClient = (() => {
     // OR if no instance exists yet
     if ((apiKey && apiKey !== currentKey) || !instance) {
       const keyToUse = apiKey || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || '';
-      
+
       if (!keyToUse) {
         console.warn('[GeminiConfig] API Key not found.');
       }
-      
+
       instance = new GoogleGenAI({ apiKey: keyToUse });
       currentKey = apiKey || null; // Track if we are using a custom key
       console.log(`[GeminiConfig] Client initialized with ${apiKey ? 'custom' : 'default'} key.`);

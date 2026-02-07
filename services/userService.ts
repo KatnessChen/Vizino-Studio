@@ -24,17 +24,19 @@ const convertFirestoreUser = (data: DocumentData): User => {
 };
 
 /**
- * Initialize usage object with all Gemini tasks set to 0
+ * Initialize usage object with all Gemini tasks set to { onVPoints: 0, onOwnKey: 0 }
  */
-export const initializeUsage = (): { [key: string]: number } => {
-  const usage: { [key: string]: number } = {};
+export const initializeUsage = (): {
+  [key: string]: { onVPoints: number; onOwnKey: number };
+} => {
+  const usage: { [key: string]: { onVPoints: number; onOwnKey: number } } = {};
 
   Object.values(GEMINI_TASKS).forEach((task) => {
-    usage[task.task_name] = 0;
+    usage[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
   });
 
   // Include special usage keys
-  usage['thinking_mode'] = 0;
+  usage['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
 
   return usage;
 };
@@ -105,10 +107,12 @@ export const getUser = async (uid: string): Promise<User | null> => {
  * Increment usage count for a specific Gemini task or feature
  * @param uid - User ID
  * @param usageKey - Gemini task name or feature key (e.g., 'thinking_mode')
+ * @param byOwnKey - Whether this usage is from user's own API key (true) or V Points (false)
  */
 export const incrementTaskUsage = async (
   uid: string,
-  usageKey: GeminiTaskName | 'thinking_mode'
+  usageKey: GeminiTaskName | 'thinking_mode',
+  byOwnKey: boolean = false
 ): Promise<void> => {
   try {
     const userRef = doc(db, 'users', uid);
@@ -116,9 +120,14 @@ export const incrementTaskUsage = async (
 
     if (userDoc.exists()) {
       const currentUsage = userDoc.data().usage || initializeUsage();
+      const trackingKey = byOwnKey ? 'onOwnKey' : 'onVPoints';
+
       const newUsage = {
         ...currentUsage,
-        [usageKey]: (currentUsage[usageKey] || 0) + 1,
+        [usageKey]: {
+          ...(currentUsage[usageKey] || { onVPoints: 0, onOwnKey: 0 }),
+          [trackingKey]: (currentUsage[usageKey]?.[trackingKey] || 0) + 1,
+        },
       };
 
       await setDoc(
@@ -128,7 +137,7 @@ export const incrementTaskUsage = async (
         },
         { merge: true }
       );
-      console.log(`Usage incremented: ${usageKey}`);
+      console.log(`Usage incremented: ${usageKey} (${byOwnKey ? 'own key' : 'V Points'})`);
     } else {
       console.warn('User not found, cannot increment usage');
     }
@@ -163,6 +172,63 @@ export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Pro
   }
 };
 
+/**
+ * Fix corrupted usage data in Firestore
+ * Clears any entries that don't match the expected format
+ */
+export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      console.warn('User not found, cannot fix usage data');
+      return;
+    }
+
+    const currentUsage = userDoc.data().usage || {};
+    const fixedUsage: Record<string, unknown> = {};
+
+    // Only keep valid entries
+    for (const [k, v] of Object.entries(currentUsage)) {
+      if (
+        v &&
+        typeof v === 'object' &&
+        'onVPoints' in v &&
+        'onOwnKey' in v &&
+        typeof (v as Record<string, unknown>).onVPoints === 'number' &&
+        typeof (v as Record<string, unknown>).onOwnKey === 'number'
+      ) {
+        fixedUsage[k] = v;
+      } else if (v) {
+        console.log(`[fixCorruptedUsageData] Removing corrupted entry: ${k}`, v);
+      }
+    }
+
+    // Ensure all expected keys exist
+    Object.values(GEMINI_TASKS).forEach((task) => {
+      if (!fixedUsage[task.task_name]) {
+        fixedUsage[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
+      }
+    });
+    if (!fixedUsage['thinking_mode']) {
+      fixedUsage['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
+    }
+
+    await setDoc(
+      userRef,
+      {
+        usage: fixedUsage,
+      },
+      { merge: true }
+    );
+    console.log(`[fixCorruptedUsageData] Usage data fixed for: ${uid}`);
+  } catch (error) {
+    console.error('Failed to fix corrupted usage data:', error);
+    throw error;
+  }
+};
+
 // ============================================================================
 // Encryption / Decryption Helpers (Client-side)
 // ============================================================================
@@ -192,8 +258,10 @@ const xorCipher = (text: string): string => {
 const encryptKey = (apiKey: string): string => {
   if (!apiKey) return '';
   try {
+    // 0. Trim whitespace first
+    const trimmed = apiKey.trim();
     // 1. XOR
-    const xored = xorCipher(apiKey);
+    const xored = xorCipher(trimmed);
     // 2. Base64 encode to ensure safe string storage
     return btoa(xored);
   } catch (e) {
@@ -211,7 +279,18 @@ const decryptKey = (encryptedKey: string): string => {
     // 1. Base64 decode
     const xored = atob(encryptedKey);
     // 2. XOR (symmetric)
-    return xorCipher(xored);
+    const decrypted = xorCipher(xored);
+    // 3. Strip ALL control characters (0x00-0x1F, 0x7F-0x9F) + trim
+    //    Control chars inside the key cause Headers.append() to throw
+    // eslint-disable-next-line no-control-regex
+    const sanitized = decrypted.replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
+    if (sanitized.length !== decrypted.trim().length) {
+      console.warn(
+        '[UserService] Decrypted API key contained control characters.',
+        `Original length: ${decrypted.length}, Sanitized: ${sanitized.length}`
+      );
+    }
+    return sanitized;
   } catch (e) {
     console.error('Decryption failed:', e);
     return '';
@@ -229,9 +308,10 @@ export const updateUserAiKey = async (
   try {
     const userRef = doc(db, 'users', uid);
 
-    // Encrypt the key before saving
+    // Trim the key and encrypt before saving
     // If apiKey is empty strings (removing), we store empty string
-    const encryptedKey = apiKey ? encryptKey(apiKey) : '';
+    const trimmedKey = apiKey.trim();
+    const encryptedKey = trimmedKey ? encryptKey(trimmedKey) : '';
 
     await setDoc(
       userRef,

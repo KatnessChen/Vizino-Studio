@@ -37,12 +37,6 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disable
       disabled={disabled || loading}
       onClick={handleLogout}
       icon={loading ? <LoadingOutlined spin /> : <LogoutOutlined />}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-      }}
     >
       {loading ? 'Signing out...' : 'Sign out'}
     </Button>

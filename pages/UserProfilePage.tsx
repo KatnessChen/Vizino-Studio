@@ -14,12 +14,14 @@ import {
 } from 'antd';
 import {
   ArrowLeftOutlined,
+  ExportOutlined,
   DownOutlined,
   DeleteOutlined,
   EditOutlined,
   InfoCircleOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
-import { updateUserAiKey, toggleUserAiKeyStatus } from '@/services/userService';
+import { updateUserAiKey, toggleUserAiKeyStatus, decryptUserApiKey } from '@/services/userService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreditCheck } from '@/hooks/useCreditCheck';
@@ -27,8 +29,17 @@ import { CREDIT_MULTIPLIERS } from '@/constants/constants';
 import { ROUTES } from '@/constants/routes';
 import VPointsProgressBar from '@/components/VPointsProgressBar';
 import VPointsIcon from '@/components/icons/VPointsIcon';
+import LogoutButton from '@/components/button/LogoutButton';
 
 const { Title, Text, Paragraph } = Typography;
+
+interface ApiKeyManagerUser {
+  uid: string;
+  apiKey?: {
+    geminiKey?: string;
+    isActive: boolean;
+  };
+}
 
 /**
  * User Profile Page - Displays V points usage and credit information
@@ -36,7 +47,7 @@ const { Title, Text, Paragraph } = Typography;
 const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { isLoading, totalCredits, usagePercentage, usage, hasEnabledOwnKey } = useCreditCheck({
+  const { isLoading, totalCredits, usagePercentage, usage } = useCreditCheck({
     userId: user?.uid,
   });
 
@@ -57,17 +68,26 @@ const UserProfilePage: React.FC = () => {
     );
   }
 
-  // Build usage data for table
-  const usageTableData = Object.entries(usage || {}).map(([taskName, count]) => ({
-    key: taskName,
-    taskName,
-    count: count as number,
-    multiplier: CREDIT_MULTIPLIERS[taskName] ?? 1,
-    credits: (count as number) * (CREDIT_MULTIPLIERS[taskName] ?? 1),
-  }));
+  // Build usage data for table (assume new format: { onVPoints, onOwnKey })
+  const usageTableData = Object.entries(usage || {})
+    .map(([taskName, counts]) => {
+      const { onVPoints = 0, onOwnKey = 0 } =
+        (counts as { onVPoints?: number; onOwnKey?: number }) || {};
+      const totalUses = onVPoints + onOwnKey;
+      const multiplier = CREDIT_MULTIPLIERS[taskName] ?? 1;
+      const credits = onVPoints * multiplier;
 
-  // Sort by credits consumed (highest first)
-  usageTableData.sort((a, b) => b.credits - a.credits);
+      return {
+        key: taskName,
+        taskName,
+        onVPoints,
+        totalUses,
+        multiplier,
+        credits,
+      };
+    })
+    .filter((row) => row.totalUses > 0)
+    .sort((a, b) => b.credits - a.credits); // Sort by credits consumed (highest first)
 
   const columns = [
     {
@@ -79,10 +99,10 @@ const UserProfilePage: React.FC = () => {
       ),
     },
     {
-      title: 'Uses',
-      dataIndex: 'count',
-      key: 'count',
-      width: 80,
+      title: 'On V Points',
+      dataIndex: 'onVPoints',
+      key: 'onVPoints',
+      width: 120,
       align: 'right' as const,
     },
     {
@@ -90,7 +110,7 @@ const UserProfilePage: React.FC = () => {
       dataIndex: 'multiplier',
       key: 'multiplier',
       width: 100,
-      align: 'center' as const,
+      align: 'right' as const,
       render: (multiplier: number) => (
         <Tag color={multiplier > 1 ? 'orange' : 'default'}>×{multiplier}</Tag>
       ),
@@ -103,7 +123,7 @@ const UserProfilePage: React.FC = () => {
       ),
       dataIndex: 'credits',
       key: 'credits',
-      width: 100,
+      width: 60,
       align: 'right' as const,
       render: (credits: number) => (
         <div className="flex items-center justify-end gap-1">
@@ -124,24 +144,24 @@ const UserProfilePage: React.FC = () => {
         User Profile
       </Title>
 
-      {/* User Info */}
-      <Card className="mb-6">
-        <div className="flex items-center gap-4">
-          {user?.photoURL && (
-            <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full" />
-          )}
-          <div>
-            <Title level={4} className="m-0">
-              {user?.displayName || 'User'}
-            </Title>
-            <Text className="text-gray-500">{user?.email}</Text>
+      <div className="flex flex-col gap-2">
+        {/* User Info */}
+        <Card className="mb-8">
+          <div className="flex items-center gap-4">
+            {user?.photoURL && (
+              <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full" />
+            )}
+            <div>
+              <Title level={4} className="m-0">
+                {user?.displayName || 'User'}
+              </Title>
+              <Text className="text-gray-500">{user?.email}</Text>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {/* V Points Usage - Hidden if user has enabled their own API key */}
-      {!hasEnabledOwnKey && (
-        <Card title="V Points Usage" className="mb-6" loading={isLoading}>
+        {/* V Points Usage */}
+        <Card title="Usage" className="mb-8" loading={isLoading}>
           {/* Progress Bar Component */}
           <VPointsProgressBar totalCredits={totalCredits} usagePercentage={usagePercentage} />
           {/* Usage Detail Breakdown - Integrated inside Card */}
@@ -182,14 +202,14 @@ const UserProfilePage: React.FC = () => {
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={1} align="right">
                         <Text strong>
-                          {usageTableData.reduce((sum, row) => sum + row.count, 0)}
+                          {usageTableData.reduce((sum, row) => sum + row.onVPoints, 0)}
                         </Text>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={2} />
                       <Table.Summary.Cell index={3} align="right">
                         <div className="flex items-center justify-end gap-1">
                           <Text strong className="text-blue-600">
-                            {totalCredits}
+                            {usageTableData.reduce((sum, row) => sum + row.credits, 0)}
                           </Text>
                         </div>
                       </Table.Summary.Cell>
@@ -200,32 +220,47 @@ const UserProfilePage: React.FC = () => {
             </Collapse.Panel>
           </Collapse>
         </Card>
-      )}
 
-      {/* API Key Section (Placeholder) */}
-      <Card
-        title={
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span>Manage Gemini API Key</span>
-              <Tooltip title="Enter your Gemini API Key to use your own quota. Your key is securely encrypted before being stored.">
-                <InfoCircleOutlined className="text-gray-400" />
-              </Tooltip>
-            </div>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm"
-            >
-              Get API Key →
-            </a>
-          </div>
-        }
-        className="mb-6"
-      >
-        <ApiKeyManager user={user} />
-      </Card>
+        {/* API Key Section */}
+        {user && (
+          <Card
+            title={
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span>Manage Gemini API Key</span>
+                  <Tooltip title="Enter your Gemini API Key to use your own quota. Your key is securely encrypted before being stored.">
+                    <InfoCircleOutlined className="text-gray-400" />
+                  </Tooltip>
+                </div>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm"
+                >
+                  Get API Key <ExportOutlined />
+                </a>
+              </div>
+            }
+            className="mb-8"
+          >
+            <ApiKeyManager user={user} />
+          </Card>
+        )}
+
+        {/* Sign out */}
+        <Card className="mt-8">
+          <LogoutButton
+            onSuccess={() => {
+              message.success('Signed out');
+              navigate(ROUTES.HOME);
+            }}
+            onError={(err) => {
+              message.error(err || 'Failed to sign out');
+            }}
+          />
+        </Card>
+      </div>
     </div>
   );
 };
@@ -233,7 +268,7 @@ const UserProfilePage: React.FC = () => {
 /**
  * Component to manage custom API Key - Simplified & Modern Design
  */
-const ApiKeyManager: React.FC<{ user: any }> = ({ user }) => {
+const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -293,33 +328,48 @@ const ApiKeyManager: React.FC<{ user: any }> = ({ user }) => {
   // Not connected and not editing: show connect button
   if (!hasKey && !isEditing) {
     return (
-      <Button
-        type="default"
-        size="large"
-        block
-        onClick={() => setIsEditing(true)}
-        className="h-auto py-3"
-      >
-        <div className="text-left">
-          <div className="font-medium">Add API Key</div>
-        </div>
+      <Button type="default" onClick={() => setIsEditing(true)} className="h-auto py-3">
+        Add API Key
       </Button>
     );
   }
 
   // Connected or editing: unified input
+  const handleCopyKey = async () => {
+    if (!user?.apiKey?.geminiKey) {
+      message.error('No API key to copy');
+      return;
+    }
+    try {
+      const decrypted = decryptUserApiKey(user.apiKey.geminiKey);
+      if (!decrypted) throw new Error('Decryption returned empty');
+      await navigator.clipboard.writeText(decrypted);
+      message.success('API key copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy API key:', err);
+      message.error('Failed to copy API key');
+    }
+  };
+
   return (
     <div className="flex items-center gap-3">
       <Input.Password
-        placeholder={isEditing ? '' : '***'}
+        placeholder={isEditing ? '' : '*********************************'}
         disabled={!isEditing && hasKey}
         value={apiKeyInput}
         onChange={(e) => setApiKeyInput(e.target.value)}
+        onBlur={(e) => setApiKeyInput(e.target.value.trim())}
         onPressEnter={isEditing ? handleSaveKey : undefined}
         className="flex-1"
       />
 
-      {hasKey && <Switch checked={isActive} onChange={handleToggleActive} loading={loading} />}
+      {hasKey && (
+        <Tooltip
+          title={isActive ? 'Disable API key (use V Points)' : 'Enable key (use your own quota)'}
+        >
+          <Switch checked={isActive} onChange={handleToggleActive} loading={loading} size="small" />
+        </Tooltip>
+      )}
 
       {isEditing ? (
         <>
@@ -343,22 +393,29 @@ const ApiKeyManager: React.FC<{ user: any }> = ({ user }) => {
           </Button>
         </>
       ) : hasKey ? (
-        <>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => setIsEditing(true)}
-          />
-          <Button
-            type="text"
-            danger
-            size="small"
-            icon={<DeleteOutlined />}
-            onClick={handleRemoveKey}
-            loading={loading}
-          />
-        </>
+        <div className="flex items-center gap-1">
+          <Tooltip title="Copy API Key">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={handleCopyKey} />
+          </Tooltip>
+          <Tooltip title="Edit API Key">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => setIsEditing(true)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete API Key">
+            <Button
+              type="text"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+              onClick={handleRemoveKey}
+              loading={loading}
+            />
+          </Tooltip>
+        </div>
       ) : null}
     </div>
   );

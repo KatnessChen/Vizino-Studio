@@ -39,6 +39,7 @@ interface UseImageProcessingProps {
   guestSessionId?: string | null;
   selectedTaskName: GeminiTaskName;
   thinkingMode?: boolean;
+  hasEnabledOwnKey?: boolean;
   options: {
     selectedColor?: Color | null;
     selectedTexture?: Texture | null;
@@ -51,6 +52,7 @@ export const useImageProcessing = ({
   guestSessionId,
   selectedTaskName,
   thinkingMode,
+  hasEnabledOwnKey,
   options: { selectedColor, selectedTexture, selectedItem },
 }: UseImageProcessingProps) => {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
@@ -181,10 +183,13 @@ export const useImageProcessing = ({
         // Increment task usage in Firestore (only for authenticated users)
         if (userId) {
           try {
-            await incrementTaskUsage(userId, selectedTaskName);
+            // Determine if this usage should be tracked as own key or V Points
+            const byOwnKey = hasEnabledOwnKey ?? false;
+
+            await incrementTaskUsage(userId, selectedTaskName, byOwnKey);
             // Also track thinking mode usage if enabled
             if (thinkingMode) {
-              await incrementTaskUsage(userId, 'thinking_mode');
+              await incrementTaskUsage(userId, 'thinking_mode', byOwnKey);
             }
           } catch (error) {
             console.error('Failed to increment task usage:', error);
@@ -271,6 +276,7 @@ export const useImageProcessing = ({
       selectedItem,
       userId,
       thinkingMode,
+      hasEnabledOwnKey,
     ]
   );
 

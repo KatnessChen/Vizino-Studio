@@ -118,14 +118,20 @@ export interface User {
   displayName: string | null;
   photoURL: string | null;
   usage: {
-    [key in GeminiTaskName]: number;
+    [key in GeminiTaskName]: {
+      onVPoints: number;
+      onOwnKey: number;
+    };
   } & {
-    thinking_mode?: number;
+    thinking_mode?: {
+      onVPoints: number;
+      onOwnKey: number;
+    };
   };
   lastLoginAt: Date;
   apiKey?: {
     geminiKey?: string; // Encrypted API Key
-    isActive: boolean;  // User choice to use custom key or not
+    isActive: boolean; // User choice to use custom key or not
   };
 }
 

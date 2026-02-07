@@ -28,40 +28,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authUser) {
         // User logged in, subscribe to Firestore document
         const userRef = doc(db, 'users', authUser.uid);
-        
+
         // Initial setup for loading state if needed, though we wait for snapshot
-        
-        unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const userData = docSnap.data();
-            
-            // Construct full user object merging Auth and Firestore data
-            // We prioritize Firestore data for app-specific fields
-            setUser({
-              uid: authUser.uid,
-              email: authUser.email,
-              displayName: authUser.displayName,
-              photoURL: authUser.photoURL,
-              usage: userData.usage || {},
-              lastLoginAt: userData.lastLoginAt?.toDate() || new Date(),
-              apiKey: userData.apiKey,
-            } as User);
-          } else {
-             // Fallback if doc doesn't exist yet (race condition with creation)
-             setUser({
-               uid: authUser.uid,
-               email: authUser.email,
-               displayName: authUser.displayName,
-               photoURL: authUser.photoURL,
-               usage: { thinking_mode: 0, recolor_wall: 0, add_texture: 0, add_home_item: 0, remove_clutter: 0, custom_prompt: 0, optimize_prompt: 0 },
-               lastLoginAt: new Date(),
-             } as User);
+
+        unsubscribeSnapshot = onSnapshot(
+          userRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const userData = docSnap.data();
+
+              // Construct full user object merging Auth and Firestore data
+              // We prioritize Firestore data for app-specific fields
+              setUser({
+                uid: authUser.uid,
+                email: authUser.email,
+                displayName: authUser.displayName,
+                photoURL: authUser.photoURL,
+                usage: userData.usage || {},
+                lastLoginAt: userData.lastLoginAt?.toDate() || new Date(),
+                apiKey: userData.apiKey,
+              } as User);
+            } else {
+              // Fallback if doc doesn't exist yet (race condition with creation)
+              setUser({
+                uid: authUser.uid,
+                email: authUser.email,
+                displayName: authUser.displayName,
+                photoURL: authUser.photoURL,
+                usage: {
+                  thinking_mode: { onVPoints: 0, onOwnKey: 0 },
+                  recolor_wall: { onVPoints: 0, onOwnKey: 0 },
+                  add_texture: { onVPoints: 0, onOwnKey: 0 },
+                  add_home_item: { onVPoints: 0, onOwnKey: 0 },
+                  remove_clutter: { onVPoints: 0, onOwnKey: 0 },
+                  custom_prompt: { onVPoints: 0, onOwnKey: 0 },
+                  optimize_prompt: { onVPoints: 0, onOwnKey: 0 },
+                },
+                lastLoginAt: new Date(),
+              } as User);
+            }
+            setIsLoading(false);
+          },
+          (error) => {
+            console.error('Error fetching user data:', error);
+            setIsLoading(false);
           }
-          setIsLoading(false);
-        }, (error) => {
-          console.error("Error fetching user data:", error);
-          setIsLoading(false);
-        });
+        );
       } else {
         // User logged out
         if (unsubscribeSnapshot) {
