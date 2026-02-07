@@ -122,11 +122,6 @@ export interface User {
       onVPoints: number;
       onOwnKey: number;
     };
-  } & {
-    thinking_mode?: {
-      onVPoints: number;
-      onOwnKey: number;
-    };
   };
   lastLoginAt: Date;
   apiKey?: {

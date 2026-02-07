@@ -1,9 +1,5 @@
 import { MAGIC_PROMPT } from './prompts';
-import {
-  FAST_TEXT_MODEL,
-  FAST_IMAGE_MODEL,
-  DEFAULT_THINKING_MODEL,
-} from './geminiConfig';
+import { FAST_TEXT_MODEL, FAST_IMAGE_MODEL, DEFAULT_THINKING_MODEL } from './geminiConfig';
 
 export const GEMINI_TASKS = {
   RECOLOR_WALL: {
@@ -143,7 +139,7 @@ export const isThinkingModeAvailable = (taskName: string | null): boolean => {
   if (!taskName) return false;
   const task = getTask(taskName);
   if (!task) return false;
-  
+
   // Thinking mode is only available for tasks using FAST_IMAGE_MODEL
   return task.model_code === FAST_IMAGE_MODEL;
 };

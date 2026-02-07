@@ -11,7 +11,7 @@ export interface UsageData {
 
 /**
  * Normalize usage object to ensure expected keys exist with default 0 values
- * - Includes all Gemini task names and special keys like 'thinking_mode'
+ * - Includes all Gemini task names
  */
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 
@@ -22,9 +22,6 @@ export const normalizeUsage = (usage?: UsageData): UsageData => {
   Object.values(GEMINI_TASKS).forEach((task) => {
     normalized[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
   });
-
-  // Include special usage keys
-  normalized['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
 
   if (!usage) return normalized;
 
@@ -86,7 +83,7 @@ export const getTotalTaskUsage = (usage: UsageData | undefined, taskName: string
 /**
  * Get the credit cost for a specific task
  *
- * @param taskName - The task name or 'thinking_mode'
+ * @param taskName - The task name
  * @param thinkingMode - Whether thinking mode is enabled (adds thinking_mode cost)
  * @returns Credit cost for this operation
  */
