@@ -35,9 +35,6 @@ export const initializeUsage = (): {
     usage[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
   });
 
-  // Include special usage keys
-  usage['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
-
   return usage;
 };
 
@@ -111,7 +108,7 @@ export const getUser = async (uid: string): Promise<User | null> => {
  */
 export const incrementTaskUsage = async (
   uid: string,
-  usageKey: GeminiTaskName | 'thinking_mode',
+  usageKey: GeminiTaskName,
   byOwnKey: boolean = false
 ): Promise<void> => {
   try {
@@ -211,9 +208,6 @@ export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
         fixedUsage[task.task_name] = { onVPoints: 0, onOwnKey: 0 };
       }
     });
-    if (!fixedUsage['thinking_mode']) {
-      fixedUsage['thinking_mode'] = { onVPoints: 0, onOwnKey: 0 };
-    }
 
     await setDoc(
       userRef,

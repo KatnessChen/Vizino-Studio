@@ -4,6 +4,7 @@ import { db } from '@/services/firestoreService';
 import { onAuthChange } from '@/services/authService';
 import { getAdminSettings, setAdminSettings, AdminSettings } from '@/utils/storageUtils';
 import { User } from '@/types';
+import { initializeUsage } from '@/services/userService';
 
 interface AuthContextType {
   user: User | null;
@@ -55,15 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: authUser.email,
                 displayName: authUser.displayName,
                 photoURL: authUser.photoURL,
-                usage: {
-                  thinking_mode: { onVPoints: 0, onOwnKey: 0 },
-                  recolor_wall: { onVPoints: 0, onOwnKey: 0 },
-                  add_texture: { onVPoints: 0, onOwnKey: 0 },
-                  add_home_item: { onVPoints: 0, onOwnKey: 0 },
-                  remove_clutter: { onVPoints: 0, onOwnKey: 0 },
-                  custom_prompt: { onVPoints: 0, onOwnKey: 0 },
-                  optimize_prompt: { onVPoints: 0, onOwnKey: 0 },
-                },
+                usage: initializeUsage(),
                 lastLoginAt: new Date(),
               } as User);
             }
