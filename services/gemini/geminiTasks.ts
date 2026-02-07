@@ -50,6 +50,16 @@ export const GEMINI_TASKS = {
     temperature: 0.4,
     defaultPrompt: MAGIC_PROMPT.REMOVE_CLUTTER,
   },
+  THINKING_MODE: {
+    task_name: 'thinking_mode',
+    label_name: 'Thinking Mode',
+    customPromptRequired: false,
+    // Thinking Mode is represented as a logical task used for tracking and
+    // accounting. It uses the DEFAULT_THINKING_MODEL and is not a standalone
+    // image generation operation in the UI.
+    model_code: DEFAULT_THINKING_MODEL,
+    temperature: 0.4,
+  },
   OPTIMIZE_PROMPT: {
     task_name: 'optimize_prompt',
     label_name: 'Optimize Prompt',
