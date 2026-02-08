@@ -1,17 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  Modal,
-  Button,
-  Input,
-  Alert,
-  Tooltip,
-  Drawer,
-  Typography,
-  Skeleton,
-  Tabs,
-  Switch,
-} from 'antd';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch } from 'antd';
 import { message } from '@/utils/antd';
 
 import {
@@ -25,10 +14,10 @@ import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/mat
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import VPointsIcon from '@/components/icons/VPointsIcon';
-import MyEmpty from '@/components/ui/MyEmpty';
+import SavedPromptList from '@/components/SavedPromptList';
 import { Timestamp } from 'firebase/firestore';
 import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
-import { ImageData, ImageOperation, CustomPrompt } from '@/types';
+import { ImageData, ImageOperation } from '@/types';
 import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,
@@ -168,8 +157,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
     const [thinkingMode, setThinkingMode] = useState(false);
 
-    const { Text } = Typography;
-
     // Generate shimmer layer configurations dynamically
     const shimmerLayers = useMemo(() => {
       const layers = [];
@@ -230,6 +217,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       prompts,
       isLoading: isLoadingPrompts,
       fetchPrompts,
+      deletePrompt,
     } = useCustomPrompts({
       userId,
       projectId: activeProjectId || '',
@@ -254,18 +242,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     );
 
     // Filter prompts based on search keyword using %match% logic
-    const filteredPrompts = useMemo(() => {
-      if (!searchPrompts.trim()) {
-        return prompts;
-      }
-
-      const keyword = searchPrompts.toLowerCase();
-      return prompts.filter(
-        (prompt) =>
-          prompt.task_name.toLowerCase().includes(keyword) ||
-          prompt.content.toLowerCase().includes(keyword)
-      );
-    }, [prompts, searchPrompts]);
 
     // Determine the active task from selectedTaskNames (assuming single task)
     const activeTaskName = useMemo(() => {
@@ -542,19 +518,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         triggerGenerate: handleGenerate,
       }),
       [handleGenerate]
-    );
-
-    const handlePickHistoricalCustomPrompt = useCallback(
-      (e: React.MouseEvent, customPrompt: string) => {
-        e.stopPropagation();
-        setCustomPrompt(customPrompt);
-        // Only switch task to CUSTOM_PROMPT if the current task is already CUSTOM_PROMPT
-        if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-          dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
-        }
-        message.success('Prompt applied!');
-      },
-      [dispatch, activeTaskName]
     );
 
     const handlePickMagicPrompt = useCallback(
@@ -1409,83 +1372,25 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
                     {/* Saved Prompts Search + List (or Magic Prompts List) */}
                     {activePromptTab === 'saved' ? (
-                      <>
-                        {/* Search Input - Only for Saved Prompts */}
-                        <div className="mt-2 mb-2 px-3">
-                          <Input
-                            placeholder="Filter prompts..."
-                            value={searchPrompts}
-                            onChange={(e) => setSearchPrompts(e.target.value)}
-                            allowClear
-                            className="w-full rounded-none border-l-0 border-r-0 border-t-0"
-                          />
-                        </div>
-
-                        {/* Saved Prompts List */}
-                        <div className="overflow-auto flex-1">
-                          {isLoadingPrompts ? (
-                            <div className="p-2">
-                              <Skeleton active paragraph={{ rows: 2 }} />
-                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
-                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
-                            </div>
-                          ) : filteredPrompts.length === 0 ? (
-                            <div className="p-4 flex items-center justify-center h-full">
-                              <MyEmpty description="No historical prompts found." />
-                            </div>
-                          ) : (
-                            <List
-                              sx={{
-                                width: '100%',
-                                bgcolor: 'background.paper',
-                                paddingBottom: 0,
-                                height: '334px', // hardcoded height to make both columns same height
-                              }}
-                            >
-                              {filteredPrompts.map((prompt: CustomPrompt, index) => (
-                                <ListItem
-                                  key={prompt.id || index}
-                                  sx={{
-                                    padding: '8px 12px',
-                                    borderBottom: '1px solid #f0f0f0',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s',
-                                    '&:hover': {
-                                      backgroundColor: '#f5f5f5',
-                                    },
-                                  }}
-                                  onClick={(e) =>
-                                    handlePickHistoricalCustomPrompt(e, prompt.content)
-                                  }
-                                >
-                                  <Box
-                                    sx={{
-                                      width: '100%',
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'flex-start',
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Text>{prompt.content}</Text>
-                                    <MuiTooltip title="Use this prompt">
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handlePickHistoricalCustomPrompt(e, prompt.content)
-                                        }
-                                        sx={{ flexShrink: 0 }}
-                                      >
-                                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                                      </IconButton>
-                                    </MuiTooltip>
-                                  </Box>
-                                </ListItem>
-                              ))}
-                            </List>
-                          )}
-                        </div>
-                      </>
+                      <SavedPromptList
+                        prompts={prompts}
+                        isLoading={isLoadingPrompts}
+                        searchKeyword={searchPrompts}
+                        onSearchChange={setSearchPrompts}
+                        onSelectPrompt={(content) => {
+                          setCustomPrompt(content);
+                          message.success('Prompt applied!');
+                        }}
+                        onDeletePrompt={async (promptId) => {
+                          try {
+                            await deletePrompt(promptId);
+                            await fetchPrompts();
+                          } catch (error) {
+                            // Error is already handled in SavedPromptList component
+                            console.error('Failed to delete and refresh prompts:', error);
+                          }
+                        }}
+                      />
                     ) : (
                       <>
                         {/* Magic Prompts List */}
@@ -1521,7 +1426,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                                     gap: 1,
                                   }}
                                 >
-                                  <Text>{item.label}</Text>
+                                  <span>{item.label}</span>
                                   <MuiTooltip title="Use this magic prompt">
                                     <IconButton
                                       size="small"

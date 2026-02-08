@@ -254,6 +254,16 @@ export const customAssetsStore = createSlice({
       projectAssets.customPrompts.unshift(action.payload.prompt);
     },
 
+    removeCustomPrompt: (
+      state,
+      action: PayloadAction<{ projectId: string; promptId: string }>
+    ) => {
+      const projectAssets = getOrCreateProjectAssets(state, action.payload.projectId);
+      projectAssets.customPrompts = projectAssets.customPrompts.filter(
+        (p) => p.id !== action.payload.promptId
+      );
+    },
+
     setLoadingPrompts: (
       state,
       action: PayloadAction<{ projectId: string; isLoadingPrompts: boolean }>
@@ -304,6 +314,7 @@ export const {
   setLoadItemsError,
   setCustomPrompts,
   addCustomPrompt,
+  removeCustomPrompt,
   setLoadingPrompts,
   setLoadPromptsError,
   clearProjectAssets,
