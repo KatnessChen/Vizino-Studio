@@ -237,6 +237,15 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           taskName: GEMINI_TASKS.REMOVE_CLUTTER.task_name,
           label: GEMINI_TASKS.REMOVE_CLUTTER.label_name,
         },
+        {
+          taskName: GEMINI_TASKS.BRIGHTEN_SPACE.task_name,
+          label: GEMINI_TASKS.BRIGHTEN_SPACE.label_name,
+        },
+        {
+          taskName: GEMINI_TASKS.INDUSTRIAL_STYLE.task_name,
+          label: GEMINI_TASKS.INDUSTRIAL_STYLE.label_name,
+        },
+        { taskName: GEMINI_TASKS.LOFT_STYLE.task_name, label: GEMINI_TASKS.LOFT_STYLE.label_name },
       ],
       []
     );
