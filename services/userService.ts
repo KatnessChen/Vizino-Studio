@@ -2,6 +2,7 @@ import { doc, setDoc, getDoc, serverTimestamp, DocumentData } from 'firebase/fir
 import { db } from './firestoreService';
 import { User } from '@/types';
 import { GEMINI_TASKS, GeminiTaskName } from './gemini/geminiTasks';
+import { withTracking } from './analyticsService';
 
 /**
  * Convert Firestore User document to User interface
@@ -48,7 +49,7 @@ export const createOrUpdateUser = async (userData: {
   displayName: string | null;
   photoURL: string | null;
 }): Promise<void> => {
-  try {
+  return withTracking('firestore_create_or_update_user', async () => {
     const userRef = doc(db, 'users', userData.uid);
     const userDoc = await getDoc(userRef);
 
@@ -74,10 +75,7 @@ export const createOrUpdateUser = async (userData: {
       });
       console.log('New user created:', userData.uid);
     }
-  } catch (error) {
-    console.error('Failed to create or update user:', error);
-    throw error;
-  }
+  });
 };
 
 /**
@@ -86,7 +84,7 @@ export const createOrUpdateUser = async (userData: {
  * @returns User data or null if not found
  */
 export const getUser = async (uid: string): Promise<User | null> => {
-  try {
+  return withTracking('firestore_get_user', async () => {
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
 
@@ -94,10 +92,7 @@ export const getUser = async (uid: string): Promise<User | null> => {
       return convertFirestoreUser(userDoc.data());
     }
     return null;
-  } catch (error) {
-    console.error('Failed to get user:', error);
-    throw error;
-  }
+  });
 };
 
 /**
@@ -111,7 +106,7 @@ export const incrementTaskUsage = async (
   usageKey: GeminiTaskName,
   byOwnKey: boolean = false
 ): Promise<void> => {
-  try {
+  return withTracking('firestore_increment_task_usage', async () => {
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
 
@@ -138,10 +133,7 @@ export const incrementTaskUsage = async (
     } else {
       console.warn('User not found, cannot increment usage');
     }
-  } catch (error) {
-    console.error('Failed to increment usage:', error);
-    throw error;
-  }
+  }, { usageKey, byOwnKey });
 };
 
 /**
@@ -150,7 +142,7 @@ export const incrementTaskUsage = async (
  * @param isActive - New active status
  */
 export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Promise<void> => {
-  try {
+  return withTracking('firestore_toggle_user_ai_key_status', async () => {
     const userRef = doc(db, 'users', uid);
 
     await setDoc(
@@ -163,10 +155,7 @@ export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Pro
       { merge: true }
     );
     console.log(`User API Key status updated for: ${uid}, Active: ${isActive}`);
-  } catch (error) {
-    console.error('Failed to update user API Key status:', error);
-    throw error;
-  }
+  }, { isActive });
 };
 
 /**
@@ -174,7 +163,7 @@ export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Pro
  * Clears any entries that don't match the expected format
  */
 export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
-  try {
+  return withTracking('firestore_fix_corrupted_usage_data', async () => {
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
 
@@ -217,10 +206,7 @@ export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
       { merge: true }
     );
     console.log(`[fixCorruptedUsageData] Usage data fixed for: ${uid}`);
-  } catch (error) {
-    console.error('Failed to fix corrupted usage data:', error);
-    throw error;
-  }
+  });
 };
 
 // ============================================================================
@@ -299,7 +285,7 @@ export const updateUserAiKey = async (
   apiKey: string,
   isActive: boolean
 ): Promise<void> => {
-  try {
+  return withTracking('firestore_update_user_ai_key', async () => {
     const userRef = doc(db, 'users', uid);
 
     // Trim the key and encrypt before saving
@@ -318,10 +304,7 @@ export const updateUserAiKey = async (
       { merge: true }
     );
     console.log(`User API Key updated for: ${uid}, Active: ${isActive}`);
-  } catch (error) {
-    console.error('Failed to update user API Key:', error);
-    throw error;
-  }
+  }, { isActive });
 };
 
 /**

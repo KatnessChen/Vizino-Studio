@@ -37,6 +37,7 @@ import {
   imageCache,
   imageDownloadUrlToBase64,
 } from '@/utils';
+import { withTracking } from './analyticsService';
 
 // Initialize Firestore and Storage with the shared Firebase app instance
 export const db = getFirestore(app);
@@ -87,22 +88,11 @@ async function getMaxAssetOrder({
       'images'
     );
   } else {
-    collectionRef = collection(
-      db,
-      'users',
-      userId,
-      'projects',
-      projectId,
-      collectionName
-    );
+    collectionRef = collection(db, 'users', userId, 'projects', projectId, collectionName);
   }
 
   // Optimize query: order by 'order' descending and limit to 1
-  const assetsQuery = query(
-    collectionRef,
-    orderBy('order', 'desc'),
-    limit(1)
-  );
+  const assetsQuery = query(collectionRef, orderBy('order', 'desc'), limit(1));
 
   const snapshot = await getDocs(assetsQuery);
 
@@ -114,7 +104,6 @@ async function getMaxAssetOrder({
   return 0;
 }
 
-
 /**
  * Creates a new project in Firestore for a user.
  *
@@ -123,15 +112,15 @@ async function getMaxAssetOrder({
  * @returns The newly created Project object.
  */
 export async function createProject(userId: string, projectName: string): Promise<Project> {
-  if (!userId) {
-    throw new Error('User ID is required to create a home.');
-  }
+  return withTracking('firestore_create_project', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to create a home.');
+    }
 
-  if (!projectName.trim()) {
-    throw new Error('Project name is required.');
-  }
+    if (!projectName.trim()) {
+      throw new Error('Project name is required.');
+    }
 
-  try {
     const projectId = crypto.randomUUID();
     const now = new Date();
     const newProject: Project = {
@@ -150,13 +139,7 @@ export async function createProject(userId: string, projectName: string): Promis
 
     console.log('Project created in Firestore:', projectId);
     return newProject;
-  } catch (error) {
-    console.error('Failed to create project:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to create project: ${error.message}`);
-    }
-    throw new Error('Failed to create project in Firebase.');
-  }
+  }, { projectName });
 }
 
 /**
@@ -167,11 +150,11 @@ export async function createProject(userId: string, projectName: string): Promis
  * @returns An array of Project objects with spaces populated (but spaces have empty images arrays).
  */
 export async function fetchProjects(userId: string): Promise<Project[]> {
-  if (!userId) {
-    throw new Error('User ID is required to fetch projects.');
-  }
+  return withTracking('firestore_fetch_projects', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to fetch projects.');
+    }
 
-  try {
     console.log('Fetching projects from Firestore for user:', userId);
 
     // Query 1: Fetch all projects for the user
@@ -236,13 +219,7 @@ export async function fetchProjects(userId: string): Promise<Project[]> {
 
     console.log('Projects fetched from Firestore:', projects.length, 'projects');
     return projects;
-  } catch (error) {
-    console.error('Failed to fetch projects:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch projects: ${error.message}`);
-    }
-    throw new Error('Failed to fetch projects from Firebase.');
-  }
+  });
 }
 
 /**
@@ -257,27 +234,20 @@ export async function updateProject(
   projectId: string,
   newName: string
 ): Promise<void> {
-  console.log({ userId, projectId, newName });
-  if (!userId) {
-    throw new Error('User ID is required to update a project.');
-  }
+  return withTracking('firestore_update_project', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to update a project.');
+    }
 
-  if (!newName.trim()) {
-    throw new Error('Project name cannot be empty.');
-  }
+    if (!newName.trim()) {
+      throw new Error('Project name cannot be empty.');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId);
     await updateDoc(docRef, { name: newName.trim() });
 
     console.log('Project updated in Firestore:', projectId);
-  } catch (error) {
-    console.error('Failed to update project:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update project: ${error.message}`);
-    }
-    throw new Error('Failed to update project in Firebase.');
-  }
+  }, { projectId, newName });
 }
 
 /**
@@ -288,13 +258,13 @@ export async function updateProject(
  * @param projectId The ID of the project to delete.
  */
 export async function deleteProject(userId: string, projectId: string): Promise<void> {
-  if (!userId) {
-    throw new Error('User ID is required to delete a project.');
-  }
+  return withTracking('firestore_delete_project', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to delete a project.');
+    }
 
-  const projectRef = doc(db, 'users', userId, 'projects', projectId);
+    const projectRef = doc(db, 'users', userId, 'projects', projectId);
 
-  try {
     // First, check if the project exists
     const projectDoc = await getDoc(projectRef);
 
@@ -319,14 +289,7 @@ export async function deleteProject(userId: string, projectId: string): Promise<
     await deleteDoc(projectRef);
 
     console.log('Project deleted successfully:', projectId);
-  } catch (error) {
-    console.error('Failed to delete project:', error);
-    // Re-throw the error so the UI can catch it and display a message
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('An unknown error occurred while deleting the project.');
-  }
+  }, { projectId });
 }
 
 /**
@@ -342,15 +305,15 @@ export async function createSpace(
   projectId: string,
   spaceName: string
 ): Promise<Space> {
-  if (!userId) {
-    throw new Error('User ID is required to create a space.');
-  }
+  return withTracking('firestore_create_space', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to create a space.');
+    }
 
-  if (!spaceName.trim()) {
-    throw new Error('Space name is required.');
-  }
+    if (!spaceName.trim()) {
+      throw new Error('Space name is required.');
+    }
 
-  try {
     const spaceId = crypto.randomUUID();
     const now = new Date();
     const newSpace: Space = {
@@ -378,13 +341,7 @@ export async function createSpace(
 
     console.log('Space created in Firestore:', spaceId);
     return newSpace;
-  } catch (error) {
-    console.error('Failed to create space:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to create space: ${error.message}`);
-    }
-    throw new Error('Failed to create space in Firebase.');
-  }
+  }, { projectId, spaceName });
 }
 
 /**
@@ -401,27 +358,21 @@ export async function updateSpace(
   spaceId: string,
   newName: string
 ): Promise<void> {
-  if (!userId) {
-    throw new Error('User ID is required to update a space.');
-  }
+  return withTracking('firestore_update_space', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to update a space.');
+    }
 
-  if (!newName.trim()) {
-    throw new Error('Space name cannot be empty.');
-  }
+    if (!newName.trim()) {
+      throw new Error('Space name cannot be empty.');
+    }
 
-  try {
     // Update the space document in the subcollection
     const spaceDocRef = doc(db, 'users', userId, 'projects', projectId, 'spaces', spaceId);
     await updateDoc(spaceDocRef, { name: newName.trim() });
 
     console.log('Space updated in Firestore:', spaceId);
-  } catch (error) {
-    console.error('Failed to update space:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update space: ${error.message}`);
-    }
-    throw new Error('Failed to update space in Firebase.');
-  }
+  }, { projectId, spaceId, newName });
 }
 
 /**
@@ -437,26 +388,20 @@ export async function deleteSpace(
   projectId: string,
   spaceId: string
 ): Promise<void> {
-  if (!userId) {
-    throw new Error('User ID is required to delete a space.');
-  }
-  if (!projectId) {
-    throw new Error('Project ID is required to delete a space.');
-  }
+  return withTracking('firestore_delete_space', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to delete a space.');
+    }
+    if (!projectId) {
+      throw new Error('Project ID is required to delete a space.');
+    }
 
-  try {
     // Delete the space document from the subcollection
     const spaceDocRef = doc(db, 'users', userId, 'projects', projectId, 'spaces', spaceId);
     await deleteDoc(spaceDocRef);
 
     console.log('Space deleted from Firestore:', spaceId);
-  } catch (error) {
-    console.error('Failed to delete space:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to delete space: ${error.message}`);
-    }
-    throw new Error('Failed to delete space from Firebase.');
-  }
+  }, { projectId, spaceId });
 }
 
 /**
@@ -472,11 +417,11 @@ export async function fetchSpaceImages(
   projectId: string,
   spaceId: string
 ): Promise<ImageData[]> {
-  if (!userId || !projectId || !spaceId) {
-    throw new Error('User ID, Project ID, and Space ID are required to fetch images.');
-  }
+  return withTracking('firestore_fetch_space_images', async () => {
+    if (!userId || !projectId || !spaceId) {
+      throw new Error('User ID, Project ID, and Space ID are required to fetch images.');
+    }
 
-  try {
     console.log('Fetching images for space:', spaceId);
 
     const imagesRef = collection(
@@ -512,13 +457,7 @@ export async function fetchSpaceImages(
     void cacheImageBase64s(images);
 
     return images;
-  } catch (error) {
-    console.error('Failed to fetch images:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch images: ${error.message}`);
-    }
-    throw new Error('Failed to fetch images from Firebase.');
-  }
+  }, { projectId, spaceId });
 }
 
 /**
@@ -550,9 +489,10 @@ export async function createImage(
     base64MimeType?: string;
   }
 ): Promise<ImageData> {
-  if (!userId) {
-    throw new Error('User ID is required to add an image.');
-  }
+  return withTracking('firestore_create_image', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to add an image.');
+    }
 
   const { operation, parentImage, base64, base64MimeType } = processingInfo || {};
 
@@ -667,7 +607,8 @@ export async function createImage(
       throw new Error(`Failed to add image: ${error.message}`);
     }
     throw new Error('Failed to add image to Firebase.');
-  }
+    }
+  }, { projectId, spaceId, metadata_name: imageMetadata.name });
 }
 
 /**
@@ -686,24 +627,24 @@ export async function updateImageMetadata(
   imageId: string,
   updates: { name?: string; description?: string }
 ): Promise<void> {
-  if (!userId || !projectId || !spaceId || !imageId) {
-    throw new Error('User ID, Project ID, Space ID, and Image ID are required to update image.');
-  }
-
-  const sanitizedUpdates: Partial<Pick<ImageData, 'name' | 'description' | 'updatedAt'>> = {};
-  if (updates.name !== undefined) {
-    if (!updates.name.trim()) {
-      throw new Error('Image name cannot be empty.');
+  return withTracking('firestore_update_image_metadata', async () => {
+    if (!userId || !projectId || !spaceId || !imageId) {
+      throw new Error('User ID, Project ID, Space ID, and Image ID are required to update image.');
     }
-    sanitizedUpdates.name = updates.name.trim();
-  }
-  if (updates.description !== undefined) {
-    sanitizedUpdates.description = updates.description.trim();
-  }
 
-  if (Object.keys(sanitizedUpdates).length === 0) return;
+    const sanitizedUpdates: Partial<Pick<ImageData, 'name' | 'description' | 'updatedAt'>> = {};
+    if (updates.name !== undefined) {
+      if (!updates.name.trim()) {
+        throw new Error('Image name cannot be empty.');
+      }
+      sanitizedUpdates.name = updates.name.trim();
+    }
+    if (updates.description !== undefined) {
+      sanitizedUpdates.description = updates.description.trim();
+    }
 
-  try {
+    if (Object.keys(sanitizedUpdates).length === 0) return;
+
     const docRef = doc(
       db,
       'users',
@@ -722,13 +663,7 @@ export async function updateImageMetadata(
     await updateDoc(docRef, sanitizedUpdates);
 
     console.log('Image metadata updated in Firestore:', imageId);
-  } catch (error) {
-    console.error('Failed to update image metadata:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update image metadata: ${error.message}`);
-    }
-    throw new Error('Failed to update image metadata in Firebase.');
-  }
+  }, { projectId, spaceId, imageId, ...updates });
 }
 
 /**
@@ -766,15 +701,15 @@ export async function deleteImages(
   spaceId: string,
   imageIds: string[]
 ): Promise<void> {
-  if (!userId) {
-    throw new Error('User ID is required to delete images.');
-  }
+  return withTracking('firestore_delete_images', async () => {
+    if (!userId) {
+      throw new Error('User ID is required to delete images.');
+    }
 
-  if (imageIds.length === 0) {
-    return;
-  }
+    if (imageIds.length === 0) {
+      return;
+    }
 
-  try {
     console.log(`Deleting ${imageIds.length} images for user ${userId}`);
 
     // Process each image
@@ -806,21 +741,6 @@ export async function deleteImages(
           });
 
           console.log(`Soft deleted image in Firestore: ${imageId}`);
-
-          // TODO: determine the hard delete logic
-          // Hard delete from Firebase Storage
-          // if (imageData.storageFilePath) {
-          //   try {
-          //     const storageRef = ref(storage, imageData.storageFilePath);
-          //     await deleteObject(storageRef);
-          //     console.log(`Hard deleted image from Storage: ${imageData.storageFilePath}`);
-          //   } catch (storageError) {
-          //     console.warn(`Failed to delete storage file for image ${imageId}:`, storageError);
-          //     // Continue even if storage deletion fails
-          //   }
-          // } else {
-          //   console.warn(`No storage path found for image ${imageId}`);
-          // }
         } else {
           console.warn(`Image document not found: ${imageId}`);
         }
@@ -831,13 +751,7 @@ export async function deleteImages(
     }
 
     console.log(`Completed deletion of ${imageIds.length} images`);
-  } catch (error) {
-    console.error('Failed to delete images:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to delete images: ${error.message}`);
-    }
-    throw new Error('Failed to delete images from Firebase.');
-  }
+  }, { projectId, spaceId, count: imageIds.length });
 }
 
 /**
@@ -867,7 +781,7 @@ export async function duplicateImage(
     throw new Error('New image name is required.');
   }
 
-  try {
+  return withTracking('firestore_duplicate_image', async () => {
     // Fetch the source image
     const sourceDocRef = doc(
       db,
@@ -947,13 +861,7 @@ export async function duplicateImage(
     console.log(`Image duplicated successfully: ${newImageId}`);
 
     return newImageData;
-  } catch (error) {
-    console.error('Failed to duplicate image:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to duplicate image: ${error.message}`);
-    }
-    throw new Error('Failed to duplicate image in Firebase.');
-  }
+  }, { projectId, spaceId, sourceImageId, newImageName });
 }
 
 /**
@@ -987,7 +895,7 @@ export async function moveImageToSpace(
     throw new Error('All parameters are required for moving an image.');
   }
 
-  try {
+  return withTracking('firestore_move_image_to_space', async () => {
     // Fetch the source image
     const sourceDocRef = doc(
       db,
@@ -1070,13 +978,7 @@ export async function moveImageToSpace(
     await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
 
     return newImageData;
-  } catch (error) {
-    console.error('Failed to move image:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to move image: ${error.message}`);
-    }
-    throw new Error('Failed to move image in Firebase.');
-  }
+  }, { sourceProjectId, sourceSpaceId, targetProjectId, targetSpaceId, sourceImageId });
 }
 
 /**
@@ -1091,18 +993,18 @@ export async function copyImageAsOriginal(
   targetProjectId: string,
   targetSpaceId: string
 ): Promise<ImageData> {
-  if (
-    !userId ||
-    !sourceProjectId ||
-    !sourceSpaceId ||
-    !sourceImageId ||
-    !targetProjectId ||
-    !targetSpaceId
-  ) {
-    throw new Error('All parameters are required for copying an image as original.');
-  }
+  return withTracking('firestore_copy_image_as_original', async () => {
+    if (
+      !userId ||
+      !sourceProjectId ||
+      !sourceSpaceId ||
+      !sourceImageId ||
+      !targetProjectId ||
+      !targetSpaceId
+    ) {
+      throw new Error('All parameters are required for copying an image as original.');
+    }
 
-  try {
     // Fetch the source image
     const sourceDocRef = doc(
       db,
@@ -1185,13 +1087,7 @@ export async function copyImageAsOriginal(
     await deleteImages(userId, sourceProjectId, sourceSpaceId, [sourceImageId]);
 
     return newImageData;
-  } catch (error) {
-    console.error('Failed to copy image as original:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to copy image as original: ${error.message}`);
-    }
-    throw new Error('Failed to copy image as original in Firebase.');
-  }
+  }, { sourceProjectId, sourceSpaceId, targetProjectId, targetSpaceId, sourceImageId });
 }
 
 // ============================================================================
@@ -1216,11 +1112,11 @@ export async function addColor(
     evolutionChain?: ImageOperation[];
   }
 ): Promise<Color> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_add_color', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const colorId = crypto.randomUUID();
     const now = Timestamp.now();
 
@@ -1250,13 +1146,7 @@ export async function addColor(
       evolutionChain: new FirestoreDataHandler(colorDoc.evolutionChain || []).serializeTimestamps()
         .value as ImageOperation[],
     };
-  } catch (error) {
-    console.error('Failed to add color:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to add color: ${error.message}`);
-    }
-    throw new Error('Failed to add color to Firestore.');
-  }
+  }, { projectId, colorName: colorData.name });
 }
 
 /**
@@ -1267,11 +1157,11 @@ export async function addColor(
  * @returns An array of Color objects.
  */
 export async function fetchColors(userId: string, projectId: string): Promise<Color[]> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_fetch_colors', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const colorsRef = collection(db, 'users', userId, 'projects', projectId, 'custom_colors');
 
     const colorsQuery = query(colorsRef, orderBy('createdAt', 'desc'));
@@ -1289,13 +1179,7 @@ export async function fetchColors(userId: string, projectId: string): Promise<Co
           .value as ImageOperation[],
       };
     });
-  } catch (error) {
-    console.error('Failed to fetch colors:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch colors: ${error.message}`);
-    }
-    throw new Error('Failed to fetch colors from Firestore.');
-  }
+  }, { projectId });
 }
 
 /**
@@ -1312,11 +1196,11 @@ export async function updateColor(
   colorId: string,
   updates: { name?: string; hex?: string; description?: string }
 ): Promise<void> {
-  if (!userId || !projectId || !colorId) {
-    throw new Error('User ID, Project ID, and Color ID are required');
-  }
+  return withTracking('firestore_update_color', async () => {
+    if (!userId || !projectId || !colorId) {
+      throw new Error('User ID, Project ID, and Color ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
 
     const updateData: Partial<
@@ -1331,13 +1215,7 @@ export async function updateColor(
 
     await updateDoc(docRef, updateData);
     console.log('Custom color updated:', colorId);
-  } catch (error) {
-    console.error('Failed to update color:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update color: ${error.message}`);
-    }
-    throw new Error('Failed to update color in Firestore.');
-  }
+  }, { projectId, colorId, ...updates });
 }
 
 /**
@@ -1352,22 +1230,16 @@ export async function deleteColor(
   projectId: string,
   colorId: string
 ): Promise<void> {
-  if (!userId || !projectId || !colorId) {
-    throw new Error('User ID, Project ID, and Color ID are required');
-  }
+  return withTracking('firestore_delete_color', async () => {
+    if (!userId || !projectId || !colorId) {
+      throw new Error('User ID, Project ID, and Color ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_colors', colorId);
 
     await deleteDoc(docRef);
     console.log('Custom color deleted:', colorId);
-  } catch (error) {
-    console.error('Failed to delete color:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to delete color: ${error.message}`);
-    }
-    throw new Error('Failed to delete color from Firestore.');
-  }
+  }, { projectId, colorId });
 }
 
 /**
@@ -1398,11 +1270,11 @@ export async function addTexture(
     evolutionChain?: ImageOperation[];
   }
 ): Promise<Texture> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_add_texture', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const textureId = crypto.randomUUID();
     const now = Timestamp.now();
 
@@ -1473,13 +1345,7 @@ export async function addTexture(
         textureDoc.evolutionChain || []
       ).serializeTimestamps().value as ImageOperation[],
     };
-  } catch (error) {
-    console.error('Failed to add texture:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to add texture: ${error.message}`);
-    }
-    throw new Error('Failed to add texture to Firestore.');
-  }
+  }, { projectId, textureName: textureData.name });
 }
 
 /**
@@ -1490,11 +1356,11 @@ export async function addTexture(
  * @returns An array of Texture objects.
  */
 export async function fetchTextures(userId: string, projectId: string): Promise<Texture[]> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_fetch_textures', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const texturesRef = collection(db, 'users', userId, 'projects', projectId, 'custom_textures');
 
     const texturesQuery = query(texturesRef, orderBy('createdAt', 'desc'));
@@ -1521,8 +1387,9 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
         deletedAt: null,
         createdAt: textureDoc.createdAt || Timestamp.now(),
         updatedAt: textureDoc.updatedAt || Timestamp.now(),
-        evolutionChain: new FirestoreDataHandler(textureDoc.evolutionChain || []).serializeTimestamps()
-          .value as ImageOperation[],
+        evolutionChain: new FirestoreDataHandler(
+          textureDoc.evolutionChain || []
+        ).serializeTimestamps().value as ImageOperation[],
       };
     });
 
@@ -1530,13 +1397,7 @@ export async function fetchTextures(userId: string, projectId: string): Promise<
     void cacheTextureImages(textures);
 
     return textures;
-  } catch (error) {
-    console.error('Failed to fetch textures:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch textures: ${error.message}`);
-    }
-    throw new Error('Failed to fetch textures from Firestore.');
-  }
+  }, { projectId });
 }
 
 /**
@@ -1553,11 +1414,11 @@ export async function updateTexture(
   textureId: string,
   updates: { name?: string; description?: string }
 ): Promise<void> {
-  if (!userId || !projectId || !textureId) {
-    throw new Error('User ID, Project ID, and Texture ID are required');
-  }
+  return withTracking('firestore_update_texture', async () => {
+    if (!userId || !projectId || !textureId) {
+      throw new Error('User ID, Project ID, and Texture ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
 
     const updateData: Partial<Texture> = {
@@ -1569,13 +1430,7 @@ export async function updateTexture(
 
     await updateDoc(docRef, updateData);
     console.log('Custom texture updated:', textureId);
-  } catch (error) {
-    console.error('Failed to update texture:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update texture: ${error.message}`);
-    }
-    throw new Error('Failed to update texture in Firestore.');
-  }
+  }, { projectId, textureId, ...updates });
 }
 
 /**
@@ -1590,22 +1445,16 @@ export async function deleteTexture(
   projectId: string,
   textureId: string
 ): Promise<void> {
-  if (!userId || !projectId || !textureId) {
-    throw new Error('User ID, Project ID, and Texture ID are required');
-  }
+  return withTracking('firestore_delete_texture', async () => {
+    if (!userId || !projectId || !textureId) {
+      throw new Error('User ID, Project ID, and Texture ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_textures', textureId);
 
     await deleteDoc(docRef);
     console.log('Custom texture deleted:', textureId);
-  } catch (error) {
-    console.error('Failed to delete texture:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to delete texture: ${error.message}`);
-    }
-    throw new Error('Failed to delete texture from Firestore.');
-  }
+  }, { projectId, textureId });
 }
 
 /**
@@ -1690,11 +1539,11 @@ export async function addItem(
     evolutionChain?: ImageOperation[];
   }
 ): Promise<Item> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_add_item', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const itemId = crypto.randomUUID();
     const now = Timestamp.now();
 
@@ -1762,13 +1611,7 @@ export async function addItem(
       evolutionChain: new FirestoreDataHandler(itemDoc.evolutionChain || []).serializeTimestamps()
         .value as ImageOperation[],
     };
-  } catch (error) {
-    console.error('Failed to add item:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to add item: ${error.message}`);
-    }
-    throw new Error('Failed to add item to Firestore.');
-  }
+  }, { projectId, itemName: itemData.name });
 }
 
 /**
@@ -1779,11 +1622,11 @@ export async function addItem(
  * @returns An array of Item objects.
  */
 export async function fetchItems(userId: string, projectId: string): Promise<Item[]> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required');
-  }
+  return withTracking('firestore_fetch_items', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required');
+    }
 
-  try {
     const itemsRef = collection(db, 'users', userId, 'projects', projectId, 'custom_items');
 
     const itemsQuery = query(itemsRef, orderBy('createdAt', 'desc'));
@@ -1819,13 +1662,7 @@ export async function fetchItems(userId: string, projectId: string): Promise<Ite
     void cacheItemImages(items);
 
     return items;
-  } catch (error) {
-    console.error('Failed to fetch items:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch items: ${error.message}`);
-    }
-    throw new Error('Failed to fetch items from Firestore.');
-  }
+  }, { projectId });
 }
 
 /**
@@ -1842,11 +1679,11 @@ export async function updateItem(
   itemId: string,
   updates: { name?: string; description?: string }
 ): Promise<void> {
-  if (!userId || !projectId || !itemId) {
-    throw new Error('User ID, Project ID, and Item ID are required');
-  }
+  return withTracking('firestore_update_item', async () => {
+    if (!userId || !projectId || !itemId) {
+      throw new Error('User ID, Project ID, and Item ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
 
     const updateData: Partial<Item> = {
@@ -1858,13 +1695,7 @@ export async function updateItem(
 
     await updateDoc(docRef, updateData);
     console.log('Custom item updated:', itemId);
-  } catch (error) {
-    console.error('Failed to update item:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update item: ${error.message}`);
-    }
-    throw new Error('Failed to update item in Firestore.');
-  }
+  }, { projectId, itemId, ...updates });
 }
 
 /**
@@ -1875,22 +1706,16 @@ export async function updateItem(
  * @param itemId The ID of the item.
  */
 export async function deleteItem(userId: string, projectId: string, itemId: string): Promise<void> {
-  if (!userId || !projectId || !itemId) {
-    throw new Error('User ID, Project ID, and Item ID are required');
-  }
+  return withTracking('firestore_delete_item', async () => {
+    if (!userId || !projectId || !itemId) {
+      throw new Error('User ID, Project ID, and Item ID are required');
+    }
 
-  try {
     const docRef = doc(db, 'users', userId, 'projects', projectId, 'custom_items', itemId);
 
     await deleteDoc(docRef);
     console.log('Custom item deleted:', itemId);
-  } catch (error) {
-    console.error('Failed to delete item:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to delete item: ${error.message}`);
-    }
-    throw new Error('Failed to delete item from Firestore.');
-  }
+  }, { projectId, itemId });
 }
 
 /**
@@ -1962,22 +1787,24 @@ export async function saveCustomPrompt(
   taskName: string,
   content: string
 ): Promise<void> {
-  if (!userId || !projectId || !taskName || !content) {
-    throw new Error('Missing required fields for saving custom prompt');
-  }
+  return withTracking('firestore_save_custom_prompt', async () => {
+    if (!userId || !projectId || !taskName || !content) {
+      throw new Error('Missing required fields for saving custom prompt');
+    }
 
-  const promptId = crypto.randomUUID();
-  const customPromptsPath = `/users/${userId}/projects/${projectId}/custom_prompts`;
-  const docRef = doc(db, customPromptsPath, promptId);
+    const promptId = crypto.randomUUID();
+    const customPromptsPath = `/users/${userId}/projects/${projectId}/custom_prompts`;
+    const docRef = doc(db, customPromptsPath, promptId);
 
-  const promptData: CustomPrompt = {
-    id: promptId,
-    task_name: taskName,
-    timestamp: Timestamp.now(),
-    content: content,
-  };
+    const promptData: CustomPrompt = {
+      id: promptId,
+      task_name: taskName,
+      timestamp: Timestamp.now(),
+      content: content,
+    };
 
-  await setDoc(docRef, promptData);
+    await setDoc(docRef, promptData);
+  }, { projectId, taskName });
 }
 
 /**
@@ -1990,23 +1817,55 @@ export async function fetchAllCustomPrompts(
   userId: string,
   projectId: string
 ): Promise<CustomPrompt[]> {
-  if (!userId || !projectId) {
-    throw new Error('Missing userId or projectId');
-  }
+  return withTracking('firestore_fetch_all_custom_prompts', async () => {
+    if (!userId || !projectId) {
+      throw new Error('Missing userId or projectId');
+    }
 
-  const customPromptsPath = `/users/${userId}/projects/${projectId}/custom_prompts`;
-  const collectionRef = collection(db, customPromptsPath);
+    const customPromptsPath = `/users/${userId}/projects/${projectId}/custom_prompts`;
+    const collectionRef = collection(db, customPromptsPath);
 
-  const q = query(collectionRef, orderBy('timestamp', 'desc'));
-  const snapshot = await getDocs(q);
+    const q = query(collectionRef, orderBy('timestamp', 'desc'));
+    const snapshot = await getDocs(q);
 
-  return snapshot.docs.map(
-    (doc) =>
-      ({
-        id: doc.id,
-        ...doc.data(),
-      }) as CustomPrompt
-  );
+    return snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as CustomPrompt
+    );
+  }, { projectId });
+}
+
+/**
+ * Deletes a single custom prompt from Firestore
+ * @param userId The ID of the user
+ * @param projectId The ID of the project
+ * @param promptId The ID of the prompt to delete
+ */
+export async function deleteCustomPrompt(
+  userId: string,
+  projectId: string,
+  promptId: string
+): Promise<void> {
+  return withTracking('firestore_delete_custom_prompt', async () => {
+    if (!userId || !projectId || !promptId) {
+      throw new Error('Missing userId, projectId, or promptId');
+    }
+
+    const promptDocRef = doc(
+      db,
+      'users',
+      userId,
+      'projects',
+      projectId,
+      'custom_prompts',
+      promptId
+    );
+    await deleteDoc(promptDocRef);
+    console.log('Custom prompt deleted successfully:', promptId);
+  }, { projectId, promptId });
 }
 
 /**
@@ -2024,21 +1883,20 @@ export async function batchUpdateImagesOrder(
   updates: Array<{ id: string; order: number }>,
   collectionName: string = 'images'
 ): Promise<void> {
-  if (!userId || !projectId) {
-    throw new Error('User ID and Project ID are required.');
-  }
+  return withTracking('firestore_batch_update_images_order', async () => {
+    if (!userId || !projectId) {
+      throw new Error('User ID and Project ID are required.');
+    }
 
-  // If collection is 'images', spaceId is required
-  if (collectionName === 'images' && !spaceId) {
-    throw new Error('Space ID is required for image updates.');
-  }
+    // If collection is 'images', spaceId is required
+    if (collectionName === 'images' && !spaceId) {
+      throw new Error('Space ID is required for image updates.');
+    }
 
-  if (!updates || updates.length === 0) {
-    return; // Nothing to update
-  }
+    if (!updates || updates.length === 0) {
+      return; // Nothing to update
+    }
 
-
-  try {
     const CHUNK_SIZE = 450; // Safety margin below 500
     const now = Timestamp.fromDate(new Date());
 
@@ -2051,28 +1909,10 @@ export async function batchUpdateImagesOrder(
 
         if (collectionName === 'images' && spaceId) {
           // Space-level images
-          docRef = doc(
-            db,
-            'users',
-            userId,
-            'projects',
-            projectId,
-            'spaces',
-            spaceId,
-            'images',
-            id
-          );
+          docRef = doc(db, 'users', userId, 'projects', projectId, 'spaces', spaceId, 'images', id);
         } else {
           // Project-level assets (custom_textures, custom_items)
-          docRef = doc(
-            db,
-            'users',
-            userId,
-            'projects',
-            projectId,
-            collectionName,
-            id
-          );
+          docRef = doc(db, 'users', userId, 'projects', projectId, collectionName, id);
         }
 
         batch.update(docRef, {
@@ -2080,18 +1920,10 @@ export async function batchUpdateImagesOrder(
           updatedAt: now,
         });
       }
-      
+
       await batch.commit();
     }
-    
+
     console.log(`Successfully updated order for ${updates.length} items in ${collectionName}`);
-  } catch (error) {
-    console.error(`Failed to batch update ${collectionName} order:`, error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to update ${collectionName} order: ${error.message}`);
-    }
-    throw new Error(`Failed to update ${collectionName} order in Firestore.`);
-  }
+  }, { projectId, spaceId, count: updates.length, collectionName });
 }
-
-

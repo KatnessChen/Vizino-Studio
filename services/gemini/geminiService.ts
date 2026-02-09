@@ -17,6 +17,7 @@ import {
 import { GEMINI_ERRORS } from './geminiApiErrors';
 import { storage } from '../firestoreService';
 import { fetchImageAsBase64, getBase64FromImageData } from '@/utils';
+import { withTracking } from '../analyticsService';
 
 /**
  * Helper to convert numeric aspect ratio to Gemini-friendly string
@@ -367,7 +368,8 @@ export const generateOptimizedPrompt = async (
   signal?: AbortSignal,
   additionalContext?: OptimizePromptContext
 ): Promise<string> => {
-  const ai = getGeminiClient();
+  return withTracking('gemini_optimize_prompt', async () => {
+    const ai = getGeminiClient();
 
   // Get task-aware thinking prompt with context
   const thinkingPrompt = getThinkingPromptForTask(task, userPrompt, additionalContext);
@@ -468,7 +470,8 @@ export const generateOptimizedPrompt = async (
     console.warn('[Gemini] Prompt optimization failed:', error);
     // Fall back to original prompt on error
     return userPrompt;
-  }
+    }
+  }, { task: task.task_name });
 };
 
 export const generateRecoloredImage = async (
@@ -703,9 +706,10 @@ export const processImageWithTask = async (
     modelOverride?: string;
   } = {}
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
-  const ai = getGeminiClient();
+  return withTracking(`gemini_generate_${task.task_name}`, async () => {
+    const ai = getGeminiClient();
 
-  const prompt = getPromptByTask(task, options);
+    const prompt = getPromptByTask(task, options);
 
   // Note: optimizePromptWithThinking is no longer called here.
   // Prompt optimization is now handled separately via generateOptimizedPrompt.
@@ -897,7 +901,8 @@ export const processImageWithTask = async (
     throw new Error(
       GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
     );
-  }
+    }
+  }, { task: task.task_name, model_code: task.model_code });
 };
 
 /**
