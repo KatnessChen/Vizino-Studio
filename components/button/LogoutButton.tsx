@@ -20,7 +20,11 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disable
       if (result.success) {
         onSuccess?.();
       } else {
-        onError?.(result.error || 'Failed to sign out');
+        const errMsg =
+          'error' in result && typeof (result as Record<string, unknown>)['error'] === 'string'
+            ? (result as Record<string, string>)['error']
+            : 'Failed to sign out';
+        onError?.(errMsg);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';

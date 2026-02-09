@@ -40,7 +40,11 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         // Don't set loading to false - page will redirect
       } else if (!result.success) {
         // Authentication failed
-        onError?.(result.error || 'Failed to sign in with Google');
+        const errMsg =
+          'error' in result && typeof (result as Record<string, unknown>)['error'] === 'string'
+            ? (result as Record<string, string>)['error']
+            : 'Failed to sign in with Google';
+        onError?.(errMsg);
         setLoading(false);
       }
     } catch (error) {
