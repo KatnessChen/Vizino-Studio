@@ -22,6 +22,7 @@ import {
   CopyOutlined,
 } from '@ant-design/icons';
 import { updateUserAiKey, toggleUserAiKeyStatus, decryptUserApiKey } from '@/services/userService';
+import { redeemPromotionCode } from '@/services/promotionCodeService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreditCheck } from '@/hooks/useCreditCheck';
@@ -47,9 +48,32 @@ interface ApiKeyManagerUser {
 const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { isLoading, totalCredits, usagePercentage, usage } = useCreditCheck({
+  const { isLoading, totalCredits, usagePercentage, usage, refresh, limit } = useCreditCheck({
     userId: user?.uid,
   });
+
+  // Promotion code state
+  const [promoCode, setPromoCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+
+  const handleRedeemCode = async () => {
+    if (!user || !promoCode.trim()) return;
+
+    setRedeeming(true);
+    try {
+      const creditsAdded = await redeemPromotionCode(user.uid, promoCode.trim());
+      message.success(`Successfully redeemed ${creditsAdded} credits!`);
+      setPromoCode('');
+      await refresh(); // Refresh user data to show updated credit_limit
+    } catch (error) {
+      console.error('Failed to redeem promotion code:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to redeem promotion code';
+      message.error(errorMessage);
+    } finally {
+      setRedeeming(false);
+    }
+  };
 
   // Redirect if not authenticated
   if (!isAuthenticated) {
@@ -163,7 +187,11 @@ const UserProfilePage: React.FC = () => {
         {/* V Points Usage */}
         <Card title="Usage" className="mb-8" loading={isLoading}>
           {/* Progress Bar Component */}
-          <VPointsProgressBar totalCredits={totalCredits} usagePercentage={usagePercentage} />
+          <VPointsProgressBar
+            totalCredits={totalCredits}
+            usagePercentage={usagePercentage}
+            limit={limit}
+          />
           {/* Usage Detail Breakdown - Integrated inside Card */}
           <Collapse ghost className="usage-breakdown-collapse mt-2">
             <Collapse.Panel
@@ -219,6 +247,37 @@ const UserProfilePage: React.FC = () => {
               </div>
             </Collapse.Panel>
           </Collapse>
+        </Card>
+
+        {/* Promotion Code Section */}
+        <Card
+          title={
+            <div className="flex items-center gap-2">
+              <span>Promotion Code</span>
+            </div>
+          }
+          className="mb-8"
+        >
+          <Paragraph className="text-gray-600 mb-4">
+            Enter a promotion code to increase your V Points credits
+          </Paragraph>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter promotion code"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              onPressEnter={handleRedeemCode}
+              disabled={redeeming}
+            />
+            <Button
+              type="primary"
+              onClick={handleRedeemCode}
+              loading={redeeming}
+              disabled={!promoCode.trim()}
+            >
+              Redeem
+            </Button>
+          </div>
         </Card>
 
         {/* API Key Section */}
