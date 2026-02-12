@@ -67,7 +67,7 @@ interface UseCreditCheckResult {
   canProceed: boolean;
   /** Normalized usage data (includes all expected keys with defaults) */
   usage: UsageData;
-  /** Credit limit (defaults to DEFAULT_CREDIT_LIMIT) */
+  /** Credit limit from user data (defaults to DEFAULT_CREDIT_LIMIT if not set) */
   limit: number;
   /** Whether user has enabled their own Gemini API key */
   hasEnabledOwnKey: boolean;
@@ -79,10 +79,7 @@ interface UseCreditCheckResult {
  * Hook to check user's V points credit status
  * Fetches user data and provides credit-related information
  */
-export const useCreditCheck = ({
-  userId,
-  limit = DEFAULT_CREDIT_LIMIT,
-}: UseCreditCheckOptions): UseCreditCheckResult => {
+export const useCreditCheck = ({ userId }: { userId: string | undefined }): UseCreditCheckResult => {
   const { adminSettings } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState<User | null>(null);
@@ -112,6 +109,9 @@ export const useCreditCheck = ({
   // Validate and normalize usage, ensure all expected keys exist with default 0
   const rawUsage = isValidUsageData(userData?.usage) ? userData.usage : undefined;
   const usage = normalizeUsage(rawUsage);
+
+  // Get user's credit_limit, fallback to DEFAULT_CREDIT_LIMIT if not set
+  const limit = userData?.credit_limit ?? DEFAULT_CREDIT_LIMIT;
 
   // Apply Mock Logic
   const isMockLimitReached = adminSettings.mock_credit_limit_reached;

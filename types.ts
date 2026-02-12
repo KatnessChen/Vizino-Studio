@@ -128,6 +128,19 @@ export interface User {
     geminiKey?: string; // Encrypted API Key
     isActive: boolean; // User choice to use custom key or not
   };
+  credit_limit?: number; // V Points limit, can be increased via promotion codes
+}
+
+/**
+ * Promotion Code document structure in Firestore.
+ * Path: promotion_codes/{code}
+ */
+export interface PromotionCode {
+  code: string; // The promotion code string (e.g., "2026MARCH-MEL")
+  credits: number; // Number of credits this code provides
+  usedBy: string | null; // User uid who used this code, null if unused
+  usedAt: Timestamp | null; // Timestamp when the code was used
+  createdAt: Timestamp; // Timestamp when the code was created
 }
 
 // ============================================================================

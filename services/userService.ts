@@ -21,6 +21,7 @@ const convertFirestoreUser = (data: DocumentData): User => {
           isActive: data.apiKey.isActive ?? true,
         }
       : undefined,
+    credit_limit: data.credit_limit,
   };
 };
 
@@ -54,26 +55,34 @@ export const createOrUpdateUser = async (userData: {
     const userDoc = await getDoc(userRef);
 
     if (userDoc.exists()) {
-      // User exists, update lastLoginAt only
-      await setDoc(
-        userRef,
-        {
-          lastLoginAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      console.log('User lastLoginAt updated:', userData.uid);
+      // User exists, check if credit_limit needs to be initialized
+      const existingData = userDoc.data();
+      const updates: Record<string, unknown> = {
+        lastLoginAt: serverTimestamp(),
+      };
+      
+      // If credit_limit doesn't exist, set it to DEFAULT_CREDIT_LIMIT
+      if (existingData.credit_limit === undefined) {
+        const { DEFAULT_CREDIT_LIMIT } = await import('@/constants/constants');
+        updates.credit_limit = DEFAULT_CREDIT_LIMIT;
+        console.log(`Initializing credit_limit for existing user ${userData.uid}: ${DEFAULT_CREDIT_LIMIT}`);
+      }
+      
+      await setDoc(userRef, updates, { merge: true });
+      console.log('User updated:', userData.uid);
     } else {
-      // New user, create document with initial data
+      // New user, create document with initial data including credit_limit
+      const { DEFAULT_CREDIT_LIMIT } = await import('@/constants/constants');
       await setDoc(userRef, {
         uid: userData.uid,
         email: userData.email,
         displayName: userData.displayName,
         photoURL: userData.photoURL,
         usage: initializeUsage(),
+        credit_limit: DEFAULT_CREDIT_LIMIT,
         lastLoginAt: serverTimestamp(),
       });
-      console.log('New user created:', userData.uid);
+      console.log(`New user created: ${userData.uid} with credit_limit: ${DEFAULT_CREDIT_LIMIT}`);
     }
   });
 };

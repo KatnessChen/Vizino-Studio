@@ -49,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 usage: userData.usage || {},
                 lastLoginAt: userData.lastLoginAt?.toDate() || new Date(),
                 apiKey: userData.apiKey,
+                credit_limit: userData.credit_limit,
               } as User);
               
               // Identify user in PostHog
