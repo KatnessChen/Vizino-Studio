@@ -42,11 +42,6 @@ const isValidUsageData = (usage: unknown): usage is UsageData => {
   return hasValidEntry;
 };
 
-interface UseCreditCheckOptions {
-  userId: string | undefined;
-  /** Credit limit (defaults to DEFAULT_CREDIT_LIMIT) */
-  limit?: number;
-}
 
 interface UseCreditCheckResult {
   /** Whether user data is being loaded */
