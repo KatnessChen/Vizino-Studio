@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch } from 'antd';
 import { message } from '@/utils/antd';
@@ -59,7 +59,8 @@ import {
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
-import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
+import { devLog, devWarn, devError, devLogContext } from '@/utils/devLogger';
+const ConfirmImageUpdateModal = lazy(() => import('./ConfirmImageUpdateModal'));
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE, MAX_CUSTOM_PROMPT_LENGTH } from '@/constants/constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -454,7 +455,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         return;
       }
 
-      console.log('[GenerateMoreModal] Starting image processing with:', {
+      devLogContext('[GenerateMoreModal] Starting image processing with:', {
         userId,
         // Use optional chaining safely
         sourceId: 'id' in effectiveSource ? effectiveSource.id : 'unknown',
@@ -469,7 +470,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       const result = await processImage(effectiveSource, customPrompt.trim() || undefined);
 
       if (result) {
-        console.log('[GenerateMoreModal] Processing successful, result:', {
+        devLogContext('[GenerateMoreModal] Processing successful, result:', {
           hasMimeType: !!result.mimeType,
           hasBase64: !!result.base64,
           base64Length: result.base64?.length || 0,
@@ -485,11 +486,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               try {
                 await fetchPrompts();
               } catch (fetchErr) {
-                console.warn('Failed to refresh prompts after saving:', fetchErr);
+                devWarn('Failed to refresh prompts after saving:', fetchErr);
               }
               message.success('Prompt saved');
             } catch (saveErr) {
-              console.warn('Failed to save custom prompt on generate:', saveErr);
+              devWarn('Failed to save custom prompt on generate:', saveErr);
             }
           })();
         }
@@ -692,7 +693,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         setCustomPrompt(optimizedPrompt);
         message.success('Prompt optimized!');
       } catch (error) {
-        console.error('[GenerateMoreModal] Help me write failed:', error);
+        devError('[GenerateMoreModal] Help me write failed:', error);
         message.error('Failed to optimize prompt. Please try again.');
       } finally {
         setIsOptimizingPrompt(false);
@@ -893,7 +894,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             onSuccess();
             return;
           } catch (error) {
-            console.error('Failed to save asset:', error);
+            devError('Failed to save asset:', error);
             setErrorMessage('Failed to save asset.');
             setIsSavingImage(false);
             setShowConfirmationModal(true);
@@ -1024,20 +1025,22 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   images,
                 })
               );
-              
+
               // Submit feedback if provided (for authenticated users)
               if (feedbackData) {
                 setTimeout(() => {
                   const submitFeedback = async () => {
                     try {
                       // Find the saved image URL from the fetched images
-                      const savedImage = images.find(img => img.id === tempImageId);
+                      const savedImage = images.find((img) => img.id === tempImageId);
                       if (!savedImage?.imageDownloadUrl) {
-                        console.warn('[GenerateMoreModal] Could not find saved image URL for feedback');
+                        console.warn(
+                          '[GenerateMoreModal] Could not find saved image URL for feedback'
+                        );
                         return;
                       }
-                      
-                      console.log('[GenerateMoreModal] Submitting feedback for saved image...');
+
+                      devLogContext('[GenerateMoreModal] Submitting feedback for saved image...');
                       await saveFeedback({
                         sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
                         generatedImageDownloadUrl: savedImage.imageDownloadUrl,
@@ -1048,33 +1051,41 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                         userId: userId || 'unknown',
                         options: {
                           prompt: finalDescription,
-                          selectedColor: selectedColor ? {
-                            id: selectedColor.id,
-                            name: selectedColor.name,
-                            hex: selectedColor.hex,
-                          } : undefined,
-                          selectedTexture: selectedTexture ? {
-                            id: selectedTexture.id,
-                            name: selectedTexture.name,
-                            textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
-                          } : undefined,
-                          selectedItem: selectedItem ? {
-                            id: selectedItem.id,
-                            name: selectedItem.name,
-                            itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
-                          } : undefined,
+                          selectedColor: selectedColor
+                            ? {
+                                id: selectedColor.id,
+                                name: selectedColor.name,
+                                hex: selectedColor.hex,
+                              }
+                            : undefined,
+                          selectedTexture: selectedTexture
+                            ? {
+                                id: selectedTexture.id,
+                                name: selectedTexture.name,
+                                textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                              }
+                            : undefined,
+                          selectedItem: selectedItem
+                            ? {
+                                id: selectedItem.id,
+                                name: selectedItem.name,
+                                itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                              }
+                            : undefined,
                         },
                       });
-                      console.log('[GenerateMoreModal] Feedback submitted successfully (authenticated)!');
+                      console.log(
+                        '[GenerateMoreModal] Feedback submitted successfully (authenticated)!'
+                      );
                     } catch (e) {
-                      console.error('[GenerateMoreModal] Failed to submit feedback:', e);
+                      devError('[GenerateMoreModal] Failed to submit feedback:', e);
                     }
                   };
                   void submitFeedback();
                 }, 100);
               }
             } catch (saveError) {
-              console.error('Failed to save processed image:', saveError);
+              devError('Failed to save processed image:', saveError);
               // Rollback optimistic update on error
               dispatch(
                 removeImageOptimistic({
@@ -1130,8 +1141,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   try {
                     // For guest users, use the data URL as the saved image URL
                     const savedImageUrl = guestImageData.imageDownloadUrl;
-                    
-                    console.log('[GenerateMoreModal] Submitting feedback for saved image (guest)...');
+
+                    console.log(
+                      '[GenerateMoreModal] Submitting feedback for saved image (guest)...'
+                    );
                     await saveFeedback({
                       sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
                       generatedImageDownloadUrl: savedImageUrl,
@@ -1142,26 +1155,32 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                       userId: guestSessionId || 'guest',
                       options: {
                         prompt: finalDescription,
-                        selectedColor: selectedColor ? {
-                          id: selectedColor.id,
-                          name: selectedColor.name,
-                          hex: selectedColor.hex,
-                        } : undefined,
-                        selectedTexture: selectedTexture ? {
-                          id: selectedTexture.id,
-                          name: selectedTexture.name,
-                          textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
-                        } : undefined,
-                        selectedItem: selectedItem ? {
-                          id: selectedItem.id,
-                          name: selectedItem.name,
-                          itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
-                        } : undefined,
+                        selectedColor: selectedColor
+                          ? {
+                              id: selectedColor.id,
+                              name: selectedColor.name,
+                              hex: selectedColor.hex,
+                            }
+                          : undefined,
+                        selectedTexture: selectedTexture
+                          ? {
+                              id: selectedTexture.id,
+                              name: selectedTexture.name,
+                              textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                            }
+                          : undefined,
+                        selectedItem: selectedItem
+                          ? {
+                              id: selectedItem.id,
+                              name: selectedItem.name,
+                              itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                            }
+                          : undefined,
                       },
                     });
-                    console.log('[GenerateMoreModal] Feedback submitted successfully (guest)!');
+                    devLogContext('[GenerateMoreModal] Feedback submitted successfully (guest)!');
                   } catch (e) {
-                    console.error('[GenerateMoreModal] Failed to submit feedback (guest):', e);
+                    devError('[GenerateMoreModal] Failed to submit feedback (guest):', e);
                   }
                 };
                 void submitFeedback();
@@ -1181,7 +1200,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             onSuccess();
           }
         } catch (error) {
-          console.error('Failed to save processed image:', error);
+          devError('Failed to save processed image:', error);
           setErrorMessage(
             error instanceof Error ? error.message : 'Failed to save processed image.'
           );
@@ -1215,13 +1234,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       ]
     );
 
-    const handleCancelConfirmation = useCallback(
-      () => {
-        setShowConfirmationModal(false);
-        setGeneratedImage(null);
-      },
-      []
-    );
+    const handleCancelConfirmation = useCallback(() => {
+      setShowConfirmationModal(false);
+      setGeneratedImage(null);
+    }, []);
 
     // const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
 
@@ -1497,7 +1513,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                             await fetchPrompts();
                           } catch (error) {
                             // Error is already handled in SavedPromptList component
-                            console.error('Failed to delete and refresh prompts:', error);
+                            devError('Failed to delete and refresh prompts:', error);
                           }
                         }}
                       />
