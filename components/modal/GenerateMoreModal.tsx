@@ -46,6 +46,8 @@ import {
   addImageOptimistic,
   removeImageOptimistic,
 } from '@/stores/projectStore';
+import { saveFeedback } from '@/services/feedbackService';
+
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';
 import {
@@ -136,9 +138,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         ? (selectedAssetRaw as Item)
         : null;
 
-    const { addAsset: addColor } = useCustomAssets(ASSET_COLOR, activeProjectId);
-    const { addAsset: addTextureToStore } = useCustomAssets(ASSET_TEXTURE, activeProjectId);
-    const { addAsset: addItemToStore } = useCustomAssets(ASSET_ITEM, activeProjectId);
+    const { addAsset: addColor } = useCustomAssets(ASSET_COLOR, activeProjectId || '');
+    const { addAsset: addTextureToStore } = useCustomAssets(ASSET_TEXTURE, activeProjectId || '');
+    const { addAsset: addItemToStore } = useCustomAssets(ASSET_ITEM, activeProjectId || '');
 
     const [validationError, setValidationError] = useState<string | null>(null);
     const [customPrompt, setCustomPrompt] = useState<string>('');
@@ -734,7 +736,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       async (
         imageData: { base64: string; mimeType: string; hex?: string },
         customName: string,
-        description?: string
+        description?: string,
+        feedbackData?: { rating: 0 | 1; comment: string }
       ) => {
         // Use edited description from modal, or fall back to current customPrompt
         const finalDescription = description !== undefined ? description : customPrompt;
@@ -1021,6 +1024,55 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   images,
                 })
               );
+              
+              // Submit feedback if provided (for authenticated users)
+              if (feedbackData) {
+                setTimeout(() => {
+                  const submitFeedback = async () => {
+                    try {
+                      // Find the saved image URL from the fetched images
+                      const savedImage = images.find(img => img.id === tempImageId);
+                      if (!savedImage?.imageDownloadUrl) {
+                        console.warn('[GenerateMoreModal] Could not find saved image URL for feedback');
+                        return;
+                      }
+                      
+                      console.log('[GenerateMoreModal] Submitting feedback for saved image...');
+                      await saveFeedback({
+                        sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
+                        generatedImageDownloadUrl: savedImage.imageDownloadUrl,
+                        taskName: activeTaskName || 'unknown',
+                        isSaved: true,
+                        rate: feedbackData.rating,
+                        comments: feedbackData.comment,
+                        userId: userId || 'unknown',
+                        options: {
+                          prompt: finalDescription,
+                          selectedColor: selectedColor ? {
+                            id: selectedColor.id,
+                            name: selectedColor.name,
+                            hex: selectedColor.hex,
+                          } : undefined,
+                          selectedTexture: selectedTexture ? {
+                            id: selectedTexture.id,
+                            name: selectedTexture.name,
+                            textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                          } : undefined,
+                          selectedItem: selectedItem ? {
+                            id: selectedItem.id,
+                            name: selectedItem.name,
+                            itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                          } : undefined,
+                        },
+                      });
+                      console.log('[GenerateMoreModal] Feedback submitted successfully (authenticated)!');
+                    } catch (e) {
+                      console.error('[GenerateMoreModal] Failed to submit feedback:', e);
+                    }
+                  };
+                  void submitFeedback();
+                }, 100);
+              }
             } catch (saveError) {
               console.error('Failed to save processed image:', saveError);
               // Rollback optimistic update on error
@@ -1071,6 +1123,51 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             // Mark that guest has saved a generated image (triggers login requirement for future generations)
             markImageGenerated();
 
+            // Submit feedback if provided (for guest users)
+            if (feedbackData) {
+              setTimeout(() => {
+                const submitFeedback = async () => {
+                  try {
+                    // For guest users, use the data URL as the saved image URL
+                    const savedImageUrl = guestImageData.imageDownloadUrl;
+                    
+                    console.log('[GenerateMoreModal] Submitting feedback for saved image (guest)...');
+                    await saveFeedback({
+                      sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
+                      generatedImageDownloadUrl: savedImageUrl,
+                      taskName: activeTaskName || 'unknown',
+                      isSaved: true,
+                      rate: feedbackData.rating,
+                      comments: feedbackData.comment,
+                      userId: guestSessionId || 'guest',
+                      options: {
+                        prompt: finalDescription,
+                        selectedColor: selectedColor ? {
+                          id: selectedColor.id,
+                          name: selectedColor.name,
+                          hex: selectedColor.hex,
+                        } : undefined,
+                        selectedTexture: selectedTexture ? {
+                          id: selectedTexture.id,
+                          name: selectedTexture.name,
+                          textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                        } : undefined,
+                        selectedItem: selectedItem ? {
+                          id: selectedItem.id,
+                          name: selectedItem.name,
+                          itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                        } : undefined,
+                      },
+                    });
+                    console.log('[GenerateMoreModal] Feedback submitted successfully (guest)!');
+                  } catch (e) {
+                    console.error('[GenerateMoreModal] Failed to submit feedback (guest):', e);
+                  }
+                };
+                void submitFeedback();
+              }, 100);
+            }
+
             // Reset state
             setCustomPrompt('');
             setGeneratedImage(null);
@@ -1080,6 +1177,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             dispatch(setSourceImage(null));
 
             message.success('Image saved successfully!');
+
             onSuccess();
           }
         } catch (error) {
@@ -1117,10 +1215,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       ]
     );
 
-    const handleCancelConfirmation = () => {
-      setShowConfirmationModal(false);
-      setGeneratedImage(null);
-    };
+    const handleCancelConfirmation = useCallback(
+      () => {
+        setShowConfirmationModal(false);
+        setGeneratedImage(null);
+      },
+      []
+    );
 
     // const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
 
@@ -1669,6 +1770,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 : undefined
             }
             defaultDescription={customPrompt}
+            ratingRequired={import.meta.env.VITE_GENERATION_RESULT_RATING_REQUIRED === 'true'}
+            userId={userId}
+            guestSessionId={guestSessionId}
+            customPrompt={customPrompt}
+            selectedColor={selectedColor}
+            selectedTexture={selectedTexture}
+            selectedItem={selectedItem}
           />
         )}
 

@@ -1,13 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ImageData } from '@/types';
+import { ImageData, Color, Texture, Item } from '@/types';
 import { imageCache } from '@/utils/imageCache';
-import { Modal, Button, Typography } from 'antd';
-import { GeminiTaskName } from '@/services/gemini/geminiTasks';
+import { Modal, Button, Typography, Input, Space, Tooltip, message } from 'antd';
+import {
+  LikeOutlined,
+  DislikeOutlined,
+  LikeFilled,
+  DislikeFilled,
+} from '@ant-design/icons';
+import { GeminiTaskName, GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { getFileExtension } from '@/utils/downloadUtils';
 import { removeExtension, generateTimestamp } from '@/utils/fileNameUtils';
 import CustomizeImageNameForm from '@/components/form/CustomizeImageNameForm';
+import { saveFeedback, uploadFeedbackImage } from '@/services/feedbackService';
 
+const { TextArea } = Input;
 const MAX_IMAGE_NAME_LENGTH = 50;
+const MAX_COMMENT_LENGTH = 200;
 
 interface ConfirmImageUpdateModalProps {
   isOpen: boolean;
@@ -16,7 +25,8 @@ interface ConfirmImageUpdateModalProps {
   onConfirm: (
     imageData: { base64: string; mimeType: string; hex?: string },
     customName: string,
-    description: string
+    description: string,
+    feedbackData?: { rating: 0 | 1; comment: string } // Pass feedback data to parent
   ) => void;
   onCancel: () => void;
   taskName: GeminiTaskName;
@@ -25,6 +35,14 @@ interface ConfirmImageUpdateModalProps {
   itemName?: string;
   originalHex?: string;
   defaultDescription?: string;
+  ratingRequired?: boolean;
+  // Feedback context props
+  userId?: string | null;
+  guestSessionId?: string | null;
+  customPrompt?: string;
+  selectedColor?: Color | null;
+  selectedTexture?: Texture | null;
+  selectedItem?: Item | null;
 }
 
 const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
@@ -39,6 +57,13 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
   itemName,
   originalHex,
   defaultDescription = '',
+  ratingRequired = false, // Configurable via props
+  userId,
+  guestSessionId,
+  customPrompt,
+  selectedColor,
+  selectedTexture,
+  selectedItem,
 }) => {
   const isColorMode = taskName === 'color_adjustment' || !!originalHex;
   // Cached image state for original image
@@ -47,10 +72,17 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
   // Description state
   const [description, setDescription] = useState<string>(defaultDescription);
 
+  // Feedback State
+  const [rating, setRating] = useState<0 | 1 | null>(null);
+  const [comment, setComment] = useState<string>('');
+
   // Update description when defaultDescription changes (e.g. re-open)
   useEffect(() => {
     if (isOpen) {
       setDescription(defaultDescription);
+      // Reset feedback on open
+      setRating(null);
+      setComment('');
     }
   }, [defaultDescription, isOpen]);
 
@@ -157,11 +189,76 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
     }
   }, [baseName, finalName]);
 
-  // Handle confirm
+  // Handle confirm - pass feedback data to parent
   const handleConfirm = () => {
     if (nameError || !generatedImage) return;
-    onConfirm(generatedImage, finalName, description);
+    
+    // Check rating requirement
+    if (ratingRequired && rating === null) {
+      return;
+    }
+
+    // Pass feedback data to parent if provided
+    const feedbackData = rating !== null ? { rating, comment } : undefined;
+    
+    // Call onConfirm to save the image (parent will handle feedback submission after getting saved URL)
+    onConfirm(generatedImage, finalName, description, feedbackData);
   };
+
+  const handleRefine = () => {
+    // Submit feedback for rejected image if provided
+    if (rating !== null && generatedImage) {
+      setTimeout(() => {
+        const submitRejectFeedback = async () => {
+          try {
+            console.log('[ConfirmImageUpdateModal] Submitting feedback for rejected image...');
+            const tempUrl = await uploadFeedbackImage(
+              generatedImage.base64,
+              generatedImage.mimeType,
+              userId || guestSessionId || 'anonymous'
+            );
+            
+            await saveFeedback({
+              sourceImageDownloadUrl: originalImage?.imageDownloadUrl || '',
+              generatedImageDownloadUrl: tempUrl,
+              taskName: taskName || 'unknown',
+              isSaved: false,
+              rate: rating,
+              comments: comment,
+              userId: userId || guestSessionId || 'anonymous',
+              options: {
+                prompt: customPrompt,
+                sourceColorHex: originalHex,
+                generatedColorHex: generatedImage.hex,
+                selectedColor: selectedColor ? {
+                  id: selectedColor.id,
+                  name: selectedColor.name,
+                  hex: selectedColor.hex,
+                } : undefined,
+                selectedTexture: selectedTexture ? {
+                  id: selectedTexture.id,
+                  name: selectedTexture.name,
+                  textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                } : undefined,
+                selectedItem: selectedItem ? {
+                  id: selectedItem.id,
+                  name: selectedItem.name,
+                  itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                } : undefined,
+              },
+            });
+            console.log('[ConfirmImageUpdateModal] Rejection feedback submitted!');
+            message.success('Feedback submitted!');
+          } catch (e) {
+            console.error('[ConfirmImageUpdateModal] Failed to submit rejection feedback:', e);
+          }
+        };
+        void submitRejectFeedback();
+      }, 100);
+    }
+    
+    onCancel();
+  }
 
   if (!generatedImage || !originalImage) return null;
 
@@ -175,15 +272,20 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
         </div>
       }
       open={isOpen}
-      onCancel={onCancel}
+      onCancel={handleRefine}
       width={isColorMode ? 800 : '90vw'}
       style={isColorMode ? {} : { top: 20, maxWidth: 1600 }}
       zIndex={1500}
       footer={[
-        <Button key="cancel" onClick={onCancel}>
+        <Button key="cancel" onClick={handleRefine}>
           Refine
         </Button>,
-        <Button key="confirm" type="primary" onClick={handleConfirm} disabled={!!nameError}>
+        <Button 
+          key="confirm" 
+          type="primary" 
+          onClick={handleConfirm} 
+          disabled={!!nameError || (ratingRequired && rating === null)}
+        >
           Save
         </Button>,
       ]}
@@ -334,6 +436,70 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Rating & Feedback Section */}
+      <div style={{ marginBottom: 24, padding: '16px', backgroundColor: '#fafafa', borderRadius: 8 }}>
+        <Typography.Text strong style={{ display: 'block', marginBottom: 12 }}>
+          Rate this result {ratingRequired && <span style={{ color: 'red' }}>*</span>}
+        </Typography.Text>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+          {/* Rating Buttons */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Tooltip title="Good result">
+              <Button
+                type={rating === 1 ? 'default' : 'text'}
+                style={{ 
+                  height: 'auto', 
+                  padding: '8px 16px',
+                  borderColor: rating === 1 ? '#52c41a' : undefined,
+                  backgroundColor: rating === 1 ? '#f6ffed' : undefined,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onClick={() => setRating(1)}
+              >
+                 {rating === 1 ? <LikeFilled style={{ fontSize: 24, color: '#52c41a' }} /> : <LikeOutlined style={{ fontSize: 24 }} />}
+                 <span style={{ fontSize: 12, color: rating === 1 ? '#52c41a' : '#666' }}>Good</span>
+              </Button>
+            </Tooltip>
+            
+            <Tooltip title="Bad result">
+              <Button
+                type={rating === 0 ? 'default' : 'text'}
+                style={{ 
+                   height: 'auto', 
+                   padding: '8px 16px',
+                   borderColor: rating === 0 ? '#ff4d4f' : undefined,
+                   backgroundColor: rating === 0 ? '#fff1f0' : undefined,
+                   display: 'flex',
+                   flexDirection: 'column',
+                   alignItems: 'center',
+                   gap: 4
+                }}
+                onClick={() => setRating(0)}
+              >
+                {rating === 0 ? <DislikeFilled style={{ fontSize: 24, color: '#ff4d4f' }} /> : <DislikeOutlined style={{ fontSize: 24 }} />}
+                 <span style={{ fontSize: 12, color: rating === 0 ? '#ff4d4f' : '#666' }}>Bad</span>
+              </Button>
+            </Tooltip>
+          </div>
+
+          {/* Comment Textarea */}
+          <div style={{ flex: 1 }}>
+            <TextArea 
+              placeholder="Comments (optional) - e.g. 'The colors are not vibrant enough...'" 
+              autoSize={{ minRows: 3, maxRows: 3 }}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              maxLength={MAX_COMMENT_LENGTH}
+              showCount
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Image Naming Section */}
       <div style={{ borderTop: '1px solid #e8e8e8', paddingTop: 16 }}>
         <CustomizeImageNameForm
@@ -369,3 +535,4 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
 };
 
 export default ConfirmImageUpdateModal;
+
