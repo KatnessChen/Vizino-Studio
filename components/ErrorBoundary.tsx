@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button, Result } from 'antd';
+import posthog from 'posthog-js';
 import { ReloadOutlined, HomeOutlined } from '@ant-design/icons';
 
 interface Props {
@@ -39,8 +40,11 @@ class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     });
 
-    // You can also log the error to an error reporting service here
-    // Example: logErrorToService(error, errorInfo);
+    // Send error to PostHog for tracking
+    posthog.captureException(error, {
+      componentStack: errorInfo.componentStack,
+      level: this.props.level || 'component',
+    });
   }
 
   handleReset = () => {
