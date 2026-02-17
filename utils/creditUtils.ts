@@ -48,7 +48,7 @@ export const normalizeUsage = (usage?: UsageData): UsageData => {
 
 /**
  * Calculate total V points consumed based on usage data (only onVPoints)
- * Formula: thinking_mode × 4, optimize_prompt × 4, all others × 1
+ * Formula: thinking_mode × 3, optimize_prompt × 4, all others × 1
  *
  * @param usage - Usage data object from Firestore
  * @returns Total V points consumed
