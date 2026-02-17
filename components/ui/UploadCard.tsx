@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { MAX_FILE_SIZE_MB } from '@/constants/constants';
 import { CloudUpload as UploadIcon } from '@mui/icons-material';
+import { devError } from '@/utils/devLogger';
 
 interface UploadCardProps {
   onImageUpload: (file: File) => void;
@@ -36,7 +37,7 @@ const UploadCard: React.FC<UploadCardProps> = ({
         onImageUpload(file);
       } catch (error) {
         onError('Failed to process image file.');
-        console.error('File upload error:', error);
+        devError('File upload error:', error);
       }
     }
   };

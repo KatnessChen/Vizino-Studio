@@ -3,6 +3,7 @@ import { AppDispatch } from './store';
 import { reorderImagesOptimistic, rollbackReorderImages } from './projectStore';
 import { setCustomTextures, setCustomItems } from './customAssetsStore';
 import { batchUpdateImagesOrder } from '@/services/firestoreService';
+import { devLog, devError } from '@/utils/devLogger';
 import { ImageData, Texture, Item } from '@/types';
 import { message } from '@/utils/antd';
 
@@ -55,10 +56,10 @@ const debouncedBatchUpdate = debounce(
       const updates = reorderedIds.map((id, index) => ({ id, order: index + 1 }));
 
       await batchUpdateImagesOrder(userId, projectId, spaceId, updates, collectionName);
-      console.log(`Successfully synced ${collectionName} order to Firestore`);
+      devLog(`Successfully synced ${collectionName} order to Firestore`);
       message.success('Order saved successfully');
     } catch (error) {
-      console.error(`Failed to update ${collectionName} order in Firestore:`, error);
+      devError(`Failed to update ${collectionName} order in Firestore:`, error);
 
       // Rollback optimistic update
       rollbackAction(dispatch);
@@ -87,7 +88,7 @@ export const reorderAssetsWithDebounce =
     const updates = calculateNewOrders(allAssets, reorderedIds);
 
     if (updates.length === 0) {
-      console.log('No order changes needed');
+      devLog('No order changes needed');
       return;
     }
 
@@ -97,7 +98,7 @@ export const reorderAssetsWithDebounce =
     // Optimistically update Redux state immediately AND define rollback
     if (collectionName === 'images') {
       if (!spaceId) {
-        console.error('Space ID required for image reordering');
+        devError('Space ID required for image reordering');
         return;
       }
       const previousOrders = updates.map(({ id }) => {
@@ -177,7 +178,7 @@ export const reorderAssetsWithDebounce =
 
       rollbackAction = (d) => d(setCustomItems({ projectId, items: allAssets as Item[] }));
     } else {
-      console.error('Unknown collection name for reordering');
+      devError('Unknown collection name for reordering');
       return;
     }
 

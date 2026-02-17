@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
+import { devWarn } from '@/utils/devLogger';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -14,7 +15,7 @@ const firebaseConfig = {
 
 // Validate required Firebase config
 if (!firebaseConfig.apiKey || !firebaseConfig.authDomain) {
-  console.warn('Firebase configuration is incomplete. Some features may not work properly.');
+  devWarn('Firebase configuration is incomplete. Some features may not work properly.');
 }
 
 // Initialize Firebase app (shared instance for all services)
@@ -25,7 +26,7 @@ let analytics = null;
 try {
   analytics = getAnalytics(app);
 } catch (error) {
-  console.debug('Firebase Analytics not available:', error);
+  devWarn('Firebase Analytics not available:', error);
 }
 
 export { analytics };

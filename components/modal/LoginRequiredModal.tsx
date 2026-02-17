@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Typography, Button } from 'antd';
 import { message } from '@/utils/antd';
-
+import { devLog, devError } from '@/utils/devLogger';
 import { useSelector, useDispatch } from 'react-redux';
 import GoogleLoginButton from '@/components/button/GoogleLoginButton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,13 +48,13 @@ const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ onLoginSuccess,
 
   const handleLoginSuccess = async () => {
     if (!user?.uid) {
-      console.error('[LoginRequiredModal] Missing user after login');
+      devError('[LoginRequiredModal] Missing user after login');
       dispatch(setShowLoginRequiredModal(false));
       return;
     }
 
     try {
-      console.log('[LoginRequiredModal] Login successful, clearing guest session...');
+      devLog('[LoginRequiredModal] Login successful, clearing guest session...');
 
       // Clear guest session (IndexedDB + Redux)
       await clearGuestSession();
@@ -72,13 +72,13 @@ const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ onLoginSuccess,
       // Call success callback
       onLoginSuccess?.();
     } catch (error) {
-      console.error('[LoginRequiredModal] Failed to clear guest session:', error);
+      devError('[LoginRequiredModal] Failed to clear guest session:', error);
       message.error('Login successful, but failed to clear guest data.');
     }
   };
 
   const handleLoginError = (error: string) => {
-    console.error('[LoginRequiredModal] Login error:', error);
+    devError('[LoginRequiredModal] Login error:', error);
     message.error('Login failed. Please try again.');
   };
 
@@ -159,11 +159,7 @@ const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ onLoginSuccess,
 
         {/* Login Button */}
         <div className="w-full">
-          <GoogleLoginButton
-            onSuccess={handleLoginSuccess}
-            onError={handleLoginError}
-            fullWidth
-          />
+          <GoogleLoginButton onSuccess={handleLoginSuccess} onError={handleLoginError} fullWidth />
         </div>
 
         {/* Cancel Button */}

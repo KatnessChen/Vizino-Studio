@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Typography } from 'antd';
+import { devWarn } from '@/utils/devLogger';
 import { imageCache } from '@/utils/imageCache';
 import { imageDownloadUrlToBase64 } from '@/utils';
 import { cardHeight } from '@/components/layout/AsideSection';
@@ -118,7 +119,7 @@ const SelectedAssets: React.FC<SelectedAssetsProps> = ({
         if (base64) setPreviewBase64(base64);
         else setPreviewBase64(null); // Fallback to URL in render
       } catch (error) {
-        console.warn('Failed to load asset preview:', error);
+        devWarn('Failed to load asset preview:', error);
         setPreviewBase64(null);
       }
     };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'antd';
 import { GoogleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { devLog, devError } from '@/utils/devLogger';
 import { signInWithGoogle } from '@/services/authService';
 
 interface GoogleLoginButtonProps {
@@ -30,13 +31,13 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       if (result.success && result.user) {
         // Popup authentication succeeded, user data is available
-        console.log('User signed in');
+        devLog('User signed in');
         onSuccess?.(result.user);
         setLoading(false);
       } else if (result.success && 'isRedirecting' in result && result.isRedirecting) {
         // Redirect authentication initiated (Safari or popup blocked)
         // Page will reload, so we keep the loading state
-        console.log('Redirecting to Google sign-in page...');
+        devLog('Redirecting to Google sign-in page...');
         // Don't set loading to false - page will redirect
       } else if (!result.success) {
         // Authentication failed
@@ -50,7 +51,7 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in with Google';
       onError?.(errorMessage);
-      console.error('Login error:', error);
+      devError('Login error:', error);
       setLoading(false);
     }
   };

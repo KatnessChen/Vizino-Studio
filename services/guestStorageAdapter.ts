@@ -5,11 +5,9 @@
  * Stores data locally in IndexedDB (no backend storage).
  */
 
-import {
-  StorageAdapter,
-  CreateImageParams,
-} from './storageAdapter';
+import { StorageAdapter, CreateImageParams } from './storageAdapter';
 import { ImageData, Color, Texture, Item, CustomPrompt } from '@/types';
+import { devLog, devError } from '@/utils/devLogger';
 import { guestIndexedDB } from '@/utils/guestIndexedDB';
 import { Timestamp } from 'firebase/firestore';
 import { ASSET_IMAGE } from '@/constants/constants';
@@ -33,7 +31,7 @@ export class GuestStorageAdapter implements StorageAdapter {
     const { operation, parentImage, base64, base64MimeType } = processingInfo || {};
 
     try {
-      console.log('[GuestAdapter] Creating image locally...');
+      devLog('[GuestAdapter] Creating image locally...');
 
       // Validate that we have base64 data (required for local storage)
       if (!base64 || !base64MimeType) {
@@ -82,10 +80,10 @@ export class GuestStorageAdapter implements StorageAdapter {
       // Save to IndexedDB with base64 data
       await guestIndexedDB.saveImage(newImageData, base64);
 
-      console.log('[GuestAdapter] Image saved locally:', newImageData.id);
+      devLog('[GuestAdapter] Image saved locally:', newImageData.id);
       return newImageData;
     } catch (error) {
-      console.error('[GuestAdapter] Failed to create image:', error);
+      devError('[GuestAdapter] Failed to create image:', error);
       throw error instanceof Error
         ? new Error(`Failed to create guest image: ${error.message}`)
         : new Error('Failed to create guest image.');
@@ -100,10 +98,10 @@ export class GuestStorageAdapter implements StorageAdapter {
         .filter((image) => !image.isDeleted)
         .sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
 
-      console.log('[GuestAdapter] Fetched', images.length, 'images from IndexedDB');
+      devLog('[GuestAdapter] Fetched', images.length, 'images from IndexedDB');
       return images;
     } catch (error) {
-      console.error('[GuestAdapter] Failed to fetch images:', error);
+      devError('[GuestAdapter] Failed to fetch images:', error);
       return [];
     }
   }

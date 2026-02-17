@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from 'antd';
 import { LogoutOutlined, LoadingOutlined } from '@ant-design/icons';
 import { signOutUser } from '@/services/authService';
+import { devError } from '@/utils/devLogger';
 
 interface LogoutButtonProps {
   onSuccess?: () => void;
@@ -29,7 +30,7 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onSuccess, onError, disable
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
       onError?.(errorMessage);
-      console.error('Logout error:', error);
+      devError('Logout error:', error);
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { ref, getBytes, FirebaseStorage } from 'firebase/storage';
+import { devError } from '@/utils/devLogger';
 import { ImageData } from '@/types';
 
 /**
@@ -55,7 +56,7 @@ export const getBase64FromImageData = async (storage: FirebaseStorage, imageData
 
     return await blobToBase64(blob);
   } catch (error) {
-    console.error(`Failed to fetch image from Storage path: ${storageFilePath}`, error);
+    devError(`Failed to fetch image from Storage path: ${storageFilePath}`, error);
     throw new Error(
       `Failed to fetch image from Storage: ${error instanceof Error ? error.message : String(error)}`
     );

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { ImageData, Color, Asset } from '@/types';
 import { ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
+import { devLog, devWarn, devError } from '@/utils/devLogger';
 import {
   generateRecoloredImage,
   generateRetexturedImage,
@@ -192,7 +193,7 @@ export const useImageProcessing = ({
               await incrementTaskUsage(userId, 'thinking_mode', byOwnKey);
             }
           } catch (error) {
-            console.error('Failed to increment task usage:', error);
+            devError('Failed to increment task usage:', error);
             // Don't block the user flow if usage tracking fails
           }
         }
@@ -203,13 +204,13 @@ export const useImageProcessing = ({
       } catch (error: unknown) {
         // Check if error is due to abort
         if ((error instanceof Error && error.name === 'AbortError') || signal.aborted) {
-          console.log('Request was cancelled by user');
+          devLog('Request was cancelled by user');
           setIsProcessingImage(false);
           abortControllerRef.current = null;
           return null;
         }
 
-        console.error('Processing failed:', error);
+        devError('Processing failed:', error);
         const msg = error instanceof Error ? error.message : String(error);
         let displayMessage = `Processing failed: ${msg}.`;
 
@@ -220,7 +221,7 @@ export const useImageProcessing = ({
             apiError = JSON.parse(jsonStringMatch[0]);
           }
         } catch (e) {
-          console.warn('Failed to parse error message as JSON:', e);
+          devWarn('Failed to parse error message as JSON:', e);
         }
 
         if (apiError && typeof apiError === 'object' && 'error' in apiError) {

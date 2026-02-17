@@ -1,16 +1,7 @@
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  Timestamp,
-} from 'firebase/firestore';
-import {
-  getStorage,
-  ref,
-  uploadString,
-  getDownloadURL,
-} from 'firebase/storage';
+import { getFirestore, collection, addDoc, Timestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { app } from '@/config/firebaseConfig';
+import { devLog, devError } from '@/utils/devLogger';
 import { withTracking } from './analyticsService';
 
 const db = getFirestore(app);
@@ -20,20 +11,23 @@ const storage = getStorage(app);
  * Optional data for feedback analysis
  */
 export interface FeedbackOptions {
-  sourceColorHex?: string;      // Original color hex (for recolor tasks)
-  generatedColorHex?: string;   // Generated color hex (for color adjustment)
-  prompt?: string;              // Custom prompt used
-  selectedColor?: {             // Selected color asset info
+  sourceColorHex?: string; // Original color hex (for recolor tasks)
+  generatedColorHex?: string; // Generated color hex (for color adjustment)
+  prompt?: string; // Custom prompt used
+  selectedColor?: {
+    // Selected color asset info
     id: string;
     name: string;
     hex: string;
   };
-  selectedTexture?: {           // Selected texture asset info
+  selectedTexture?: {
+    // Selected texture asset info
     id: string;
     name: string;
     textureImageDownloadUrl: string;
   };
-  selectedItem?: {              // Selected item asset info
+  selectedItem?: {
+    // Selected item asset info
     id: string;
     name: string;
     itemImageDownloadUrl: string;
@@ -43,20 +37,20 @@ export interface FeedbackOptions {
 /**
  * Simplified feedback data structure for Firestore
  * Only includes essential fields to minimize database storage
- * 
+ *
  * Note: For image-based tasks (recolor_wall, add_texture, etc.), both image URLs are required.
  *       For color adjustment tasks, image URLs are optional and color info is in options.
  */
 export interface FeedbackData {
-  sourceImageDownloadUrl?: string;    // Original source image URL (optional for color tasks)
+  sourceImageDownloadUrl?: string; // Original source image URL (optional for color tasks)
   generatedImageDownloadUrl?: string; // Generated result image URL (optional for color tasks)
-  taskName: string;                   // e.g. 'recolor_wall', 'add_texture', 'color_adjustment'
-  isSaved: boolean;                   // true if user saved, false if rejected
-  rate: number;                       // 0: bad, 1: good
-  comments: string;                   // User feedback comments
-  createdAt?: Timestamp;              // Set automatically by service
-  userId: string;                     // User ID or guest session ID
-  options?: FeedbackOptions;          // Optional analysis data (required for color tasks)
+  taskName: string; // e.g. 'recolor_wall', 'add_texture', 'color_adjustment'
+  isSaved: boolean; // true if user saved, false if rejected
+  rate: number; // 0: bad, 1: good
+  comments: string; // User feedback comments
+  createdAt?: Timestamp; // Set automatically by service
+  userId: string; // User ID or guest session ID
+  options?: FeedbackOptions; // Optional analysis data (required for color tasks)
 }
 
 /**
@@ -65,17 +59,18 @@ export interface FeedbackData {
  */
 function cleanOptions(options?: FeedbackOptions): FeedbackOptions | undefined {
   if (!options) return undefined;
-  
-  const cleaned: any = {};
-  
+
+  const cleaned: Partial<FeedbackOptions> = {};
+
   // Only add fields that are not undefined
   if (options.sourceColorHex !== undefined) cleaned.sourceColorHex = options.sourceColorHex;
-  if (options.generatedColorHex !== undefined) cleaned.generatedColorHex = options.generatedColorHex;
+  if (options.generatedColorHex !== undefined)
+    cleaned.generatedColorHex = options.generatedColorHex;
   if (options.prompt !== undefined) cleaned.prompt = options.prompt;
   if (options.selectedColor !== undefined) cleaned.selectedColor = options.selectedColor;
   if (options.selectedTexture !== undefined) cleaned.selectedTexture = options.selectedTexture;
   if (options.selectedItem !== undefined) cleaned.selectedItem = options.selectedItem;
-  
+
   // Return undefined if no fields were added
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
@@ -88,17 +83,17 @@ export async function saveFeedback(data: FeedbackData): Promise<string> {
   return withTracking('feedback_save', async () => {
     try {
       const feedbackRef = collection(db, 'feedbacks');
-      
+
       // Save only the essential fields
-      const feedbackDoc: any = {
+      const feedbackDoc: Record<string, unknown> = {
         taskName: data.taskName,
         isSaved: data.isSaved,
         rate: data.rate,
         comments: data.comments || '',
         createdAt: Timestamp.now(),
         userId: data.userId,
-      };
-      
+      }; 
+
       // Add image URLs if provided (not present for color adjustment tasks)
       if (data.sourceImageDownloadUrl) {
         feedbackDoc.sourceImageDownloadUrl = data.sourceImageDownloadUrl;
@@ -106,18 +101,18 @@ export async function saveFeedback(data: FeedbackData): Promise<string> {
       if (data.generatedImageDownloadUrl) {
         feedbackDoc.generatedImageDownloadUrl = data.generatedImageDownloadUrl;
       }
-      
+
       // Add options if provided (for analysis), cleaned of undefined values
       const cleanedOptions = cleanOptions(data.options);
       if (cleanedOptions) {
         feedbackDoc.options = cleanedOptions;
       }
-      
+
       const docRef = await addDoc(feedbackRef, feedbackDoc);
-      console.log('Feedback saved with ID:', docRef.id);
+      devLog('Feedback saved with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
-      console.error('Error saving feedback:', error);
+      devError('Error saving feedback:', error);
       // We don't want to block the user flow if feedback fails, so we just log it
       return '';
     }
@@ -128,7 +123,7 @@ export async function saveFeedback(data: FeedbackData): Promise<string> {
  * Uploads a rejected/discarded generated image to 'discarded_images' storage.
  * This is only used for images that the user rejected (bad rating).
  * For saved images (good rating), we use the already-uploaded image URL from the gallery.
- * 
+ *
  * @param base64 The base64 string of the image (without data prefix preferred, or handle both)
  * @param mimeType The mime type of the image
  * @param userId The user ID (used in filename for tracking, not folder structure)
@@ -164,10 +159,10 @@ export async function uploadFeedbackImage(
       });
 
       const downloadUrl = await getDownloadURL(storageRef);
-      console.log('Discarded feedback image uploaded:', downloadUrl);
+      devLog('Discarded feedback image uploaded:', downloadUrl);
       return downloadUrl;
     } catch (error) {
-      console.error('Error uploading discarded feedback image:', error);
+      devError('Error uploading discarded feedback image:', error);
       throw error;
     }
   });

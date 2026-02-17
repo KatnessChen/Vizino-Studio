@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { devWarn, devLog } from '@/utils/devLogger';
 
 /**
  * Analytics Service using PostHog
@@ -10,7 +11,7 @@ const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.
 
 export const initPostHog = () => {
   if (!POSTHOG_KEY) {
-    console.warn('PostHog API Key not found. Analytics will be disabled.');
+    devWarn('PostHog API Key not found. Analytics will be disabled.');
     return;
   }
 
@@ -32,7 +33,7 @@ export const initPostHog = () => {
     persistence: 'localStorage', // Persist user identity across sessions
   });
 
-  console.log('[Analytics] PostHog initialized');
+  devLog('[Analytics] PostHog initialized');
 };
 
 /**

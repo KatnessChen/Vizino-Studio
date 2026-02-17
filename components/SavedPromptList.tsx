@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Input, Modal, Skeleton } from 'antd';
 import { message } from '@/utils/antd';
+import { devError } from '@/utils/devLogger';
 import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
 import { ContentCopy as CopyIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import MyEmpty from '@/components/ui/MyEmpty';
@@ -58,7 +59,7 @@ const SavedPromptList: React.FC<SavedPromptListProps> = ({
             await onDeletePrompt(promptId);
             message.success('Prompt deleted successfully');
           } catch (error) {
-            console.error('Failed to delete prompt:', error);
+            devError('Failed to delete prompt:', error);
             message.error('Failed to delete prompt');
           } finally {
             setIsDeletingPrompt(false);

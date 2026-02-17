@@ -27,6 +27,7 @@ import GenerationHistoryModal from './modal/GenerationHistoryModal';
 import BatchUploadModal from './modal/BatchUploadModal';
 import ImagesComparingButton from './button/ImagesComparingButton';
 import { Card, Button, Tooltip, Segmented } from 'antd';
+import { devError, devWarn } from '@/utils/devLogger';
 import { BarsOutlined, AppstoreOutlined, LockOutlined } from '@ant-design/icons';
 import MyEmpty from '@/components/ui/MyEmpty';
 import {
@@ -439,7 +440,7 @@ const Gallery: React.FC<GalleryProps> = ({
           description,
         });
       } catch (error) {
-        console.error('Failed to upload file:', file.name, error);
+        devError('Failed to upload file:', file.name, error);
         onUploadError?.(`Failed to upload ${file.name}`);
         throw error; // Stop on first error
       }
@@ -563,7 +564,7 @@ const Gallery: React.FC<GalleryProps> = ({
                     fn();
                     return;
                   } catch (err) {
-                    console.warn('onUploadImage handler threw when invoked without args:', err);
+                    devWarn('onUploadImage handler threw when invoked without args:', err);
                   }
                 }
               }

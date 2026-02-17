@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { devLog, devError } from '@/utils/devLogger';
 import { useAuth } from './AuthContext';
 import {
   initializeGuestSession,
@@ -63,7 +64,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!guestSessionId || isAuthenticated) return;
 
       try {
-        console.log('[GuestContext] Loading guest images from IndexedDB...');
+        devLog('[GuestContext] Loading guest images from IndexedDB...');
         const entries = await guestIndexedDB.getImages();
         const images = entries.map((entry) => entry.imageData);
         dispatch(setGuestImages(images));
@@ -74,9 +75,9 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           dispatch(setHasGeneratedImage(true));
         }
 
-        console.log('[GuestContext] Loaded', images.length, 'guest images from IndexedDB');
+        devLog('[GuestContext] Loaded', images.length, 'guest images from IndexedDB');
       } catch (error) {
-        console.error('[GuestContext] Failed to load guest images:', error);
+        devError('[GuestContext] Failed to load guest images:', error);
       }
     };
 
@@ -86,7 +87,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Clear guest state when user logs in
   useEffect(() => {
     if (isAuthenticated && guestSessionId) {
-      console.log('[GuestContext] User authenticated, clearing guest session');
+      devLog('[GuestContext] User authenticated, clearing guest session');
     }
   }, [isAuthenticated, guestSessionId]);
 
@@ -97,13 +98,13 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const clearGuestSession = async () => {
     // Clear Redux state
     dispatch(clearGuestState());
-    
+
     // Clear IndexedDB
     try {
       await guestIndexedDB.clearAll();
-      console.log('[GuestContext] Guest IndexedDB cleared');
+      devLog('[GuestContext] Guest IndexedDB cleared');
     } catch (error) {
-      console.error('[GuestContext] Failed to clear guest IndexedDB:', error);
+      devError('[GuestContext] Failed to clear guest IndexedDB:', error);
     }
   };
 

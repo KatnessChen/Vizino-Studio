@@ -1,5 +1,6 @@
 import { CREDIT_MULTIPLIERS, DEFAULT_CREDIT_LIMIT } from '@/constants/constants';
 import { GeminiTaskName } from '@/services/gemini/geminiTasks';
+import { devWarn } from '@/utils/devLogger';
 
 /**
  * Usage data from Firestore user document
@@ -38,7 +39,7 @@ export const normalizeUsage = (usage?: UsageData): UsageData => {
     ) {
       normalized[k] = v as { onVPoints: number; onOwnKey: number };
     } else if (v) {
-      console.warn(`[creditUtils] Skipping corrupted usage entry for "${k}":`, v);
+      devWarn(`[creditUtils] Skipping corrupted usage entry for "${k}":`, v);
     }
   }
 

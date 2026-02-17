@@ -3,6 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firestoreService';
 import { onAuthChange } from '@/services/authService';
 import { getAdminSettings, setAdminSettings, AdminSettings } from '@/utils/storageUtils';
+import { devError } from '@/utils/devLogger';
 import { User } from '@/types';
 import { initializeUsage } from '@/services/userService';
 import { identifyUser, resetAnalytics } from '@/services/analyticsService';
@@ -51,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 apiKey: userData.apiKey,
                 credit_limit: userData.credit_limit,
               } as User);
-              
+
               // Identify user in PostHog
               identifyUser(authUser.uid, {
                 email: authUser.email,
@@ -78,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(false);
           },
           (error) => {
-            console.error('Error fetching user data:', error);
+            devError('Error fetching user data:', error);
             setIsLoading(false);
           }
         );

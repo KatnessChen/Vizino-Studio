@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Input, Button } from 'antd';
 import { Color } from '@/types';
+import { devError } from '@/utils/devLogger';
 import {
   MAX_CUSTOM_ASSET_NAME_LENGTH,
   MAX_CUSTOM_ASSET_DESCRIPTION_LENGTH,
@@ -128,12 +129,12 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd }) =
         hex: normalizedHex,
         assetType: ASSET_COLOR,
         description: description.trim() || '',
-      };  
+      };
 
       await onAdd(newColor);
       handleReset();
     } catch (err) {
-      console.error('Failed to add color:', err);
+      devError('Failed to add color:', err);
     } finally {
       setIsAdding(false);
     }

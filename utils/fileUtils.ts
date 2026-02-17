@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { devLog } from '@/utils/devLogger';
 import { imageCache } from './imageCache';
 
 /**
@@ -34,12 +35,12 @@ async function imageDownloadUrlToBase64(imageDownloadUrl: string): Promise<strin
   // Check cache first (memory + IndexedDB)
   const cached = await imageCache.get(imageDownloadUrl);
   if (cached) {
-    console.log('[imageDownloadUrlToBase64] Retrieved from cache:', imageDownloadUrl);
+    devLog('[imageDownloadUrlToBase64] Retrieved from cache:', imageDownloadUrl);
     return cached;
   }
 
   try {
-    console.log('[imageDownloadUrlToBase64] Fetching and converting:', imageDownloadUrl);
+    devLog('[imageDownloadUrlToBase64] Fetching and converting:', imageDownloadUrl);
     const response = await fetch(imageDownloadUrl, {
       mode: 'cors',
       credentials: 'omit',
@@ -60,7 +61,7 @@ async function imageDownloadUrlToBase64(imageDownloadUrl: string): Promise<strin
 
         // Store in cache
         await imageCache.set(imageDownloadUrl, base64, mimeType);
-        console.log('[imageDownloadUrlToBase64] Stored in cache');
+        devLog('[imageDownloadUrlToBase64] Stored in cache');
 
         resolve(base64);
       };

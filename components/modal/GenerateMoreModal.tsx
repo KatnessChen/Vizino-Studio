@@ -1,4 +1,12 @@
-import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle, lazy, Suspense } from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  lazy,
+} from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch } from 'antd';
 import { message } from '@/utils/antd';
@@ -59,7 +67,7 @@ import {
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
-import { devLog, devWarn, devError, devLogContext } from '@/utils/devLogger';
+import { devWarn, devError, devLog, devLogContext } from '@/utils/devLogger';
 const ConfirmImageUpdateModal = lazy(() => import('./ConfirmImageUpdateModal'));
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE, MAX_CUSTOM_PROMPT_LENGTH } from '@/constants/constants';
@@ -1034,9 +1042,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                       // Find the saved image URL from the fetched images
                       const savedImage = images.find((img) => img.id === tempImageId);
                       if (!savedImage?.imageDownloadUrl) {
-                        console.warn(
-                          '[GenerateMoreModal] Could not find saved image URL for feedback'
-                        );
+                        devWarn('[GenerateMoreModal] Could not find saved image URL for feedback');
                         return;
                       }
 
@@ -1074,7 +1080,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                             : undefined,
                         },
                       });
-                      console.log(
+                      devLog(
                         '[GenerateMoreModal] Feedback submitted successfully (authenticated)!'
                       );
                     } catch (e) {
@@ -1142,9 +1148,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     // For guest users, use the data URL as the saved image URL
                     const savedImageUrl = guestImageData.imageDownloadUrl;
 
-                    console.log(
-                      '[GenerateMoreModal] Submitting feedback for saved image (guest)...'
-                    );
+                    devLog('[GenerateMoreModal] Submitting feedback for saved image (guest)...');
                     await saveFeedback({
                       sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
                       generatedImageDownloadUrl: savedImageUrl,

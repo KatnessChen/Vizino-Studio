@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getUser } from '@/services/userService';
+import { devWarn, devError } from '@/utils/devLogger';
 import { User } from '@/types';
 import {
   calculateTotalCredits,
@@ -16,11 +17,11 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 const isValidUsageData = (usage: unknown): usage is UsageData => {
   if (!usage) {
-    console.warn('[useCreditCheck] Usage data is falsy');
+    devWarn('[useCreditCheck] Usage data is falsy');
     return false;
   }
   if (typeof usage !== 'object') {
-    console.warn('[useCreditCheck] Usage data is not an object:', typeof usage);
+    devWarn('[useCreditCheck] Usage data is not an object:', typeof usage);
     return false;
   }
 
@@ -37,11 +38,10 @@ const isValidUsageData = (usage: unknown): usage is UsageData => {
   });
 
   if (!hasValidEntry) {
-    console.warn('[useCreditCheck] Usage data has no valid entries');
+    devWarn('[useCreditCheck] Usage data has no valid entries');
   }
   return hasValidEntry;
 };
-
 
 interface UseCreditCheckResult {
   /** Whether user data is being loaded */
@@ -74,7 +74,11 @@ interface UseCreditCheckResult {
  * Hook to check user's V points credit status
  * Fetches user data and provides credit-related information
  */
-export const useCreditCheck = ({ userId }: { userId: string | undefined }): UseCreditCheckResult => {
+export const useCreditCheck = ({
+  userId,
+}: {
+  userId: string | undefined;
+}): UseCreditCheckResult => {
   const { adminSettings } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState<User | null>(null);
@@ -91,7 +95,7 @@ export const useCreditCheck = ({ userId }: { userId: string | undefined }): UseC
       const user = await getUser(userId);
       setUserData(user);
     } catch (error) {
-      console.error('[useCreditCheck] Failed to fetch user data:', error);
+      devError('[useCreditCheck] Failed to fetch user data:', error);
     } finally {
       setIsLoading(false);
     }

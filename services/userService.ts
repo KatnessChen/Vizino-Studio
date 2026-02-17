@@ -2,6 +2,7 @@ import { doc, setDoc, getDoc, serverTimestamp, DocumentData } from 'firebase/fir
 import { db } from './firestoreService';
 import { User } from '@/types';
 import { GEMINI_TASKS, GeminiTaskName } from './gemini/geminiTasks';
+import { devLog, devWarn, devError } from '@/utils/devLogger';
 import { withTracking } from './analyticsService';
 
 /**
@@ -60,16 +61,18 @@ export const createOrUpdateUser = async (userData: {
       const updates: Record<string, unknown> = {
         lastLoginAt: serverTimestamp(),
       };
-      
+
       // If credit_limit doesn't exist, set it to DEFAULT_CREDIT_LIMIT
       if (existingData.credit_limit === undefined) {
         const { DEFAULT_CREDIT_LIMIT } = await import('@/constants/constants');
         updates.credit_limit = DEFAULT_CREDIT_LIMIT;
-        console.log(`Initializing credit_limit for existing user ${userData.uid}: ${DEFAULT_CREDIT_LIMIT}`);
+        devLog(
+          `Initializing credit_limit for existing user ${userData.uid}: ${DEFAULT_CREDIT_LIMIT}`
+        );
       }
-      
+
       await setDoc(userRef, updates, { merge: true });
-      console.log('User updated:', userData.uid);
+      devLog('User updated:', userData.uid);
     } else {
       // New user, create document with initial data including credit_limit
       const { DEFAULT_CREDIT_LIMIT } = await import('@/constants/constants');
@@ -82,7 +85,7 @@ export const createOrUpdateUser = async (userData: {
         credit_limit: DEFAULT_CREDIT_LIMIT,
         lastLoginAt: serverTimestamp(),
       });
-      console.log(`New user created: ${userData.uid} with credit_limit: ${DEFAULT_CREDIT_LIMIT}`);
+      devLog(`New user created: ${userData.uid} with credit_limit: ${DEFAULT_CREDIT_LIMIT}`);
     }
   });
 };
@@ -115,34 +118,38 @@ export const incrementTaskUsage = async (
   usageKey: GeminiTaskName,
   byOwnKey: boolean = false
 ): Promise<void> => {
-  return withTracking('firestore_increment_task_usage', async () => {
-    const userRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userRef);
+  return withTracking(
+    'firestore_increment_task_usage',
+    async () => {
+      const userRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userRef);
 
-    if (userDoc.exists()) {
-      const currentUsage = userDoc.data().usage || initializeUsage();
-      const trackingKey = byOwnKey ? 'onOwnKey' : 'onVPoints';
+      if (userDoc.exists()) {
+        const currentUsage = userDoc.data().usage || initializeUsage();
+        const trackingKey = byOwnKey ? 'onOwnKey' : 'onVPoints';
 
-      const newUsage = {
-        ...currentUsage,
-        [usageKey]: {
-          ...(currentUsage[usageKey] || { onVPoints: 0, onOwnKey: 0 }),
-          [trackingKey]: (currentUsage[usageKey]?.[trackingKey] || 0) + 1,
-        },
-      };
+        const newUsage = {
+          ...currentUsage,
+          [usageKey]: {
+            ...(currentUsage[usageKey] || { onVPoints: 0, onOwnKey: 0 }),
+            [trackingKey]: (currentUsage[usageKey]?.[trackingKey] || 0) + 1,
+          },
+        };
 
-      await setDoc(
-        userRef,
-        {
-          usage: newUsage,
-        },
-        { merge: true }
-      );
-      console.log(`Usage incremented: ${usageKey} (${byOwnKey ? 'own key' : 'V Points'})`);
-    } else {
-      console.warn('User not found, cannot increment usage');
-    }
-  }, { usageKey, byOwnKey });
+        await setDoc(
+          userRef,
+          {
+            usage: newUsage,
+          },
+          { merge: true }
+        );
+        devLog(`Usage incremented: ${usageKey} (${byOwnKey ? 'own key' : 'V Points'})`);
+      } else {
+        devWarn('User not found, cannot increment usage');
+      }
+    },
+    { usageKey, byOwnKey }
+  );
 };
 
 /**
@@ -151,20 +158,24 @@ export const incrementTaskUsage = async (
  * @param isActive - New active status
  */
 export const toggleUserAiKeyStatus = async (uid: string, isActive: boolean): Promise<void> => {
-  return withTracking('firestore_toggle_user_ai_key_status', async () => {
-    const userRef = doc(db, 'users', uid);
+  return withTracking(
+    'firestore_toggle_user_ai_key_status',
+    async () => {
+      const userRef = doc(db, 'users', uid);
 
-    await setDoc(
-      userRef,
-      {
-        apiKey: {
-          isActive,
+      await setDoc(
+        userRef,
+        {
+          apiKey: {
+            isActive,
+          },
         },
-      },
-      { merge: true }
-    );
-    console.log(`User API Key status updated for: ${uid}, Active: ${isActive}`);
-  }, { isActive });
+        { merge: true }
+      );
+      devLog(`User API Key status updated for: ${uid}, Active: ${isActive}`);
+    },
+    { isActive }
+  );
 };
 
 /**
@@ -177,7 +188,7 @@ export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
-      console.warn('User not found, cannot fix usage data');
+      devWarn('User not found, cannot fix usage data');
       return;
     }
 
@@ -196,7 +207,7 @@ export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
       ) {
         fixedUsage[k] = v;
       } else if (v) {
-        console.log(`[fixCorruptedUsageData] Removing corrupted entry: ${k}`, v);
+        devLog(`[fixCorruptedUsageData] Removing corrupted entry: ${k}`, v);
       }
     }
 
@@ -214,7 +225,7 @@ export const fixCorruptedUsageData = async (uid: string): Promise<void> => {
       },
       { merge: true }
     );
-    console.log(`[fixCorruptedUsageData] Usage data fixed for: ${uid}`);
+    devLog(`[fixCorruptedUsageData] Usage data fixed for: ${uid}`);
   });
 };
 
@@ -254,7 +265,7 @@ const encryptKey = (apiKey: string): string => {
     // 2. Base64 encode to ensure safe string storage
     return btoa(xored);
   } catch (e) {
-    console.error('Encryption failed:', e);
+    devError('Encryption failed:', e);
     return '';
   }
 };
@@ -274,14 +285,14 @@ const decryptKey = (encryptedKey: string): string => {
     // eslint-disable-next-line no-control-regex
     const sanitized = decrypted.replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
     if (sanitized.length !== decrypted.trim().length) {
-      console.warn(
+      devWarn(
         '[UserService] Decrypted API key contained control characters.',
         `Original length: ${decrypted.length}, Sanitized: ${sanitized.length}`
       );
     }
     return sanitized;
   } catch (e) {
-    console.error('Decryption failed:', e);
+    devError('Decryption failed:', e);
     return '';
   }
 };
@@ -294,26 +305,30 @@ export const updateUserAiKey = async (
   apiKey: string,
   isActive: boolean
 ): Promise<void> => {
-  return withTracking('firestore_update_user_ai_key', async () => {
-    const userRef = doc(db, 'users', uid);
+  return withTracking(
+    'firestore_update_user_ai_key',
+    async () => {
+      const userRef = doc(db, 'users', uid);
 
-    // Trim the key and encrypt before saving
-    // If apiKey is empty strings (removing), we store empty string
-    const trimmedKey = apiKey.trim();
-    const encryptedKey = trimmedKey ? encryptKey(trimmedKey) : '';
+      // Trim the key and encrypt before saving
+      // If apiKey is empty strings (removing), we store empty string
+      const trimmedKey = apiKey.trim();
+      const encryptedKey = trimmedKey ? encryptKey(trimmedKey) : '';
 
-    await setDoc(
-      userRef,
-      {
-        apiKey: {
-          geminiKey: encryptedKey,
-          isActive,
+      await setDoc(
+        userRef,
+        {
+          apiKey: {
+            geminiKey: encryptedKey,
+            isActive,
+          },
         },
-      },
-      { merge: true }
-    );
-    console.log(`User API Key updated for: ${uid}, Active: ${isActive}`);
-  }, { isActive });
+        { merge: true }
+      );
+      devLog(`User API Key updated for: ${uid}, Active: ${isActive}`);
+    },
+    { isActive }
+  );
 };
 
 /**

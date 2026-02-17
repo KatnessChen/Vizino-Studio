@@ -5,6 +5,7 @@ import { Typography, Breadcrumb, Dropdown, Button, Modal, Alert, Input } from 'a
 import { PlusOutlined, DownOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
 import { Box, Skeleton } from '@mui/material';
+import { devError } from '@/utils/devLogger';
 import GenericConfirmModal from '../modal/GenericConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
@@ -159,7 +160,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
           dispatch(setCustomColors({ projectId, colors }));
           dispatch(setCustomTextures({ projectId, textures }));
         } catch (error) {
-          console.error('Failed to load custom assets:', error);
+          devError('Failed to load custom assets:', error);
           dispatch(
             setLoadColorsError({
               projectId,
@@ -229,7 +230,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
               navigate('/');
             }
           } catch (error) {
-            console.error('Error deleting project:', error);
+            devError('Error deleting project:', error);
           } finally {
             setConfirmModal({ ...confirmModal, isOpen: false });
           }
@@ -265,7 +266,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
               }
             }
           } catch (error) {
-            console.error('Error deleting space:', error);
+            devError('Error deleting space:', error);
           } finally {
             setConfirmModal({ ...confirmModal, isOpen: false });
           }
@@ -353,7 +354,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error in modal submission:', error);
+      devError('Error in modal submission:', error);
     } finally {
       setModalInput('');
       setModalMode(null);
@@ -566,10 +567,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             {/* Guest Mode Badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
               <span className="text-sm">💫</span>
-              <span className="text-indigo-700 font-bold text-xs uppercase">
-
-                Guest Mode
-              </span>
+              <span className="text-indigo-700 font-bold text-xs uppercase">Guest Mode</span>
             </div>
 
             {/* Take a Tour Button - Only show if guest hasn't generated any images yet */}

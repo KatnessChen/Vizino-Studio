@@ -1,3 +1,5 @@
+import { devError } from '@/utils/devLogger';
+
 /**
  * Admin Settings stored in localStorage
  */
@@ -25,7 +27,7 @@ export const getAdminSettings = (): AdminSettings => {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
     }
   } catch (error) {
-    console.error('Failed to load admin settings from localStorage:', error);
+    devError('Failed to load admin settings from localStorage:', error);
   }
   return DEFAULT_SETTINGS;
 };
@@ -37,6 +39,6 @@ export const setAdminSettings = (settings: AdminSettings): void => {
   try {
     localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(settings));
   } catch (error) {
-    console.error('Failed to save admin settings to localStorage:', error);
+    devError('Failed to save admin settings to localStorage:', error);
   }
 };

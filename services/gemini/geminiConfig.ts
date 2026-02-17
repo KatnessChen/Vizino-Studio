@@ -7,6 +7,7 @@
 // https://ai.google.dev/gemini-api/docs/models
 
 import { GoogleGenAI } from '@google/genai';
+import { devLog, devWarn } from '@/utils/devLogger';
 
 export const FAST_TEXT_MODEL = 'gemini-2.5-flash-lite';
 
@@ -40,12 +41,12 @@ export const getGeminiClient = (() => {
       const keyToUse = apiKey || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || '';
 
       if (!keyToUse) {
-        console.warn('[GeminiConfig] API Key not found.');
+        devWarn('[GeminiConfig] API Key not found.');
       }
 
       instance = new GoogleGenAI({ apiKey: keyToUse });
       currentKey = apiKey || null; // Track if we are using a custom key
-      console.log(`[GeminiConfig] Client initialized with ${apiKey ? 'custom' : 'default'} key.`);
+      devLog(`[GeminiConfig] Client initialized with ${apiKey ? 'custom' : 'default'} key.`);
     }
     return instance;
   };

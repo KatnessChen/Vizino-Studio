@@ -1,5 +1,6 @@
 import { indexedDBService, type CacheEntry } from '@/services/indexedDBService';
 import { imageDownloadUrlToBase64 } from '@/utils';
+import { devWarn } from '@/utils/devLogger';
 import { ImageData } from '@/types';
 
 /**
@@ -41,7 +42,7 @@ class ImageCache {
         return entry.base64;
       }
     } catch (error) {
-      console.warn('[Cache] IndexedDB read failed:', error);
+      devWarn('[Cache] IndexedDB read failed:', error);
     }
 
     return null;
@@ -70,7 +71,7 @@ class ImageCache {
     try {
       await indexedDBService.set(cacheKey, entry);
     } catch (error) {
-      console.warn('[Cache] IndexedDB write failed:', error);
+      devWarn('[Cache] IndexedDB write failed:', error);
     }
   }
 
@@ -135,10 +136,10 @@ export async function cacheImageBase64s(images: ImageData[]): Promise<void> {
           // Cache completed
         })
         .catch((error) => {
-          console.warn(`[Cache] Failed to cache image ${image.id}:`, error);
+          devWarn(`[Cache] Failed to cache image ${image.id}:`, error);
         });
     } catch (error) {
-      console.warn(`[Cache] Error caching image ${image.id}:`, error);
+      devWarn(`[Cache] Error caching image ${image.id}:`, error);
     }
   }
 }

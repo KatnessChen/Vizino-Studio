@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
+import { devWarn } from '@/utils/devLogger';
 import { formatTimestamp } from '@/utils';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
 import { storage } from '@/services/firestoreService';
@@ -57,7 +58,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
           setCachedImageSrc(`data:${image.mimeType};base64,${base64}`);
         }
       } catch (error) {
-        console.warn('[ImageDisplayModal] Failed to load cached image:', error);
+        devWarn('[ImageDisplayModal] Failed to load cached image:', error);
       }
     };
 
@@ -98,7 +99,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
 
         setFileSizeMB(null);
       } catch (err) {
-        console.warn('[ImageDisplayModal] Failed to determine file size:', err);
+        devWarn('[ImageDisplayModal] Failed to determine file size:', err);
         setFileSizeMB(null);
       }
     };

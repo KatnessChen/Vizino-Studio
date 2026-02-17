@@ -12,6 +12,7 @@ import {
   Tooltip,
   Modal,
 } from 'antd';
+import { devError } from '@/utils/devLogger';
 import {
   ArrowLeftOutlined,
   ExportOutlined,
@@ -66,7 +67,7 @@ const UserProfilePage: React.FC = () => {
       setPromoCode('');
       await refresh(); // Refresh user data to show updated credit_limit
     } catch (error) {
-      console.error('Failed to redeem promotion code:', error);
+      devError('Failed to redeem promotion code:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to redeem promotion code';
       message.error(errorMessage);
@@ -344,7 +345,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
       setApiKeyInput('');
       message.success('API Key saved');
     } catch (error) {
-      console.error(error);
+      devError(error);
       message.error('Failed to save API Key');
     } finally {
       setLoading(false);
@@ -363,7 +364,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
           await updateUserAiKey(user.uid, '', false);
           message.success('API Key removed');
         } catch (error) {
-          console.error(error);
+          devError(error);
           message.error('Failed to remove API Key');
         } finally {
           setLoading(false);
@@ -377,7 +378,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
     try {
       await toggleUserAiKeyStatus(user.uid, checked);
     } catch (error) {
-      console.error(error);
+      devError(error);
       message.error('Failed to update');
     } finally {
       setLoading(false);
@@ -405,7 +406,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
       await navigator.clipboard.writeText(decrypted);
       message.success('API key copied to clipboard');
     } catch (err) {
-      console.error('Failed to copy API key:', err);
+      devError('Failed to copy API key:', err);
       message.error('Failed to copy API key');
     }
   };

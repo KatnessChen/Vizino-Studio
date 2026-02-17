@@ -17,23 +17,21 @@ import {
 import { GEMINI_ERRORS } from './geminiApiErrors';
 import { storage } from '../firestoreService';
 import { fetchImageAsBase64, getBase64FromImageData } from '@/utils';
+import { devWarn, devError, devLog } from '@/utils/devLogger';
 import { withTracking } from '../analyticsService';
-import {
-  mockProcessImageWithTask,
-  mockGenerateOptimizedPrompt,
-} from './mockGeminiService';
+import { mockProcessImageWithTask, mockGenerateOptimizedPrompt } from './mockGeminiService';
 
 // Helper function to check if we should use mock Gemini
 // Mock is ONLY used in development mode when explicitly enabled
 const shouldUseMockGemini = (): boolean => {
   const mode = import.meta.env.MODE; // 'development', 'production', or 'preview'
   const useMock = import.meta.env.VITE_USE_MOCK_GEMINI === 'true';
-  
+
   // Never use mock in production or preview
   if (mode === 'production' || mode === 'preview') {
     return false;
   }
-  
+
   // In development, respect the env variable
   return useMock;
 };
@@ -389,114 +387,118 @@ export const generateOptimizedPrompt = async (
 ): Promise<string> => {
   // Use mock service if enabled
   if (shouldUseMockGemini()) {
-    console.log('[MOCK MODE] Using mock prompt optimization');
+    devLog('[MOCK MODE] Using mock prompt optimization');
     return mockGenerateOptimizedPrompt(task, userPrompt, imageBase64, imageMimeType, signal);
   }
-  
-  return withTracking('gemini_optimize_prompt', async () => {
-    const ai = getGeminiClient();
 
-  // Get task-aware thinking prompt with context
-  const thinkingPrompt = getThinkingPromptForTask(task, userPrompt, additionalContext);
+  return withTracking(
+    'gemini_optimize_prompt',
+    async () => {
+      const ai = getGeminiClient();
 
-  // Check for early abort
-  if (signal?.aborted) {
-    const abortErr = new Error('Request aborted');
-    abortErr.name = 'AbortError';
-    throw abortErr;
-  }
+      // Get task-aware thinking prompt with context
+      const thinkingPrompt = getThinkingPromptForTask(task, userPrompt, additionalContext);
 
-  try {
-    // Build parts array - main image first
-    const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: imageMimeType,
-        },
-      },
-    ];
-
-    // Add texture image if provided (for ADD_TEXTURE task)
-    if (additionalContext?.textureImage) {
-      parts.push({
-        inlineData: {
-          data: additionalContext.textureImage.base64,
-          mimeType: additionalContext.textureImage.mimeType,
-        },
-      });
-    }
-
-    // Add item image if provided (for ADD_HOME_ITEM task)
-    if (additionalContext?.itemImage) {
-      parts.push({
-        inlineData: {
-          data: additionalContext.itemImage.base64,
-          mimeType: additionalContext.itemImage.mimeType,
-        },
-      });
-    }
-
-    // Add the thinking prompt as the last part
-    parts.push({ text: thinkingPrompt });
-
-    const generateParams = {
-      model: GEMINI_TASKS.OPTIMIZE_PROMPT.model_code,
-      contents: {
-        parts,
-      },
-      config: {
-        responseModalities: [Modality.TEXT],
-        temperature: (task as { temperature?: number }).temperature ?? 0.4,
-      },
-      signal,
-    };
-
-    const result = await ai.models.generateContent(
-      generateParams as unknown as Parameters<typeof ai.models.generateContent>[0]
-    );
-
-    let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (optimizedPrompt) {
-      // Clean up any markdown formatting
-      optimizedPrompt = optimizedPrompt.replace(/```(?:json|text|markdown)?\n?|\n?```/g, '');
-
-      // Remove common prefixes
-      optimizedPrompt = optimizedPrompt.replace(
-        /^(Here is|Here's|Here are|The optimized|Optimized|Prompt:)\s*/i,
-        ''
-      );
-
-      // Remove surrounding quotes if present
-      optimizedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
-
-      optimizedPrompt = optimizedPrompt.trim();
-
-      // Enforce character limit
-      if (optimizedPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
-        console.warn(
-          `[Gemini] Optimized prompt exceeded ${MAX_CUSTOM_PROMPT_LENGTH} chars (${optimizedPrompt.length}), truncating...`
-        );
-        optimizedPrompt = optimizedPrompt.substring(0, MAX_CUSTOM_PROMPT_LENGTH).trim();
+      // Check for early abort
+      if (signal?.aborted) {
+        const abortErr = new Error('Request aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
       }
 
-      console.log('[Gemini] Generated Optimized Prompt:', optimizedPrompt);
-      return optimizedPrompt;
-    }
+      try {
+        // Build parts array - main image first
+        const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [
+          {
+            inlineData: {
+              data: imageBase64,
+              mimeType: imageMimeType,
+            },
+          },
+        ];
 
-    // Return original prompt if optimization failed
-    return userPrompt;
-  } catch (error) {
-    // Propagate abort errors
-    if (error && (error as Error).name === 'AbortError') {
-      throw error;
-    }
-    console.warn('[Gemini] Prompt optimization failed:', error);
-    // Fall back to original prompt on error
-    return userPrompt;
-    }
-  }, { task: task.task_name });
+        // Add texture image if provided (for ADD_TEXTURE task)
+        if (additionalContext?.textureImage) {
+          parts.push({
+            inlineData: {
+              data: additionalContext.textureImage.base64,
+              mimeType: additionalContext.textureImage.mimeType,
+            },
+          });
+        }
+
+        // Add item image if provided (for ADD_HOME_ITEM task)
+        if (additionalContext?.itemImage) {
+          parts.push({
+            inlineData: {
+              data: additionalContext.itemImage.base64,
+              mimeType: additionalContext.itemImage.mimeType,
+            },
+          });
+        }
+
+        // Add the thinking prompt as the last part
+        parts.push({ text: thinkingPrompt });
+
+        const generateParams = {
+          model: GEMINI_TASKS.OPTIMIZE_PROMPT.model_code,
+          contents: {
+            parts,
+          },
+          config: {
+            responseModalities: [Modality.TEXT],
+            temperature: (task as { temperature?: number }).temperature ?? 0.4,
+          },
+          signal,
+        };
+
+        const result = await ai.models.generateContent(
+          generateParams as unknown as Parameters<typeof ai.models.generateContent>[0]
+        );
+
+        let optimizedPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (optimizedPrompt) {
+          // Clean up any markdown formatting
+          optimizedPrompt = optimizedPrompt.replace(/```(?:json|text|markdown)?\n?|\n?```/g, '');
+
+          // Remove common prefixes
+          optimizedPrompt = optimizedPrompt.replace(
+            /^(Here is|Here's|Here are|The optimized|Optimized|Prompt:)\s*/i,
+            ''
+          );
+
+          // Remove surrounding quotes if present
+          optimizedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
+
+          optimizedPrompt = optimizedPrompt.trim();
+
+          // Enforce character limit
+          if (optimizedPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+            devWarn(
+              `[Gemini] Optimized prompt exceeded ${MAX_CUSTOM_PROMPT_LENGTH} chars (${optimizedPrompt.length}), truncating...`
+            );
+            optimizedPrompt = optimizedPrompt.substring(0, MAX_CUSTOM_PROMPT_LENGTH).trim();
+          }
+
+          devLog('[Gemini] Generated Optimized Prompt:', optimizedPrompt);
+          return optimizedPrompt;
+        }
+
+        // Return original prompt if optimization failed
+        return userPrompt;
+      } catch (error) {
+        // Propagate abort errors
+        if (error && (error as Error).name === 'AbortError') {
+          throw error;
+        }
+        devWarn('[Gemini] Prompt optimization failed:', error);
+        // Fall back to original prompt on error
+        return userPrompt;
+      }
+    },
+    { task: task.task_name }
+  );
 };
 
 export const generateRecoloredImage = async (
@@ -692,7 +694,7 @@ export const generateNameSuggestion = async (
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
     return text?.trim();
   } catch (e) {
-    console.warn('[Gemini] Failed to generate name suggestion:', e);
+    devWarn('[Gemini] Failed to generate name suggestion:', e);
     return undefined;
   }
 };
@@ -733,207 +735,216 @@ export const processImageWithTask = async (
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
   // Use mock service if enabled (only in development)
   if (shouldUseMockGemini()) {
-    console.log('[MOCK MODE] Using mock Gemini service');
+    devLog('[MOCK MODE] Using mock Gemini service');
     return mockProcessImageWithTask(task, image, options);
   }
-  
-  return withTracking(`gemini_generate_${task.task_name}`, async () => {
-    const ai = getGeminiClient();
 
-    const prompt = getPromptByTask(task, options);
+  return withTracking(
+    `gemini_generate_${task.task_name}`,
+    async () => {
+      const ai = getGeminiClient();
 
-  // Note: optimizePromptWithThinking is no longer called here.
-  // Prompt optimization is now handled separately via generateOptimizedPrompt.
-  // Magic tasks use the default MAGIC_PROMPT or user-provided prompt directly.
+      const prompt = getPromptByTask(task, options);
 
-  // Priority: options.modelOverride > task.model_code > FAST_IMAGE_MODEL
-  // modelOverride is used when Thinking Mode is enabled to switch to PRO_IMAGE_MODEL
-  const model = options.modelOverride || task.model_code || FAST_IMAGE_MODEL;
+      // Note: optimizePromptWithThinking is no longer called here.
+      // Prompt optimization is now handled separately via generateOptimizedPrompt.
+      // Magic tasks use the default MAGIC_PROMPT or user-provided prompt directly.
 
-  try {
-    // Build parts array
-    const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [];
+      // Priority: options.modelOverride > task.model_code > FAST_IMAGE_MODEL
+      // modelOverride is used when Thinking Mode is enabled to switch to PRO_IMAGE_MODEL
+      const model = options.modelOverride || task.model_code || FAST_IMAGE_MODEL;
 
-    // For ADD_TEXTURE task, texture image comes first
-    if (task.task_name === GEMINI_TASKS.ADD_TEXTURE.task_name && options.textureImage) {
-      parts.push({
-        inlineData: {
-          data: options.textureImage.base64String,
-          mimeType: options.textureImage.mimeType,
-        },
-      });
-    }
+      try {
+        // Build parts array
+        const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [];
 
-    // For ADD_HOME_ITEM task, item image comes first
-    if (task.task_name === GEMINI_TASKS.ADD_HOME_ITEM.task_name && options.itemImage) {
-      parts.push({
-        inlineData: {
-          data: options.itemImage.base64String,
-          mimeType: options.itemImage.mimeType,
-        },
-      });
-    }
+        // For ADD_TEXTURE task, texture image comes first
+        if (task.task_name === GEMINI_TASKS.ADD_TEXTURE.task_name && options.textureImage) {
+          parts.push({
+            inlineData: {
+              data: options.textureImage.base64String,
+              mimeType: options.textureImage.mimeType,
+            },
+          });
+        }
 
-    // Add the main image
-    parts.push({
-      inlineData: {
-        data: image.base64String,
-        mimeType: image.mimeType,
-      },
-    });
+        // For ADD_HOME_ITEM task, item image comes first
+        if (task.task_name === GEMINI_TASKS.ADD_HOME_ITEM.task_name && options.itemImage) {
+          parts.push({
+            inlineData: {
+              data: options.itemImage.base64String,
+              mimeType: options.itemImage.mimeType,
+            },
+          });
+        }
 
-    // Add the prompt text
-    parts.push({ text: prompt + '\n' + prompt }); // Improve the ai response by repeating the prompt
+        // Add the main image
+        parts.push({
+          inlineData: {
+            data: image.base64String,
+            mimeType: image.mimeType,
+          },
+        });
 
-    // If the caller provided an AbortSignal and it's already aborted, throw early
-    if (options.signal && options.signal.aborted) {
-      const abortErr = new Error('Request aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
+        // Add the prompt text
+        parts.push({ text: prompt + '\n' + prompt }); // Improve the ai response by repeating the prompt
 
-    // Pass AbortSignal to the underlying request if supported by the SDK. Also race with the signal
-    // to ensure we respond quickly to aborts even if the SDK doesn't forward the signal.
-    // Build request params; avoid passing unknown properties directly to typed SDK call
-    const generateParams = {
-      model,
-      contents: {
-        parts,
-      },
-      config: {
-        responseModalities: options.responseModalities || [Modality.IMAGE],
-        // Temperature is configured in geminiTask definition
-        temperature: (task as { temperature?: number }).temperature ?? 1.0,
-        aspectRatio: options.aspectRatio, // Pass converted aspect ratio (e.g., '16:9')
-        imageSize: '2K', // Enforce 2K resolution as requested
-      },
-      signal: options.signal,
-    } as const;
-
-    const generatePromise = ai.models.generateContent(generateParams);
-
-    let response: GenerateContentResponse;
-    let abortHandler: (() => void) | null = null;
-
-    if (options.signal) {
-      // Race the generate promise with a promise that rejects when signal aborts
-      const abortPromise = new Promise<never>((_, reject) => {
-        abortHandler = () => {
+        // If the caller provided an AbortSignal and it's already aborted, throw early
+        if (options.signal && options.signal.aborted) {
           const abortErr = new Error('Request aborted');
           abortErr.name = 'AbortError';
-          reject(abortErr);
-        };
-        options.signal!.addEventListener('abort', abortHandler!);
-      });
+          throw abortErr;
+        }
 
-      try {
-        response = await Promise.race([generatePromise, abortPromise]);
-      } finally {
-        // Clean up event listener to avoid leaks
-        if (abortHandler) {
+        // Pass AbortSignal to the underlying request if supported by the SDK. Also race with the signal
+        // to ensure we respond quickly to aborts even if the SDK doesn't forward the signal.
+        // Build request params; avoid passing unknown properties directly to typed SDK call
+        const generateParams = {
+          model,
+          contents: {
+            parts,
+          },
+          config: {
+            responseModalities: options.responseModalities || [Modality.IMAGE],
+            // Temperature is configured in geminiTask definition
+            temperature: (task as { temperature?: number }).temperature ?? 1.0,
+            aspectRatio: options.aspectRatio, // Pass converted aspect ratio (e.g., '16:9')
+            imageSize: '2K', // Enforce 2K resolution as requested
+          },
+          signal: options.signal,
+        } as const;
+
+        const generatePromise = ai.models.generateContent(generateParams);
+
+        let response: GenerateContentResponse;
+        let abortHandler: (() => void) | null = null;
+
+        if (options.signal) {
+          // Race the generate promise with a promise that rejects when signal aborts
+          const abortPromise = new Promise<never>((_, reject) => {
+            abortHandler = () => {
+              const abortErr = new Error('Request aborted');
+              abortErr.name = 'AbortError';
+              reject(abortErr);
+            };
+            options.signal!.addEventListener('abort', abortHandler!);
+          });
+
           try {
-            options.signal!.removeEventListener('abort', abortHandler);
-          } catch {
-            // ignore
+            response = await Promise.race([generatePromise, abortPromise]);
+          } finally {
+            // Clean up event listener to avoid leaks
+            if (abortHandler) {
+              try {
+                options.signal!.removeEventListener('abort', abortHandler);
+              } catch {
+                // ignore
+              }
+            }
+          }
+        } else {
+          response = await generatePromise;
+        }
+
+        // If signal was aborted after response arrived, treat as aborted and ignore result
+        if (options.signal && options.signal.aborted) {
+          const abortErr = new Error('Request aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+
+        // Check if request was blocked by safety filters or other reasons
+        // Reference: https://ai.google.dev/docs/safety_ratings
+        if (response.promptFeedback?.blockReason) {
+          const blockReason = response.promptFeedback.blockReason;
+          const errorMessage = GEMINI_ERRORS.BLOCKED_BY_SAFETY_POLICY(blockReason);
+          throw new Error(errorMessage);
+        }
+
+        const candidates = response.candidates?.[0]?.content?.parts || [];
+
+        // Find Image Part
+        const generatedImagePart = candidates.find((p) => p.inlineData);
+
+        // Find Text Part (for Name suggestion)
+        const generatedTextPart = candidates.find((p) => p.text);
+        let suggestedName: string | undefined;
+
+        if (generatedTextPart && generatedTextPart.text) {
+          try {
+            const cleanJson = generatedTextPart.text.replace(/```json\n?|\n?```/g, '').trim();
+            // Try to find JSON object pattern
+            const match =
+              cleanJson.match(/\{.*"name":\s*".*"\s*.*\}/s) || cleanJson.match(/\{.*\}/s);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              suggestedName = parsed.name;
+            }
+          } catch (e) {
+            devWarn('[Gemini] Failed to parse JSON name from text part:', e);
           }
         }
-      }
-    } else {
-      response = await generatePromise;
-    }
 
-    // If signal was aborted after response arrived, treat as aborted and ignore result
-    if (options.signal && options.signal.aborted) {
-      const abortErr = new Error('Request aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
-
-    // Check if request was blocked by safety filters or other reasons
-    // Reference: https://ai.google.dev/docs/safety_ratings
-    if (response.promptFeedback?.blockReason) {
-      const blockReason = response.promptFeedback.blockReason;
-      const errorMessage = GEMINI_ERRORS.BLOCKED_BY_SAFETY_POLICY(blockReason);
-      throw new Error(errorMessage);
-    }
-
-    const candidates = response.candidates?.[0]?.content?.parts || [];
-
-    // Find Image Part
-    const generatedImagePart = candidates.find((p) => p.inlineData);
-
-    // Find Text Part (for Name suggestion)
-    const generatedTextPart = candidates.find((p) => p.text);
-    let suggestedName: string | undefined;
-
-    if (generatedTextPart && generatedTextPart.text) {
-      try {
-        const cleanJson = generatedTextPart.text.replace(/```json\n?|\n?```/g, '').trim();
-        // Try to find JSON object pattern
-        const match = cleanJson.match(/\{.*"name":\s*".*"\s*.*\}/s) || cleanJson.match(/\{.*\}/s);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          suggestedName = parsed.name;
+        if (!generatedImagePart || !generatedImagePart.inlineData) {
+          // If we have text but no image, the model might have refused or failed.
+          const textContent = candidates
+            .map((p) => p.text)
+            .filter(Boolean)
+            .join('\n');
+          if (textContent) {
+            devWarn('[Gemini] Received text only (no image):', textContent);
+            throw new Error(`Gemini refused to generate image: ${textContent.slice(0, 200)}...`);
+          }
+          throw new Error(GEMINI_ERRORS.NO_IMAGE_DATA_RECEIVED);
         }
-      } catch (e) {
-        console.warn('[Gemini] Failed to parse JSON name from text part:', e);
+
+        const newImageBase64: string = generatedImagePart.inlineData.data ?? '';
+        const newImageMimeType: string = generatedImagePart.inlineData.mimeType ?? 'image/png';
+
+        if (!newImageBase64) {
+          const textContent = candidates
+            .map((p) => p.text)
+            .filter(Boolean)
+            .join('\n');
+          if (textContent) {
+            throw new Error(
+              `Received empty image data. Model text: ${textContent.slice(0, 200)}...`
+            );
+          }
+          throw new Error(GEMINI_ERRORS.NO_BASE64_DATA_RECEIVED);
+        }
+
+        return {
+          base64: newImageBase64,
+          mimeType: newImageMimeType,
+          name: suggestedName,
+        };
+      } catch (error) {
+        // Propagate aborts so callers can distinguish cancellation
+        if (error && (error as Error).name === 'AbortError') {
+          devWarn('Gemini request aborted by signal');
+          const abortErr = new Error('Request aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+
+        if (options.signal && options.signal.aborted) {
+          devWarn('Gemini request aborted by provided signal');
+          const abortErr = new Error('Request aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+
+        devError('Error processing image with Gemini API:', error);
+        throw new Error(
+          GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(
+            error instanceof Error ? error.message : String(error)
+          )
+        );
       }
-    }
-
-    if (!generatedImagePart || !generatedImagePart.inlineData) {
-      // If we have text but no image, the model might have refused or failed.
-      const textContent = candidates
-        .map((p) => p.text)
-        .filter(Boolean)
-        .join('\n');
-      if (textContent) {
-        console.warn('[Gemini] Received text only (no image):', textContent);
-        throw new Error(`Gemini refused to generate image: ${textContent.slice(0, 200)}...`);
-      }
-      throw new Error(GEMINI_ERRORS.NO_IMAGE_DATA_RECEIVED);
-    }
-
-    const newImageBase64: string = generatedImagePart.inlineData.data ?? '';
-    const newImageMimeType: string = generatedImagePart.inlineData.mimeType ?? 'image/png';
-
-    if (!newImageBase64) {
-      const textContent = candidates
-        .map((p) => p.text)
-        .filter(Boolean)
-        .join('\n');
-      if (textContent) {
-        throw new Error(`Received empty image data. Model text: ${textContent.slice(0, 200)}...`);
-      }
-      throw new Error(GEMINI_ERRORS.NO_BASE64_DATA_RECEIVED);
-    }
-
-    return {
-      base64: newImageBase64,
-      mimeType: newImageMimeType,
-      name: suggestedName,
-    };
-  } catch (error) {
-    // Propagate aborts so callers can distinguish cancellation
-    if (error && (error as Error).name === 'AbortError') {
-      console.warn('Gemini request aborted by signal');
-      const abortErr = new Error('Request aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
-
-    if (options.signal && options.signal.aborted) {
-      console.warn('Gemini request aborted by provided signal');
-      const abortErr = new Error('Request aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
-
-    console.error('Error processing image with Gemini API:', error);
-    throw new Error(
-      GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
-    );
-    }
-  }, { task: task.task_name, model_code: task.model_code });
+    },
+    { task: task.task_name, model_code: task.model_code }
+  );
 };
 
 /**
@@ -968,7 +979,7 @@ export const processColorAdjustment = async (
     // Extract text from response
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    console.log('[Gemini] Color Adjustment Response:', responseText);
+    devLog('[Gemini] Color Adjustment Response:', responseText);
 
     // Parse JSON from response
     let newHex = '';
@@ -980,7 +991,7 @@ export const processColorAdjustment = async (
       newHex = data.hex;
       suggestedName = data.name;
     } catch (e) {
-      console.warn('[Gemini] Failed to parse JSON, trying regex match', e);
+      devWarn('[Gemini] Failed to parse JSON, trying regex match', e);
       // Fallback regex for #RRGGBB
       const match = responseText.match(/#[0-9A-Fa-f]{6}/);
       if (match) newHex = match[0];
@@ -1002,7 +1013,7 @@ export const processColorAdjustment = async (
       name: suggestedName,
     };
   } catch (error) {
-    console.error('Error processing color adjustment:', error);
+    devError('Error processing color adjustment:', error);
     throw new Error(
       GEMINI_ERRORS.FAILED_TO_PROCESS_IMAGE(error instanceof Error ? error.message : String(error))
     );
