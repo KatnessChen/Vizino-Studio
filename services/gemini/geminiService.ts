@@ -18,6 +18,25 @@ import { GEMINI_ERRORS } from './geminiApiErrors';
 import { storage } from '../firestoreService';
 import { fetchImageAsBase64, getBase64FromImageData } from '@/utils';
 import { withTracking } from '../analyticsService';
+import {
+  mockProcessImageWithTask,
+  mockGenerateOptimizedPrompt,
+} from './mockGeminiService';
+
+// Helper function to check if we should use mock Gemini
+// Mock is ONLY used in development mode when explicitly enabled
+const shouldUseMockGemini = (): boolean => {
+  const mode = import.meta.env.MODE; // 'development', 'production', or 'preview'
+  const useMock = import.meta.env.VITE_USE_MOCK_GEMINI === 'true';
+  
+  // Never use mock in production or preview
+  if (mode === 'production' || mode === 'preview') {
+    return false;
+  }
+  
+  // In development, respect the env variable
+  return useMock;
+};
 
 /**
  * Helper to convert numeric aspect ratio to Gemini-friendly string
@@ -368,6 +387,12 @@ export const generateOptimizedPrompt = async (
   signal?: AbortSignal,
   additionalContext?: OptimizePromptContext
 ): Promise<string> => {
+  // Use mock service if enabled
+  if (shouldUseMockGemini()) {
+    console.log('[MOCK MODE] Using mock prompt optimization');
+    return mockGenerateOptimizedPrompt(task, userPrompt, imageBase64, imageMimeType, signal);
+  }
+  
   return withTracking('gemini_optimize_prompt', async () => {
     const ai = getGeminiClient();
 
@@ -706,6 +731,12 @@ export const processImageWithTask = async (
     modelOverride?: string;
   } = {}
 ): Promise<{ base64: string; mimeType: string; hex?: string; name?: string }> => {
+  // Use mock service if enabled (only in development)
+  if (shouldUseMockGemini()) {
+    console.log('[MOCK MODE] Using mock Gemini service');
+    return mockProcessImageWithTask(task, image, options);
+  }
+  
   return withTracking(`gemini_generate_${task.task_name}`, async () => {
     const ai = getGeminiClient();
 
