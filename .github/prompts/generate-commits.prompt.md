@@ -337,7 +337,7 @@ Before staging:
 - ✅ Ensure no merge conflicts
 - ✅ Verify all files compile (TypeScript)
 - ✅ Check for console errors
-- ✅ Confirm no debug code or console.logs
+- ✅ Confirm no debug code or devLogs
 
 ## Example Usage
 

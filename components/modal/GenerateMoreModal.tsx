@@ -1,17 +1,14 @@
-import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import {
-  Modal,
-  Button,
-  Input,
-  Alert,
-  Tooltip,
-  Drawer,
-  Typography,
-  Skeleton,
-  Tabs,
-  Switch,
-} from 'antd';
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  lazy,
+} from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch } from 'antd';
 import { message } from '@/utils/antd';
 
 import {
@@ -25,10 +22,10 @@ import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/mat
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import VPointsIcon from '@/components/icons/VPointsIcon';
-import MyEmpty from '@/components/ui/MyEmpty';
+import SavedPromptList from '@/components/SavedPromptList';
 import { Timestamp } from 'firebase/firestore';
 import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM, ASSET_IMAGE } from '@/constants/constants';
-import { ImageData, ImageOperation, CustomPrompt } from '@/types';
+import { ImageData, ImageOperation } from '@/types';
 import { Color, Texture, Item } from '@/types';
 import {
   getRecolorTaskDefaultPrompt,
@@ -57,6 +54,8 @@ import {
   addImageOptimistic,
   removeImageOptimistic,
 } from '@/stores/projectStore';
+import { saveFeedback } from '@/services/feedbackService';
+
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';
 import {
@@ -68,7 +67,8 @@ import {
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
-import ConfirmImageUpdateModal from './ConfirmImageUpdateModal';
+import { devWarn, devError, devLog, devLogContext } from '@/utils/devLogger';
+const ConfirmImageUpdateModal = lazy(() => import('./ConfirmImageUpdateModal'));
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE, MAX_CUSTOM_PROMPT_LENGTH } from '@/constants/constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,9 +147,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         ? (selectedAssetRaw as Item)
         : null;
 
-    const { addAsset: addColor } = useCustomAssets(ASSET_COLOR, activeProjectId);
-    const { addAsset: addTextureToStore } = useCustomAssets(ASSET_TEXTURE, activeProjectId);
-    const { addAsset: addItemToStore } = useCustomAssets(ASSET_ITEM, activeProjectId);
+    const { addAsset: addColor } = useCustomAssets(ASSET_COLOR, activeProjectId || '');
+    const { addAsset: addTextureToStore } = useCustomAssets(ASSET_TEXTURE, activeProjectId || '');
+    const { addAsset: addItemToStore } = useCustomAssets(ASSET_ITEM, activeProjectId || '');
 
     const [validationError, setValidationError] = useState<string | null>(null);
     const [customPrompt, setCustomPrompt] = useState<string>('');
@@ -167,8 +167,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
     const [activePromptTab, setActivePromptTab] = useState<'magic' | 'saved'>('saved');
     const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
     const [thinkingMode, setThinkingMode] = useState(false);
-
-    const { Text } = Typography;
 
     // Generate shimmer layer configurations dynamically
     const shimmerLayers = useMemo(() => {
@@ -230,6 +228,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       prompts,
       isLoading: isLoadingPrompts,
       fetchPrompts,
+      deletePrompt,
     } = useCustomPrompts({
       userId,
       projectId: activeProjectId || '',
@@ -249,23 +248,20 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           taskName: GEMINI_TASKS.REMOVE_CLUTTER.task_name,
           label: GEMINI_TASKS.REMOVE_CLUTTER.label_name,
         },
+        {
+          taskName: GEMINI_TASKS.BRIGHTEN_SPACE.task_name,
+          label: GEMINI_TASKS.BRIGHTEN_SPACE.label_name,
+        },
+        {
+          taskName: GEMINI_TASKS.INDUSTRIAL_STYLE.task_name,
+          label: GEMINI_TASKS.INDUSTRIAL_STYLE.label_name,
+        },
+        { taskName: GEMINI_TASKS.LOFT_STYLE.task_name, label: GEMINI_TASKS.LOFT_STYLE.label_name },
       ],
       []
     );
 
     // Filter prompts based on search keyword using %match% logic
-    const filteredPrompts = useMemo(() => {
-      if (!searchPrompts.trim()) {
-        return prompts;
-      }
-
-      const keyword = searchPrompts.toLowerCase();
-      return prompts.filter(
-        (prompt) =>
-          prompt.task_name.toLowerCase().includes(keyword) ||
-          prompt.content.toLowerCase().includes(keyword)
-      );
-    }, [prompts, searchPrompts]);
 
     // Determine the active task from selectedTaskNames (assuming single task)
     const activeTaskName = useMemo(() => {
@@ -467,7 +463,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         return;
       }
 
-      console.log('[GenerateMoreModal] Starting image processing with:', {
+      devLogContext('[GenerateMoreModal] Starting image processing with:', {
         userId,
         // Use optional chaining safely
         sourceId: 'id' in effectiveSource ? effectiveSource.id : 'unknown',
@@ -482,7 +478,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       const result = await processImage(effectiveSource, customPrompt.trim() || undefined);
 
       if (result) {
-        console.log('[GenerateMoreModal] Processing successful, result:', {
+        devLogContext('[GenerateMoreModal] Processing successful, result:', {
           hasMimeType: !!result.mimeType,
           hasBase64: !!result.base64,
           base64Length: result.base64?.length || 0,
@@ -498,11 +494,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
               try {
                 await fetchPrompts();
               } catch (fetchErr) {
-                console.warn('Failed to refresh prompts after saving:', fetchErr);
+                devWarn('Failed to refresh prompts after saving:', fetchErr);
               }
               message.success('Prompt saved');
             } catch (saveErr) {
-              console.warn('Failed to save custom prompt on generate:', saveErr);
+              devWarn('Failed to save custom prompt on generate:', saveErr);
             }
           })();
         }
@@ -542,19 +538,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         triggerGenerate: handleGenerate,
       }),
       [handleGenerate]
-    );
-
-    const handlePickHistoricalCustomPrompt = useCallback(
-      (e: React.MouseEvent, customPrompt: string) => {
-        e.stopPropagation();
-        setCustomPrompt(customPrompt);
-        // Only switch task to CUSTOM_PROMPT if the current task is already CUSTOM_PROMPT
-        if (activeTaskName === GEMINI_TASKS.CUSTOM_PROMPT.task_name) {
-          dispatch(setSelectedTaskNames([GEMINI_TASKS.CUSTOM_PROMPT.task_name]));
-        }
-        message.success('Prompt applied!');
-      },
-      [dispatch, activeTaskName]
     );
 
     const handlePickMagicPrompt = useCallback(
@@ -718,7 +701,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         setCustomPrompt(optimizedPrompt);
         message.success('Prompt optimized!');
       } catch (error) {
-        console.error('[GenerateMoreModal] Help me write failed:', error);
+        devError('[GenerateMoreModal] Help me write failed:', error);
         message.error('Failed to optimize prompt. Please try again.');
       } finally {
         setIsOptimizingPrompt(false);
@@ -762,7 +745,8 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       async (
         imageData: { base64: string; mimeType: string; hex?: string },
         customName: string,
-        description?: string
+        description?: string,
+        feedbackData?: { rating: 0 | 1; comment: string }
       ) => {
         // Use edited description from modal, or fall back to current customPrompt
         const finalDescription = description !== undefined ? description : customPrompt;
@@ -918,7 +902,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             onSuccess();
             return;
           } catch (error) {
-            console.error('Failed to save asset:', error);
+            devError('Failed to save asset:', error);
             setErrorMessage('Failed to save asset.');
             setIsSavingImage(false);
             setShowConfirmationModal(true);
@@ -1049,8 +1033,65 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                   images,
                 })
               );
+
+              // Submit feedback if provided (for authenticated users)
+              if (feedbackData) {
+                setTimeout(() => {
+                  const submitFeedback = async () => {
+                    try {
+                      // Find the saved image URL from the fetched images
+                      const savedImage = images.find((img) => img.id === tempImageId);
+                      if (!savedImage?.imageDownloadUrl) {
+                        devWarn('[GenerateMoreModal] Could not find saved image URL for feedback');
+                        return;
+                      }
+
+                      devLogContext('[GenerateMoreModal] Submitting feedback for saved image...');
+                      await saveFeedback({
+                        sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
+                        generatedImageDownloadUrl: savedImage.imageDownloadUrl,
+                        taskName: activeTaskName || 'unknown',
+                        isSaved: true,
+                        rate: feedbackData.rating,
+                        comments: feedbackData.comment,
+                        userId: userId || 'unknown',
+                        options: {
+                          prompt: finalDescription,
+                          selectedColor: selectedColor
+                            ? {
+                                id: selectedColor.id,
+                                name: selectedColor.name,
+                                hex: selectedColor.hex,
+                              }
+                            : undefined,
+                          selectedTexture: selectedTexture
+                            ? {
+                                id: selectedTexture.id,
+                                name: selectedTexture.name,
+                                textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                              }
+                            : undefined,
+                          selectedItem: selectedItem
+                            ? {
+                                id: selectedItem.id,
+                                name: selectedItem.name,
+                                itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                              }
+                            : undefined,
+                        },
+                      });
+                      devLog(
+                        '[GenerateMoreModal] Feedback submitted successfully (authenticated)!'
+                      );
+                    } catch (e) {
+                      devError('[GenerateMoreModal] Failed to submit feedback:', e);
+                    }
+                  };
+                  void submitFeedback();
+                }, 100);
+              }
             } catch (saveError) {
-              console.error('Failed to save processed image:', saveError);
+              devError('Failed to save processed image:', saveError);
               // Rollback optimistic update on error
               dispatch(
                 removeImageOptimistic({
@@ -1099,6 +1140,57 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             // Mark that guest has saved a generated image (triggers login requirement for future generations)
             markImageGenerated();
 
+            // Submit feedback if provided (for guest users)
+            if (feedbackData) {
+              setTimeout(() => {
+                const submitFeedback = async () => {
+                  try {
+                    // For guest users, use the data URL as the saved image URL
+                    const savedImageUrl = guestImageData.imageDownloadUrl;
+
+                    devLog('[GenerateMoreModal] Submitting feedback for saved image (guest)...');
+                    await saveFeedback({
+                      sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
+                      generatedImageDownloadUrl: savedImageUrl,
+                      taskName: activeTaskName || 'unknown',
+                      isSaved: true,
+                      rate: feedbackData.rating,
+                      comments: feedbackData.comment,
+                      userId: guestSessionId || 'guest',
+                      options: {
+                        prompt: finalDescription,
+                        selectedColor: selectedColor
+                          ? {
+                              id: selectedColor.id,
+                              name: selectedColor.name,
+                              hex: selectedColor.hex,
+                            }
+                          : undefined,
+                        selectedTexture: selectedTexture
+                          ? {
+                              id: selectedTexture.id,
+                              name: selectedTexture.name,
+                              textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                            }
+                          : undefined,
+                        selectedItem: selectedItem
+                          ? {
+                              id: selectedItem.id,
+                              name: selectedItem.name,
+                              itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                            }
+                          : undefined,
+                      },
+                    });
+                    devLogContext('[GenerateMoreModal] Feedback submitted successfully (guest)!');
+                  } catch (e) {
+                    devError('[GenerateMoreModal] Failed to submit feedback (guest):', e);
+                  }
+                };
+                void submitFeedback();
+              }, 100);
+            }
+
             // Reset state
             setCustomPrompt('');
             setGeneratedImage(null);
@@ -1108,10 +1200,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
             dispatch(setSourceImage(null));
 
             message.success('Image saved successfully!');
+
             onSuccess();
           }
         } catch (error) {
-          console.error('Failed to save processed image:', error);
+          devError('Failed to save processed image:', error);
           setErrorMessage(
             error instanceof Error ? error.message : 'Failed to save processed image.'
           );
@@ -1145,10 +1238,10 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       ]
     );
 
-    const handleCancelConfirmation = () => {
+    const handleCancelConfirmation = useCallback(() => {
       setShowConfirmationModal(false);
       setGeneratedImage(null);
-    };
+    }, []);
 
     // const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
 
@@ -1409,83 +1502,25 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
                     {/* Saved Prompts Search + List (or Magic Prompts List) */}
                     {activePromptTab === 'saved' ? (
-                      <>
-                        {/* Search Input - Only for Saved Prompts */}
-                        <div className="mt-2 mb-2 px-3">
-                          <Input
-                            placeholder="Filter prompts..."
-                            value={searchPrompts}
-                            onChange={(e) => setSearchPrompts(e.target.value)}
-                            allowClear
-                            className="w-full rounded-none border-l-0 border-r-0 border-t-0"
-                          />
-                        </div>
-
-                        {/* Saved Prompts List */}
-                        <div className="overflow-auto flex-1">
-                          {isLoadingPrompts ? (
-                            <div className="p-2">
-                              <Skeleton active paragraph={{ rows: 2 }} />
-                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
-                              <Skeleton active paragraph={{ rows: 2 }} className="mt-2" />
-                            </div>
-                          ) : filteredPrompts.length === 0 ? (
-                            <div className="p-4 flex items-center justify-center h-full">
-                              <MyEmpty description="No historical prompts found." />
-                            </div>
-                          ) : (
-                            <List
-                              sx={{
-                                width: '100%',
-                                bgcolor: 'background.paper',
-                                paddingBottom: 0,
-                                height: '334px', // hardcoded height to make both columns same height
-                              }}
-                            >
-                              {filteredPrompts.map((prompt: CustomPrompt, index) => (
-                                <ListItem
-                                  key={prompt.id || index}
-                                  sx={{
-                                    padding: '8px 12px',
-                                    borderBottom: '1px solid #f0f0f0',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s',
-                                    '&:hover': {
-                                      backgroundColor: '#f5f5f5',
-                                    },
-                                  }}
-                                  onClick={(e) =>
-                                    handlePickHistoricalCustomPrompt(e, prompt.content)
-                                  }
-                                >
-                                  <Box
-                                    sx={{
-                                      width: '100%',
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'flex-start',
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Text>{prompt.content}</Text>
-                                    <MuiTooltip title="Use this prompt">
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handlePickHistoricalCustomPrompt(e, prompt.content)
-                                        }
-                                        sx={{ flexShrink: 0 }}
-                                      >
-                                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                                      </IconButton>
-                                    </MuiTooltip>
-                                  </Box>
-                                </ListItem>
-                              ))}
-                            </List>
-                          )}
-                        </div>
-                      </>
+                      <SavedPromptList
+                        prompts={prompts}
+                        isLoading={isLoadingPrompts}
+                        searchKeyword={searchPrompts}
+                        onSearchChange={setSearchPrompts}
+                        onSelectPrompt={(content) => {
+                          setCustomPrompt(content);
+                          message.success('Prompt applied!');
+                        }}
+                        onDeletePrompt={async (promptId) => {
+                          try {
+                            await deletePrompt(promptId);
+                            await fetchPrompts();
+                          } catch (error) {
+                            // Error is already handled in SavedPromptList component
+                            devError('Failed to delete and refresh prompts:', error);
+                          }
+                        }}
+                      />
                     ) : (
                       <>
                         {/* Magic Prompts List */}
@@ -1521,7 +1556,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                                     gap: 1,
                                   }}
                                 >
-                                  <Text>{item.label}</Text>
+                                  <span>{item.label}</span>
                                   <MuiTooltip title="Use this magic prompt">
                                     <IconButton
                                       size="small"
@@ -1755,6 +1790,13 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                 : undefined
             }
             defaultDescription={customPrompt}
+            ratingRequired={import.meta.env.VITE_GENERATION_RESULT_RATING_REQUIRED === 'true'}
+            userId={userId}
+            guestSessionId={guestSessionId}
+            customPrompt={customPrompt}
+            selectedColor={selectedColor}
+            selectedTexture={selectedTexture}
+            selectedItem={selectedItem}
           />
         )}
 

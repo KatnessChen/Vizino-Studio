@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
+import { devError } from '@/utils/devLogger';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppDispatch } from '@/stores/store';
 import {
@@ -135,7 +136,7 @@ export const useAppInit = () => {
         dispatch(setIsAppInitiated(true));
         hasInitialized.current = true;
       } catch (error) {
-        console.error('Error initializing app:', error);
+        devError('Error initializing app:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to initialize app';
         dispatch(setInitError(errorMessage));
         dispatch(setIsAppInitiated(true));

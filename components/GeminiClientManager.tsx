@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { decryptUserApiKey } from '@/services/userService';
 import { initializeGeminiClient } from '@/services/gemini/geminiConfig';
+import { devWarn, devError } from '@/utils/devLogger';
 
 /**
  * Component to manage global Gemini Client state based on user auth
@@ -18,11 +19,11 @@ const GeminiClientManager: React.FC = () => {
         if (decryptedKey) {
           initializeGeminiClient(decryptedKey);
         } else {
-          console.warn('Failed to decrypt user API key, reverting to default.');
+          devWarn('Failed to decrypt user API key, reverting to default.');
           initializeGeminiClient();
         }
       } catch (e) {
-        console.error('Error decrypting API key:', e);
+        devError('Error decrypting API key:', e);
         initializeGeminiClient();
       }
     } else {

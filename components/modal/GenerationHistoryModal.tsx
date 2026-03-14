@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Typography } from 'antd';
+import { devWarn } from '@/utils/devLogger';
 import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
 import { ImageData } from '@/types';
 import { imageCache, formatTimestamp } from '@/utils';
@@ -33,7 +34,7 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
             sources[image.imageDownloadUrl] = `data:${image.mimeType};base64,${base64}`;
           }
         } catch (error) {
-          console.warn('[GenerationHistoryModal] Failed to load current image from cache:', error);
+          devWarn('[GenerationHistoryModal] Failed to load current image from cache:', error);
         }
       }
 
@@ -49,10 +50,7 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
                 sources[operation.imageDownloadUrl] = `data:${mimeType};base64,${base64}`;
               }
             } catch (error) {
-              console.warn(
-                '[GenerationHistoryModal] Failed to load source image from cache:',
-                error
-              );
+              devWarn('[GenerationHistoryModal] Failed to load source image from cache:', error);
             }
           }
         }

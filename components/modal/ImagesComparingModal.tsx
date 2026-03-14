@@ -15,6 +15,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { ImageData, Color, Texture, Item } from '@/types';
 import { ASSET_IMAGE, ASSET_TEXTURE, ASSET_ITEM, ASSET_COLOR } from '@/constants/constants';
 import { imageCache } from '@/utils/imageCache';
+import { devWarn, devError } from '@/utils/devLogger';
 import { CloseOutlined as CloseIcon } from '@ant-design/icons';
 
 type AssetType = ImageData | Color | Texture | Item;
@@ -80,11 +81,11 @@ const DraggableImageCard: React.FC<DraggableImageCardProps> = ({
   const handleError = () => {
     if (!isColorData(image) && currentSrc === cachedImageSrc && assetUrl) {
       // If cached image fails, try the original download URL
-      console.warn(`[DraggableImageCard] Cached image failed for ${image.id}, retrying with URL`);
+      devWarn(`[DraggableImageCard] Cached image failed for ${image.id}, retrying with URL`);
       setCurrentSrc(assetUrl);
     } else {
       // If original URL also fails (or we were already using it), show error
-      console.error(`[DraggableImageCard] Failed to load image for ${image.id}`);
+      devError(`[DraggableImageCard] Failed to load image for ${image.id}`);
       setHasError(true);
     }
   };
@@ -200,7 +201,7 @@ const ImagesComparingModal: React.FC<ComparePhotosModalProps> = ({
             newCachedImages[image.id] = null;
           }
         } catch (error) {
-          console.warn('[ImagesComparingModal] Failed to load cached image:', error);
+          devWarn('[ImagesComparingModal] Failed to load cached image:', error);
           newCachedImages[image.id] = null;
         }
       }

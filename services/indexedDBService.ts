@@ -3,6 +3,8 @@
  * Handles all database operations (init, get, set, delete, etc.)
  */
 
+import { devLog, devWarn } from '@/utils/devLogger';
+
 export interface CacheEntry {
   base64: string;
   timestamp: number;
@@ -35,14 +37,14 @@ class IndexedDBService {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.warn('[IndexedDB] Initialization failed:', request.error);
+        devWarn('[IndexedDB] Initialization failed:', request.error);
         this.initPromise = null;
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[IndexedDB] Initialized successfully');
+        devLog('[IndexedDB] Initialized successfully');
         resolve();
       };
 
@@ -51,7 +53,7 @@ class IndexedDBService {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'url' });
           store.createIndex('timestamp', 'timestamp', { unique: false });
-          console.log('[IndexedDB] Object store created');
+          devLog('[IndexedDB] Object store created');
         }
       };
     });
@@ -86,7 +88,7 @@ class IndexedDBService {
         };
       });
     } catch (error) {
-      console.warn('[IndexedDB] Get failed:', error);
+      devWarn('[IndexedDB] Get failed:', error);
       return null;
     }
   }
@@ -110,7 +112,7 @@ class IndexedDBService {
         request.onsuccess = () => resolve();
       });
     } catch (error) {
-      console.warn('[IndexedDB] Set failed:', error);
+      devWarn('[IndexedDB] Set failed:', error);
     }
   }
 
@@ -131,12 +133,12 @@ class IndexedDBService {
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
-          console.log('[IndexedDB] Cleared');
+          devLog('[IndexedDB] Cleared');
           resolve();
         };
       });
     } catch (error) {
-      console.warn('[IndexedDB] Clear failed:', error);
+      devWarn('[IndexedDB] Clear failed:', error);
     }
   }
 }

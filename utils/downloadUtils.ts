@@ -1,3 +1,5 @@
+import { devError } from '@/utils/devLogger';
+
 /**
  * MIME type to file extension mapping
  */
@@ -34,7 +36,7 @@ async function downloadFile(url: string, filename: string): Promise<void> {
     // Clean up the blob URL
     URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.error('Download failed:', error);
+    devError('Download failed:', error);
     throw error;
   }
 }

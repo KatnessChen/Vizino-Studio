@@ -94,11 +94,11 @@ export type AssetType = (typeof ASSET_TYPES)[number];
 /**
  * Default credit limit for free users (V points)
  */
-export const DEFAULT_CREDIT_LIMIT = 500;
+export const DEFAULT_CREDIT_LIMIT = 50;
 
 /**
  * Credit multipliers for each task type
- * thinking_mode and optimize_prompt cost 4x, all others cost 1x
+ * optimize_prompt costs 4x, thinking_mode costs 3x, all others cost 1x
  */
 export const CREDIT_MULTIPLIERS: Record<string, number> = {
   // High-cost task

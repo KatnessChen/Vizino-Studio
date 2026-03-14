@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
 import { Segmented, Tag, Modal } from 'antd';
 import { message } from '@/utils/antd';
+import { devError } from '@/utils/devLogger';
 import {
   ASSET_TYPES,
   ASSET_IMAGE,
@@ -561,7 +562,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
         setErrorMessage(null); // Clear error on successful upload
       } catch (error) {
-        console.error('Failed to upload image:', error);
+        devError('Failed to upload image:', error);
 
         // Rollback optimistic update on error
         dispatch(
@@ -629,7 +630,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         message.success('Image updated successfully');
         setErrorMessage(null);
       } catch (error) {
-        console.error('Failed to update image:', error);
+        devError('Failed to update image:', error);
 
         // Rollback - refresh from server
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
@@ -684,7 +685,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
       dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
     } catch (error) {
-      console.error('Failed to refresh images:', error);
+      devError('Failed to refresh images:', error);
       setErrorMessage('Failed to refresh images. Please reload the page.');
     } finally {
       dispatch(setIsFetchingSpaceImages(false));
@@ -779,7 +780,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             setShowDeleteConfirmModal(false);
             setDeleteConfirmConfig(null);
           } catch (error) {
-            console.error('Failed to delete images:', error);
+            devError('Failed to delete images:', error);
 
             // Rollback - refresh from server
             const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
@@ -837,7 +838,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         if (selectedImageIds.has(img.id)) {
           const filename = buildDownloadFilename(img.name, img.mimeType);
           downloadFile(img.imageDownloadUrl, filename).catch((error) => {
-            console.error('Download failed for image:', img.id, error);
+            devError('Download failed for image:', img.id, error);
             setErrorMessage('Failed to download one or more images. Please try again.');
           });
         }
@@ -926,14 +927,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
       message.success(`${imagesToCopyArray.length} image(s) copied successfully!`);
     } catch (error) {
-      console.error('Failed to copy images:', error);
+      devError('Failed to copy images:', error);
 
       // Rollback - refresh from server
       try {
         const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
       } catch (refreshError) {
-        console.error('Failed to refresh images:', refreshError);
+        devError('Failed to refresh images:', refreshError);
       }
 
       setErrorMessage('Failed to copy images. Please try again.');
@@ -1180,7 +1181,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           </span>
         );
       } catch (error) {
-        console.error('Failed to move image:', error);
+        devError('Failed to move image:', error);
         setErrorMessage(
           error instanceof Error ? error.message : 'Failed to move image. Please try again.'
         );

@@ -3,8 +3,10 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firestoreService';
 import { onAuthChange } from '@/services/authService';
 import { getAdminSettings, setAdminSettings, AdminSettings } from '@/utils/storageUtils';
+import { devError } from '@/utils/devLogger';
 import { User } from '@/types';
 import { initializeUsage } from '@/services/userService';
+import { identifyUser, resetAnalytics } from '@/services/analyticsService';
 
 interface AuthContextType {
   user: User | null;
@@ -48,22 +50,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 usage: userData.usage || {},
                 lastLoginAt: userData.lastLoginAt?.toDate() || new Date(),
                 apiKey: userData.apiKey,
+                credit_limit: userData.credit_limit,
               } as User);
+
+              // Identify user in PostHog
+              identifyUser(authUser.uid, {
+                email: authUser.email,
+                displayName: authUser.displayName,
+              });
             } else {
               // Fallback if doc doesn't exist yet (race condition with creation)
-              setUser({
+              const fallbackUser = {
                 uid: authUser.uid,
                 email: authUser.email,
                 displayName: authUser.displayName,
                 photoURL: authUser.photoURL,
                 usage: initializeUsage(),
                 lastLoginAt: new Date(),
-              } as User);
+              } as User;
+              setUser(fallbackUser);
+
+              // Identify user in PostHog
+              identifyUser(authUser.uid, {
+                email: authUser.email,
+                displayName: authUser.displayName,
+              });
             }
             setIsLoading(false);
           },
           (error) => {
-            console.error('Error fetching user data:', error);
+            devError('Error fetching user data:', error);
             setIsLoading(false);
           }
         );
@@ -74,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubscribeSnapshot = undefined;
         }
         setUser(null);
+        resetAnalytics(); // Reset PostHog identity
         setIsLoading(false);
       }
     });

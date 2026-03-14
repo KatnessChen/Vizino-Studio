@@ -31,6 +31,7 @@ import {
 import { reorderAssetsWithDebounce } from '@/stores/imageOrderThunks';
 import { useStorageAdapter } from '@/hooks/useStorageAdapter';
 import { useUploadGate } from '@/hooks/useUploadGate';
+import { devError } from '@/utils/devLogger';
 import { ImageOperation, Texture, Item, Color } from '@/types';
 import { ASSET_COLOR } from '@/constants/constants';
 import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from '@/utils/assetUtils';
@@ -127,7 +128,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
           dispatch(setCustomColors({ projectId: effectiveProjectId, colors }));
         }
       } catch (error) {
-        console.error(`Failed to load ${assetType}s:`, error);
+        devError(`Failed to load ${assetType}s:`, error);
         if (isTexture) {
           dispatch(
             setLoadTexturesError({

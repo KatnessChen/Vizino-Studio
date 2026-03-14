@@ -4,6 +4,7 @@ import { Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { Texture, Item, ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
+import { devWarn } from '@/utils/devLogger';
 import MyButton from '../button/MyButton';
 
 type Asset = Texture | Item | ImageData;
@@ -58,7 +59,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
           setCachedImageSrc(`data:${imageData.mimeType};base64,${cachedBase64}`);
         }
       } catch (error) {
-        console.warn('[AssetCard] Failed to load cached image:', error);
+        devWarn('[AssetCard] Failed to load cached image:', error);
       } finally {
         setIsLoadingCache(false);
       }

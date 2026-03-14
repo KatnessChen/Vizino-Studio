@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchAllCustomPrompts } from '@/services/firestoreService';
+import { fetchAllCustomPrompts, deleteCustomPrompt } from '@/services/firestoreService';
 import {
   setCustomPrompts,
   setLoadingPrompts,
   setLoadPromptsError,
+  removeCustomPrompt,
   selectCustomPromptsForProject,
   selectIsLoadingPromptsForProject,
   selectLoadPromptsErrorForProject,
@@ -18,7 +19,7 @@ interface UseCustomPromptsOptions {
 
 /**
  * Hook for managing custom prompts
- * Provides access to cached prompts, loading states, and fetch/search operations
+ * Provides access to cached prompts, loading states, and fetch/search/delete operations
  */
 export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
   const { userId, projectId } = options;
@@ -59,6 +60,27 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
     }
   }, [userId, projectId, dispatch]);
 
+  // Delete a single prompt
+  const deletePrompt = useCallback(
+    async (promptId: string) => {
+      if (!userId || !projectId) {
+        throw new Error('Missing userId or projectId');
+      }
+
+      try {
+        // Delete from Firestore
+        await deleteCustomPrompt(userId, projectId, promptId);
+        
+        // Remove from Redux store
+        dispatch(removeCustomPrompt({ projectId, promptId }));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to delete custom prompt';
+        throw new Error(errorMessage);
+      }
+    },
+    [userId, projectId, dispatch]
+  );
+
   // Filter prompts by keyword
   const searchPrompts = useCallback(
     (keyword: string) => {
@@ -73,6 +95,7 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
     isLoading,
     error,
     fetchPrompts,
+    deletePrompt,
     searchPrompts,
   };
 };

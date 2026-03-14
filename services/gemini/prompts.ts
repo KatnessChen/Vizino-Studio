@@ -204,10 +204,17 @@ export const getPromptByTask = (
       }
       return getColorAdjustmentDefaultPrompt(colorHex, customPrompt);
 
-    case GEMINI_TASKS.REMOVE_CLUTTER.task_name: {
-      // Use custom prompt if provided, otherwise use default magic prompt
+    case GEMINI_TASKS.REMOVE_CLUTTER.task_name:
       return customPrompt || MAGIC_PROMPT.REMOVE_CLUTTER;
-    }
+
+    case GEMINI_TASKS.BRIGHTEN_SPACE.task_name:
+      return customPrompt || MAGIC_PROMPT.BRIGHTEN_SPACE;
+
+    case GEMINI_TASKS.INDUSTRIAL_STYLE.task_name:
+      return customPrompt || MAGIC_PROMPT.INDUSTRIAL_STYLE;
+
+    case GEMINI_TASKS.LOFT_STYLE.task_name:
+      return customPrompt || MAGIC_PROMPT.LOFT_STYLE;
 
     default:
       // Exhaustive check - all task types should be handled above
@@ -235,8 +242,10 @@ export const MAGIC_PROMPT = {
     'Act as a professional interior cleaner and organizer. Identify and remove all clutter, small personal items, trash, loose papers, toys, and unnecessary objects from surfaces like tables, floors, and counters. Keep the main furniture and architectural elements intact. The goal is to create a pristine, show-home ready appearance where the space looks spacious, tidy, and organized. Fill in the background where items are removed with appropriate textures and lighting to match the surroundings seamlessly.',
   BRIGHTEN_SPACE:
     'Act as a professional lighting designer and photographer. Enhancing the ambient lighting of the room. Significantly increase the brightness and exposure to eliminate dark shadows and gloomy areas. Use natural daylight simulation to creating a bright, airy, and well-lit atmosphere. Adjust the white balance to be neutral and fresh, avoiding yellow or blue casts. The room should feel inviting, spacious, and filled with soft, diffused light.',
-  MODERN_STYLE:
-    'Act as a lead interior designer specializing in modern aesthetics. Transform this room into a sleek, Modern style space. Use a neutral color palette with whites, greys, and blacks. Replace existing furniture with minimalist, straight-line designs. Incorporate materials like glass, steel, and matte finishes. Simplify the decor to emphasize open space and clean lines. Ensure the lighting is contemporary and architectural.',
   INDUSTRIAL_STYLE:
     'Act as an interior designer specializing in Industrial Chic. Transform this room to reflect an industrial design aesthetic. Incorporate raw materials such as exposed brick walls, concrete flooring, and distressed wood. Use metal accents in black or rust finishes for furniture and fixtures. Expose architectural elements like beams or ductwork if possible. Use a moody but warm lighting scheme with Edison bulbs or metal pendant lights. The atmosphere should be raw, edgy, and sophisticated.',
+  LOFT_STYLE:
+    'Act as an interior designer specializing in loft-style conversions. Transform this space into a stylish loft with high ceilings, large industrial-style windows, and an open floor plan. Emphasize exposed structural elements like brick, steel beams, and concrete surfaces. Combine warm reclaimed wood furniture with metal accents and layered textiles for a cozy yet airy feel. Use a neutral but warm palette, incorporate mixed materials, and add ambient and task lighting to create depth and comfort. Maintain a balance of raw industrial details and soft, livable touches to achieve an urban loft aesthetic.',
+  MODERN_STYLE:
+    'Act as a lead interior designer specializing in modern aesthetics. Transform this room into a sleek, Modern style space. Use a neutral color palette with whites, greys, and blacks. Replace existing furniture with minimalist, straight-line designs. Incorporate materials like glass, steel, and matte finishes. Simplify the decor to emphasize open space and clean lines. Ensure the lighting is contemporary and architectural.',
 };

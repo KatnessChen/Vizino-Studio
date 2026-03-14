@@ -1,5 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button, Result } from 'antd';
+import posthog from 'posthog-js';
+import { devError } from '@/utils/devLogger';
 import { ReloadOutlined, HomeOutlined } from '@ant-design/icons';
 
 interface Props {
@@ -32,15 +34,18 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+    devError('ErrorBoundary caught an error:', error, errorInfo);
+
     this.setState({
       error,
       errorInfo,
     });
 
-    // You can also log the error to an error reporting service here
-    // Example: logErrorToService(error, errorInfo);
+    // Send error to PostHog for tracking
+    posthog.captureException(error, {
+      componentStack: errorInfo.componentStack,
+      level: this.props.level || 'component',
+    });
   }
 
   handleReset = () => {
@@ -86,11 +91,7 @@ class ErrorBoundary extends Component<Props, State> {
                 >
                   Reload Page
                 </Button>,
-                <Button
-                  key="home"
-                  icon={<HomeOutlined />}
-                  onClick={this.handleGoHome}
-                >
+                <Button key="home" icon={<HomeOutlined />} onClick={this.handleGoHome}>
                   Go Home
                 </Button>,
               ]}
@@ -135,11 +136,7 @@ class ErrorBoundary extends Component<Props, State> {
                 >
                   Retry
                 </Button>,
-                <Button
-                  key="home"
-                  icon={<HomeOutlined />}
-                  onClick={this.handleGoHome}
-                >
+                <Button key="home" icon={<HomeOutlined />} onClick={this.handleGoHome}>
                   Go Home
                 </Button>,
               ]}
@@ -147,9 +144,7 @@ class ErrorBoundary extends Component<Props, State> {
               {process.env.NODE_ENV === 'development' && error && (
                 <div className="mt-4 text-left max-w-2xl mx-auto">
                   <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
-                    <div className="font-semibold text-yellow-800 mb-2">
-                      Developer Info
-                    </div>
+                    <div className="font-semibold text-yellow-800 mb-2">Developer Info</div>
                     <div className="text-sm text-yellow-700">
                       <p className="font-mono mb-2">
                         <strong>Error:</strong> {error.toString()}
@@ -173,11 +168,7 @@ class ErrorBoundary extends Component<Props, State> {
         <div className="p-4 bg-red-50 border border-red-200 rounded">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 text-red-500">
-              <svg
-                className="w-5 h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -186,9 +177,7 @@ class ErrorBoundary extends Component<Props, State> {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-red-800 mb-1">
-                Component Load Error
-              </h3>
+              <h3 className="text-sm font-semibold text-red-800 mb-1">Component Load Error</h3>
               <p className="text-sm text-red-700 mb-2">
                 We sincerely apologize. This component encountered an error. Please try reloading.
               </p>
@@ -203,9 +192,7 @@ class ErrorBoundary extends Component<Props, State> {
               </Button>
               {process.env.NODE_ENV === 'development' && error && (
                 <div className="mt-3">
-                  <div className="text-xs font-semibold text-red-800 mb-2">
-                    Developer Info
-                  </div>
+                  <div className="text-xs font-semibold text-red-800 mb-2">Developer Info</div>
                   <div className="text-xs text-red-700">
                     <p className="font-mono mb-1">{error.toString()}</p>
                     {errorInfo && (
@@ -227,4 +214,3 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
-

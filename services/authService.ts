@@ -11,6 +11,8 @@ import {
 } from 'firebase/auth';
 import { auth } from './firebaseService';
 import { createOrUpdateUser } from './userService';
+import { devLog, devError } from '@/utils/devLogger';
+import { withTracking } from './analyticsService';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -33,13 +35,13 @@ googleProvider.addScope('email');
  * Falls back to redirect if popup is blocked in other browsers
  */
 export const signInWithGoogle = async () => {
-  try {
+  return withTracking('auth_sign_in_with_google', async () => {
     // Enable persistence so user stays logged in
     await setPersistence(auth, browserLocalPersistence);
 
     // Safari has issues with popup authentication due to ITP, use redirect instead
     if (isSafari()) {
-      console.log('Safari detected, using redirect authentication');
+      devLog('Safari detected, using redirect authentication');
       await signInWithRedirect(auth, googleProvider);
       // After redirect, the page will reload and handleRedirectResult will process the result
       return { success: true, isRedirecting: true };
@@ -73,21 +75,18 @@ export const signInWithGoogle = async () => {
       // If popup is blocked, fall back to redirect
       if (popupError instanceof Error && 'code' in popupError) {
         const firebaseError = popupError as { code: string };
-        if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/cancelled-popup-request') {
-          console.log('Popup blocked, falling back to redirect authentication');
+        if (
+          firebaseError.code === 'auth/popup-blocked' ||
+          firebaseError.code === 'auth/cancelled-popup-request'
+        ) {
+          devLog('Popup blocked, falling back to redirect authentication');
           await signInWithRedirect(auth, googleProvider);
           return { success: true, isRedirecting: true };
         }
       }
       throw popupError;
     }
-  } catch (error) {
-    console.error('Google sign-in error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to sign in with Google',
-    };
-  }
+  });
 };
 
 /**
@@ -95,13 +94,13 @@ export const signInWithGoogle = async () => {
  * This should be called when the app initializes to process redirect authentication
  */
 export const handleRedirectResult = async () => {
-  try {
+  return withTracking('auth_handle_redirect_result', async () => {
     const result = await getRedirectResult(auth);
-    
+
     if (result) {
       // User just returned from Google sign-in page
       const user = result.user;
-      console.log('Processing redirect authentication result');
+      devLog('Processing redirect authentication result');
 
       // Create or update user in Firestore
       await createOrUpdateUser({
@@ -123,32 +122,20 @@ export const handleRedirectResult = async () => {
         token: await user.getIdToken(),
       };
     }
-    
+
     // No redirect result (normal page load)
     return null;
-  } catch (error) {
-    console.error('Redirect result error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to process redirect result',
-    };
-  }
+  });
 };
 
 /**
  * Sign out current user
  */
 export const signOutUser = async () => {
-  try {
+  return withTracking('auth_sign_out', async () => {
     await signOut(auth);
     return { success: true };
-  } catch (error) {
-    console.error('Sign-out error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to sign out',
-    };
-  }
+  });
 };
 
 /**
@@ -179,7 +166,7 @@ export const getIdToken = async (forceRefresh = false): Promise<string | null> =
     if (!user) return null;
     return await user.getIdToken(forceRefresh);
   } catch (error) {
-    console.error('Failed to get ID token:', error);
+    devError('Failed to get ID token:', error);
     return null;
   }
 };

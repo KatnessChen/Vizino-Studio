@@ -6,6 +6,7 @@
  */
 
 import { ImageData } from '@/types';
+import { devLog, devError } from '@/utils/devLogger';
 
 const DB_NAME = 'vizino-guest-data';
 const DB_VERSION = 1;
@@ -31,13 +32,13 @@ class GuestIndexedDB {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.error('[GuestDB] Failed to open database:', request.error);
+        devError('[GuestDB] Failed to open database:', request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[GuestDB] Database opened successfully');
+        devLog('[GuestDB] Database opened successfully');
         resolve(this.db);
       };
 
@@ -48,7 +49,7 @@ class GuestIndexedDB {
         if (!db.objectStoreNames.contains(IMAGES_STORE)) {
           const objectStore = db.createObjectStore(IMAGES_STORE, { keyPath: 'id' });
           objectStore.createIndex('timestamp', 'timestamp', { unique: false });
-          console.log('[GuestDB] Created images object store');
+          devLog('[GuestDB] Created images object store');
         }
       };
     });
@@ -76,9 +77,9 @@ class GuestIndexedDB {
         request.onerror = () => reject(request.error);
       });
 
-      console.log('[GuestDB] Image saved:', imageData.id);
+      devLog('[GuestDB] Image saved:', imageData.id);
     } catch (error) {
-      console.error('[GuestDB] Failed to save image:', error);
+      devError('[GuestDB] Failed to save image:', error);
       throw error;
     }
   }
@@ -96,13 +97,13 @@ class GuestIndexedDB {
         const request = store.getAll();
         request.onsuccess = () => {
           const entries = request.result as GuestImageEntry[];
-          console.log('[GuestDB] Retrieved', entries.length, 'images');
+          devLog('[GuestDB] Retrieved', entries.length, 'images');
           resolve(entries);
         };
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      console.error('[GuestDB] Failed to get images:', error);
+      devError('[GuestDB] Failed to get images:', error);
       return [];
     }
   }
@@ -122,7 +123,7 @@ class GuestIndexedDB {
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      console.error('[GuestDB] Failed to get image:', error);
+      devError('[GuestDB] Failed to get image:', error);
       return null;
     }
   }
@@ -142,9 +143,9 @@ class GuestIndexedDB {
         request.onerror = () => reject(request.error);
       });
 
-      console.log('[GuestDB] Image deleted:', imageId);
+      devLog('[GuestDB] Image deleted:', imageId);
     } catch (error) {
-      console.error('[GuestDB] Failed to delete image:', error);
+      devError('[GuestDB] Failed to delete image:', error);
       throw error;
     }
   }
@@ -164,9 +165,9 @@ class GuestIndexedDB {
         request.onerror = () => reject(request.error);
       });
 
-      console.log('[GuestDB] All data cleared');
+      devLog('[GuestDB] All data cleared');
     } catch (error) {
-      console.error('[GuestDB] Failed to clear data:', error);
+      devError('[GuestDB] Failed to clear data:', error);
       throw error;
     }
   }
@@ -186,7 +187,7 @@ class GuestIndexedDB {
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      console.error('[GuestDB] Failed to get image count:', error);
+      devError('[GuestDB] Failed to get image count:', error);
       return 0;
     }
   }

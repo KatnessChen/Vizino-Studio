@@ -27,13 +27,13 @@ describe('creditUtils', () => {
       expect(calculateTotalCredits(usage)).toBe(18);
     });
 
-    it('should apply 4x multiplier for thinking_mode', () => {
+    it('should apply 3x multiplier for thinking_mode', () => {
       const usage = {
         recolor_wall: { onVPoints: 10, onOwnKey: 0 },
         thinking_mode: { onVPoints: 3, onOwnKey: 0 },
       };
-      // 10*1 + 3*4 = 22
-      expect(calculateTotalCredits(usage)).toBe(22);
+      // 10*1 + 3*3 = 19
+      expect(calculateTotalCredits(usage)).toBe(19);
     });
 
     it('should apply 4x multiplier for optimize_prompt', () => {
@@ -57,9 +57,9 @@ describe('creditUtils', () => {
         thinking_mode: { onVPoints: 3, onOwnKey: 0 },
       };
       // Standard: 40 + 34 + 1 + 103 + 65 + 9 = 252
-      // High cost: 4*4 + 3*4 = 16 + 12 = 28
-      // Total: 252 + 28 = 280
-      expect(calculateTotalCredits(usage)).toBe(280);
+      // High cost: 4*4 + 3*3 = 16 + 9 = 25
+      // Total: 252 + 25 = 277
+      expect(calculateTotalCredits(usage)).toBe(277);
     });
   });
 
@@ -79,13 +79,13 @@ describe('creditUtils', () => {
     });
 
     it('should add thinking mode cost when enabled', () => {
-      // Standard task (1) + thinking_mode (4) = 5
-      expect(getCreditCost('recolor_wall', true)).toBe(5);
+      // Standard task (1) + thinking_mode (3) = 4
+      expect(getCreditCost('recolor_wall', true)).toBe(4);
     });
 
     it('should not double count thinking_mode cost', () => {
-      // thinking_mode already costs 4, don't add extra
-      expect(getCreditCost('thinking_mode', true)).toBe(4);
+      // thinking_mode already costs 3, don't add extra
+      expect(getCreditCost('thinking_mode', true)).toBe(3);
     });
   });
 
