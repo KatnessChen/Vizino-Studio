@@ -111,22 +111,7 @@ async function pollPrediction(
   throw new Error('Upscaling timed out');
 }
 
-/**
- * Fetch image from URL and convert to base64
- */
-async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch upscaled image: ${response.statusText}`);
-  }
 
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const base64 = buffer.toString('base64');
-  const mimeType = response.headers.get('content-type') || 'image/png';
-
-  return { base64, mimeType };
-}
 
 /**
  * Check if image should be uploaded to Firebase Storage (for large files)
