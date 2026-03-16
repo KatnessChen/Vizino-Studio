@@ -26,5 +26,5 @@ dist-ssr
 # project setting
 cors.json
 
-# Local act env (secrets for local CI) - deprecated
-# .env.act (removed, act-based local testing not used)
+# docs
+/docs
