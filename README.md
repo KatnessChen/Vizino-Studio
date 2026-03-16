@@ -123,6 +123,9 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_ADMIN_EMAILS=admin@example.com
+
+# Optional: For 4K/8K AI upscaling (via Replicate Real-ESRGAN)
+VITE_REPLICATE_API_TOKEN=your_replicate_api_token
 ```
 
 ---
