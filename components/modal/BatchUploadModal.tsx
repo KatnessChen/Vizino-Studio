@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Modal, Button, Alert, Skeleton, Input, Tooltip } from 'antd';
-import { CloudUpload as UploadIcon, Close as CloseIcon } from '@mui/icons-material';
+import { CloudUploadOutlined, CloseOutlined } from '@ant-design/icons';
 import {
   MAX_FILE_SIZE_MB,
   MAX_IMAGES_PER_SPACE,
@@ -336,7 +336,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
         onClick={() => fileInputRef.current?.click()}
         style={{ cursor: 'pointer' }}
       >
-        <UploadIcon style={{ fontSize: 48, color: '#9ca3af' }} />
+        <CloudUploadOutlined style={{ fontSize: 48, color: '#9ca3af' }} />
         <p className="mt-2 text-sm font-semibold text-gray-700">Click or drag files to upload</p>
         <p className="mt-1 text-xs text-gray-500">
           Accepted: {acceptedFileTypes} • Max {MAX_FILE_SIZE_MB}MB per file • {remainingSlots} slots
@@ -424,16 +424,17 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
                   >
                     {/* Remove button */}
                     <Tooltip title="Remove from upload list">
-                      <button
+                      <Button
+                        shape="circle"
+                        size="small"
+                        icon={<CloseOutlined style={{ fontSize: 16 }} />}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveFile(fp.id);
                         }}
-                        className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-300 hover:text-gray-800 cursor-pointer"
                         disabled={isUploading}
-                      >
-                        <CloseIcon style={{ fontSize: 16 }} />
-                      </button>
+                        className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
+                      />
                     </Tooltip>
 
                     {/* Image preview */}

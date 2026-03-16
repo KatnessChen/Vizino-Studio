@@ -1,6 +1,5 @@
 import React from 'react';
-import { Avatar, IconButton } from '@mui/material';
-import { Button } from 'antd';
+import { Avatar, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,20 +44,16 @@ const Header: React.FC = () => {
                 Admin Settings
               </Button>
             )}
-            <IconButton
+            <div 
               onClick={goToUserProfile}
-              sx={{
-                p: 0,
-                border: '2px solid rgba(255,255,255,0.3)',
-                '&:hover': { border: '2px solid rgba(255,255,255,0.5)' },
-              }}
+              className="p-0 border-2 border-white/30 rounded-full hover:border-white/50 cursor-pointer transition-all duration-200"
             >
               <Avatar
                 alt={user?.displayName || 'User'}
                 src={user?.photoURL || undefined}
-                sx={{ width: 32, height: 32 }}
+                size={32}
               />
-            </IconButton>
+            </div>
           </div>
         </div>
       </nav>

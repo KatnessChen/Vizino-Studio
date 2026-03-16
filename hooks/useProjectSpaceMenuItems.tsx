@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { MenuProps } from 'antd';
 import { Space, Tooltip } from 'antd';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
+import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Project } from '@/types';
 import {
   checkProjectLimit,
@@ -87,7 +87,7 @@ export const useProjectSpaceMenuItems = ({
             {isMenuItemEditable && (
               <Space size={4} onClick={(e) => e.stopPropagation()}>
                 <Tooltip title="Edit Project Name">
-                  <EditIcon
+                  <EditOutlined
                     style={{ fontSize: 14, cursor: 'pointer' }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -102,7 +102,7 @@ export const useProjectSpaceMenuItems = ({
                       : 'Delete Project'
                   }
                 >
-                  <DeleteIcon
+                  <DeleteOutlined
                     style={{
                       fontSize: 14,
                       cursor: project.spaces.length > 0 ? 'not-allowed' : 'pointer',
@@ -137,7 +137,7 @@ export const useProjectSpaceMenuItems = ({
               opacity: projectLimitCheck.canAdd ? 1 : 0.5,
             }}
           >
-            <AddIcon style={{ fontSize: 16 }} />
+            <PlusOutlined style={{ fontSize: 16 }} />
             <span>Add New Project</span>
             <span style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>
               {formatLimitMessage('Projects', projects.length, 10)}
@@ -187,7 +187,7 @@ export const useProjectSpaceMenuItems = ({
             {isMenuItemEditable && (
               <Space size={4} onClick={(e) => e.stopPropagation()}>
                 <Tooltip title="Edit Space Name">
-                  <EditIcon
+                  <EditOutlined
                     style={{ fontSize: 14, cursor: 'pointer' }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -197,7 +197,7 @@ export const useProjectSpaceMenuItems = ({
                   />
                 </Tooltip>
                 <Tooltip title="Delete Space">
-                  <DeleteIcon
+                  <DeleteOutlined
                     style={{ fontSize: 14, cursor: 'pointer' }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -227,7 +227,7 @@ export const useProjectSpaceMenuItems = ({
               opacity: spaceLimitCheck.canAdd ? 1 : 0.5,
             }}
           >
-            <AddIcon style={{ fontSize: 16 }} />
+            <PlusOutlined style={{ fontSize: 16 }} />
             <span>Add New Space</span>
             <span style={{ fontSize: 12, color: '#999', marginLeft: 4 }}>
               {activeProject ? formatLimitMessage('Spaces', activeProject.spaces.length, 10) : ''}

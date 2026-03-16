@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Typography } from 'antd';
+import { ArrowDownOutlined } from '@ant-design/icons';
 import { devWarn } from '@/utils/devLogger';
-import { ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
 import { ImageData } from '@/types';
 import { imageCache, formatTimestamp } from '@/utils';
 
@@ -220,7 +220,7 @@ const GenerationHistoryModal: React.FC<GenerationHistoryModalProps> = ({
                 </div>
 
                 <div className="flex justify-center py-2">
-                  <ArrowDownwardIcon sx={{ fontSize: 32, color: '#9ca3af' }} />
+                  <ArrowDownOutlined style={{ fontSize: 32, color: '#9ca3af' }} />
                 </div>
               </React.Fragment>
             ))}

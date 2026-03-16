@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import TaskSelect from '@/components/select/TaskSelect';
 import SelectedAssets from '@/components/SelectedAssets';
-import { AutoAwesome as AutoAwesomeIcon } from '@mui/icons-material';
 import {
   selectSelectedOriginalImageIds,
   selectSelectedUpdatedImageIds,
@@ -228,7 +227,7 @@ const AsideSection: React.FC = () => {
             className={`btn-generate h-11 text-base font-semibold rounded-md shadow-sm ${isDisabled ? 'btn-disabled' : ''}`}
             style={buttonOpacity ? { opacity: buttonOpacity } : undefined}
           >
-            <AutoAwesomeIcon className="text-lg mr-2 align-middle" />
+            <ThunderboltOutlined className="text-lg mr-2 align-middle" />
             Generate
           </Button>
           {shouldShowLockedStyle && (

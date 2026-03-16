@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Modal, Button, Dropdown, Input, Alert, Checkbox } from 'antd';
-import { DownOutlined } from '@ant-design/icons';
-import { Category as CategoryIcon } from '@mui/icons-material';
+import { DownOutlined, AppstoreOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import {
   selectActiveProject,
@@ -173,29 +172,19 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
           trigger={['click']}
           placement="bottomLeft"
         >
-          <button
+          <Button
+            className="w-full text-left"
+            disabled={isLoading}
             style={{
-              width: '100%',
+              height: 'auto',
               padding: '8px 12px',
-              border: '1px solid #d9d9d9',
-              borderRadius: '4px',
-              background: '#fff',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              fontSize: '14px',
-              opacity: isLoading ? 0.6 : 1,
             }}
           >
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <CategoryIcon style={{ fontSize: '20px' }} />
+            <span className="flex items-center gap-1.5">
+              <AppstoreOutlined style={{ fontSize: '18px' }} />
               {selectedSpaceId
                 ? activeProject?.spaces.find((s) => s.id === selectedSpaceId)?.name ||
                   'Select a Space'
@@ -204,7 +193,7 @@ const MoveImageModal: React.FC<MoveImageModalProps> = ({
                   : 'Select a space'}
             </span>
             <DownOutlined style={{ fontSize: '12px' }} />
-          </button>
+          </Button>
         </Dropdown>
       </div>
 

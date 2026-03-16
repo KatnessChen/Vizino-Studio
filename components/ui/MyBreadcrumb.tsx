@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Typography, Breadcrumb, Dropdown, Button, Modal, Alert, Input } from 'antd';
-import { PlusOutlined, DownOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { Home as HomeIcon, Category as CategoryIcon } from '@mui/icons-material';
-import { Box, Skeleton } from '@mui/material';
+import { Typography, Breadcrumb, Dropdown, Button, Modal, Alert, Input, Flex, Skeleton } from 'antd';
+import { 
+  PlusOutlined, 
+  DownOutlined, 
+  ThunderboltOutlined,
+  HomeOutlined,
+  AppstoreOutlined
+} from '@ant-design/icons';
 import { devError } from '@/utils/devLogger';
 import GenericConfirmModal from '../modal/GenericConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -386,7 +390,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
       case ModalMode.ADD_PROJECT:
         return (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <HomeIcon />
+            <HomeOutlined />
             Add New Project
           </span>
         );
@@ -432,7 +436,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         {
           title: (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <HomeIcon />
+              <HomeOutlined />
               Default Project
             </span>
           ),
@@ -440,7 +444,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         {
           title: (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CategoryIcon />
+              <AppstoreOutlined />
               Default Space
             </span>
           ),
@@ -480,7 +484,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             placement="bottomLeft"
           >
             <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <HomeIcon />
+              <HomeOutlined />
               {activeProjectId && activeProject ? activeProject.name : 'Select Project'}
               <DownOutlined style={{ fontSize: '12px' }} />
             </span>
@@ -513,7 +517,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
               placement="bottomLeft"
             >
               <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CategoryIcon />
+                <AppstoreOutlined />
                 {activeSpaceId && activeProject.spaces.find((s) => s.id === activeSpaceId)
                   ? activeProject.spaces.find((s) => s.id === activeSpaceId)?.name
                   : 'Select Space'}
@@ -538,16 +542,16 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
 
   if (!isAppInitiated) {
     return (
-      <Box display="flex" alignItems="center" gap={2} p={2}>
-        <Skeleton variant="rounded" width={200} height={25} />
-        <Skeleton variant="rounded" width={200} height={25} />
-      </Box>
+      <Flex align="center" gap={16} p={16}>
+        <Skeleton.Button active style={{ width: 200, height: 25 }} />
+        <Skeleton.Button active style={{ width: 200, height: 25 }} />
+      </Flex>
     );
   }
 
   return (
     <>
-      <Box display="flex" alignItems="center" gap={2} pt={3} px={3} pb={0}>
+      <Flex align="center" gap={16} pt={24} px={24} pb={0}>
         <Breadcrumb
           items={breadcrumbItems}
           style={{
@@ -559,7 +563,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
           }}
         />
 
-        <Box flexGrow={1} />
+        <div style={{ flexGrow: 1 }} />
 
         {/* Guest Mode Indicator and Tour - Moved from Header */}
         {isGuestMode && (
@@ -687,7 +691,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
         />
-      </Box>
+      </Flex>
     </>
   );
 };

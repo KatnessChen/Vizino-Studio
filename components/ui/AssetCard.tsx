@@ -174,6 +174,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             src={imageSrc}
             alt={asset.name}
             className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-[#e5e7eb]">
@@ -231,4 +232,4 @@ const AssetCard: React.FC<AssetCardProps> = ({
   );
 };
 
-export default AssetCard;
+export default React.memo(AssetCard);

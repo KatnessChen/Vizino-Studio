@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Tooltip } from 'antd';
-import { CompareArrows as CompareIcon } from '@mui/icons-material';
-import { Button } from 'antd';
+import { Tooltip, Button } from 'antd';
+import { SwapOutlined } from '@ant-design/icons';
 import ImagesComparingModal from '../modal/ImagesComparingModal';
 import { ImageData } from '@/types';
 
@@ -34,7 +33,7 @@ const ImagesComparingButton: React.FC<ImagesComparingButtonProps> = ({
           type="text"
           size="small"
           icon={
-            <CompareIcon style={{ fontSize: '18px', color: isEnabled ? 'gray' : 'lightgray' }} />
+            <SwapOutlined style={{ fontSize: '18px', color: isEnabled ? 'gray' : 'lightgray' }} />
           }
           onClick={handleClick}
           disabled={!isEnabled}
