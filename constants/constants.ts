@@ -88,6 +88,59 @@ export type CustomPromptAssetType = (typeof ASSET_TYPES)[number];
 export type AssetType = (typeof ASSET_TYPES)[number];
 
 // ============================================================================
+// Image Generation Resolution Constants
+// ============================================================================
+export const RESOLUTION_1K = '1K' as const;
+export const RESOLUTION_2K = '2K' as const;
+export const RESOLUTION_4K = '4K' as const;
+export const RESOLUTION_8K = '8K' as const;
+
+export const RESOLUTIONS = [RESOLUTION_1K, RESOLUTION_2K, RESOLUTION_4K, RESOLUTION_8K] as const;
+export type ImageResolution = (typeof RESOLUTIONS)[number];
+
+export const RESOLUTION_PIXELS: Record<ImageResolution, number> = {
+  [RESOLUTION_1K]: 1024,
+  [RESOLUTION_2K]: 2048,
+  [RESOLUTION_4K]: 4096,
+  [RESOLUTION_8K]: 8192,
+};
+
+/**
+ * Resolutions that require upscaling (not natively supported by Gemini)
+ * Gemini only supports up to 2K natively
+ */
+export const RESOLUTIONS_REQUIRING_UPSCALE: ImageResolution[] = [RESOLUTION_4K, RESOLUTION_8K];
+
+/**
+ * Check if a resolution requires upscaling
+ */
+export const requiresUpscaling = (resolution: ImageResolution): boolean => {
+  return RESOLUTIONS_REQUIRING_UPSCALE.includes(resolution);
+};
+
+/**
+ * Get the base generation resolution (what Gemini will generate)
+ * Always 2K for resolutions that need upscaling
+ */
+export const getBaseGenerationResolution = (targetResolution: ImageResolution): ImageResolution => {
+  return requiresUpscaling(targetResolution) ? RESOLUTION_2K : targetResolution;
+};
+
+/**
+ * Get the upscale factor needed to reach target resolution from 2K
+ */
+export const getUpscaleFactor = (targetResolution: ImageResolution): 1 | 2 | 4 => {
+  switch (targetResolution) {
+    case RESOLUTION_4K:
+      return 2; // 2K → 4K = 2x
+    case RESOLUTION_8K:
+      return 4; // 2K → 8K = 4x
+    default:
+      return 1; // No upscaling needed
+  }
+};
+
+// ============================================================================
 // V Points (Credit System) Constants
 // ============================================================================
 
@@ -112,4 +165,17 @@ export const CREDIT_MULTIPLIERS: Record<string, number> = {
   color_adjustment: 1,
   remove_clutter: 1,
   brighten_space: 1,
+  // Upscaling (cost is passed as amount, so multiplier is 1)
+  upscale_image: 1,
 } as const;
+
+/**
+ * Credit multipliers for image resolutions
+ * 4K and 8K cost more due to upscaling processing
+ */
+export const RESOLUTION_CREDIT_MULTIPLIERS: Record<ImageResolution, number> = {
+  [RESOLUTION_1K]: 1,
+  [RESOLUTION_2K]: 2,
+  [RESOLUTION_4K]: 6, // 2 (base 2K) + 4 (upscaling)
+  [RESOLUTION_8K]: 10, // 2 (base 2K) + 8 (upscaling 4x)
+};

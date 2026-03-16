@@ -1,6 +1,13 @@
 import { Timestamp } from 'firebase/firestore';
 import { GeminiTaskName } from './services/gemini/geminiTasks';
-import { ASSET_IMAGE, ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';
+import {
+  ASSET_IMAGE,
+  ASSET_COLOR,
+  ASSET_TEXTURE,
+  ASSET_ITEM,
+  ImageResolution,
+  RESOLUTION_2K,
+} from '@/constants/constants';
 
 export interface AppImageData {
   id: string;
@@ -32,6 +39,10 @@ export interface AppImageData {
   width?: number | null;
   height?: number | null;
   aspect_ratio?: number | null; // width / height
+
+  // Resolution tracking for upscaling
+  currentResolution?: ImageResolution; // Current resolution of the image (default: 2K)
+  isUpscaled?: boolean; // Whether this image has been upscaled from its original 2K generation (default: false)
 
   // Soft delete
   isDeleted: boolean;
@@ -107,6 +118,13 @@ export interface ImageOperation {
       name: string;
       url: string; // The URL of the item image at that time
     } | null;
+
+    /**
+     * Resolution tracking for upscaling operations
+     */
+    targetResolution?: ImageResolution; // The resolution this operation was targeting
+    appliedResolution?: ImageResolution; // The actual resolution that was applied
+    isUpscalingOperation?: boolean; // Whether this operation is an upscaling operation
   };
 
   timestamp: Timestamp;
