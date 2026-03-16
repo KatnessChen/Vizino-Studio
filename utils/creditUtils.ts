@@ -1,4 +1,10 @@
-import { CREDIT_MULTIPLIERS, DEFAULT_CREDIT_LIMIT } from '@/constants/constants';
+import {
+  CREDIT_MULTIPLIERS,
+  DEFAULT_CREDIT_LIMIT,
+  ImageResolution,
+  RESOLUTION_CREDIT_MULTIPLIERS,
+  RESOLUTION_2K,
+} from '@/constants/constants';
 import { GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { devWarn } from '@/utils/devLogger';
 
@@ -82,28 +88,57 @@ export const getTotalTaskUsage = (usage: UsageData | undefined, taskName: string
 };
 
 /**
- * Get the credit cost for a specific task
+ * Get the credit multiplier for a specific resolution
+ *
+ * @param resolution - The image resolution (1K, 2K, 4K)
+ * @returns Multiplier for this resolution
+ */
+export const getResolutionMultiplier = (resolution: ImageResolution = RESOLUTION_2K): number => {
+  return RESOLUTION_CREDIT_MULTIPLIERS[resolution] || 1;
+};
+
+/**
+ * Get the credit cost for a specific task and resolution
  *
  * @param taskName - The task name
  * @param thinkingMode - Whether thinking mode is enabled (adds thinking_mode cost)
+ * @param resolution - The image resolution (1K, 2K, 4K)
  * @returns Credit cost for this operation
  */
 export const getCreditCost = (
   taskName: GeminiTaskName | string | null,
-  thinkingMode: boolean = false
+  thinkingMode: boolean = false,
+  resolution: ImageResolution = RESOLUTION_2K
 ): number => {
   if (!taskName) return 1;
 
   // Base cost from task
-  const baseCost = CREDIT_MULTIPLIERS[taskName] ?? 1;
+  let cost = CREDIT_MULTIPLIERS[taskName] ?? 1;
+
+  // Apply resolution multiplier if it's an image generation task
+  const isImageTask = [
+    'recolor_wall',
+    'add_texture',
+    'add_home_item',
+    'custom_prompt',
+    'remove_clutter',
+    'brighten_space',
+    'industrial_style',
+    'loft_style',
+  ].includes(taskName);
+
+  if (isImageTask) {
+    const resolutionMultiplier = getResolutionMultiplier(resolution);
+    cost *= resolutionMultiplier;
+  }
 
   // If thinking mode is enabled and this isn't already thinking_mode or optimize_prompt,
   // we count the thinking_mode increment separately
   if (thinkingMode && taskName !== 'thinking_mode' && taskName !== 'optimize_prompt') {
-    return baseCost + CREDIT_MULTIPLIERS.thinking_mode;
+    cost += CREDIT_MULTIPLIERS.thinking_mode;
   }
 
-  return baseCost;
+  return cost;
 };
 
 /**

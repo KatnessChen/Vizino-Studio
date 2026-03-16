@@ -179,6 +179,30 @@ export const projectStore = createSlice({
         }
       }
     },
+    updateImageUpscaleData: (
+      state,
+      action: PayloadAction<{
+        projectId: string;
+        spaceId: string;
+        imageId: string;
+        updates: Partial<ImageData>;
+      }>
+    ) => {
+      const project = state.projects.find((p) => p.id === action.payload.projectId);
+      if (project) {
+        const space = project.spaces.find((s) => s.id === action.payload.spaceId);
+        if (space?.images) {
+          const idx = space.images.findIndex((img) => img.id === action.payload.imageId);
+          if (idx !== -1) {
+            space.images[idx] = {
+              ...space.images[idx],
+              ...action.payload.updates,
+              updatedAt: Timestamp.fromDate(new Date()),
+            };
+          }
+        }
+      }
+    },
     // Reorder images optimistically
     reorderImagesOptimistic: (
       state,
@@ -266,6 +290,7 @@ export const {
   removeImageOptimistic,
   removeImagesOptimistic,
   updateImageOptimistic,
+  updateImageUpscaleData,
   reorderImagesOptimistic,
   rollbackReorderImages,
 } = projectStore.actions;
