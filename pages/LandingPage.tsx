@@ -12,6 +12,7 @@ import {
   ASSET_TEXTURE,
   ASSET_ITEM,
   CustomPromptAssetType,
+  ImageResolution,
 } from '@/constants/constants';
 import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
@@ -20,6 +21,7 @@ import GenericConfirmModal from '@/components/modal/GenericConfirmModal';
 import CopyImageModal from '@/components/modal/CopyImageModal';
 import MoveImageModal from '@/components/modal/MoveImageModal';
 import RenameImageModal from '@/components/modal/RenameImageModal';
+import UpscaleImageModal from '@/components/modal/UpscaleImageModal';
 import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
 import GreetingModal from '@/components/modal/GreetingModal';
 import Footer from '@/components/layout/Footer';
@@ -28,6 +30,7 @@ import ColorGallery from '@/components/select/ColorGallery';
 import AssetRenameModal from '@/components/modal/AssetRenameModal';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelectionHandler } from '@/hooks/useSelectionHandler';
+import { useImageUpscaling } from '@/hooks/useImageUpscaling';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, Texture, Item, Color, Asset } from '@/types';
 import {
@@ -93,12 +96,18 @@ interface LandingPageProps {
   tourRef: React.RefObject<GuestOnboardingTourRef | null>;
 }
 
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // Get authenticated user
   const { user, adminSettings } = useAuth();
   const { isGuestMode } = useGuest();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email.toLowerCase()) : false;
 
   // Ref for GenerateMoreModal to trigger generation from Tour
   const generateModalRef = useRef<GenerateMoreModalRef>(null);
@@ -179,6 +188,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     updateAsset: updateItem,
     reorderAssets: reorderItems,
   } = useCustomAssets(ASSET_ITEM, activeProjectId);
+
+  // Upscaling hook for handling image upscaling
+  const {
+    upscaleImage,
+    isUpscaling,
+    upscaleProgress,
+    errorMessage: upscaleErrorMessage,
+  } = useImageUpscaling({
+    userId: user?.uid,
+    projectId: activeProjectId || undefined,
+    hasEnabledOwnKey: false,
+  });
 
   // Derive selected IDs from selectedAssets
   const textureSelectedIds = useMemo(() => {
@@ -267,6 +288,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   // State for rename modal
   const [showRenameModal, setShowRenameModal] = useState<boolean>(false);
   const [imageToRename, setImageToRename] = useState<ImageData | null>(null);
+
+  // State for upscale modal
+  const [showUpscaleModal, setShowUpscaleModal] = useState<boolean>(false);
+  const [imageToUpscale, setImageToUpscale] = useState<ImageData | null>(null);
 
   // Mapped assets for Galleries
   const mappedTextures = useMemo(() => {
@@ -1013,6 +1038,37 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
     [originalImages, updatedImages, dispatch]
   );
 
+  const handleSingleUpscale = useCallback(
+    (imageId: string) => {
+      const image = [...originalImages, ...updatedImages].find((img) => img.id === imageId);
+      if (!image) return;
+
+      setImageToUpscale(image);
+      setShowUpscaleModal(true);
+    },
+    [originalImages, updatedImages]
+  );
+
+  const handleUpscaleConfirm = useCallback(
+    async (targetResolution: ImageResolution) => {
+      if (!imageToUpscale) return;
+
+      try {
+        const success = await upscaleImage(imageToUpscale, targetResolution);
+        if (success) {
+          // Close modal on successful completion
+          setShowUpscaleModal(false);
+          setImageToUpscale(null);
+          message.success(`Image upscaled to ${targetResolution} successfully`);
+        }
+      } catch (error) {
+        // Error is already handled by the hook and shown via upscaleErrorMessage
+        devError('Upscaling failed:', error);
+      }
+    },
+    [imageToUpscale, upscaleImage]
+  );
+
   const handleBulkMove = useCallback(
     (imageType: 'original' | 'generated') => {
       const selectedIds =
@@ -1293,6 +1349,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             onReorder={handleReorderOriginalImages}
                             onSingleRename={handleSingleRename}
                             onSingleCopy={handleSingleCopy}
+                            onSingleUpscale={isAdmin ? handleSingleUpscale : undefined}
                             isLoading={isFetchingSpaceImages}
                             showCompare={true}
                           />
@@ -1493,6 +1550,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                             onReorder={handleReorderOriginalImages}
                             onSingleRename={handleSingleRename}
                             onSingleCopy={handleSingleCopy}
+                            onSingleUpscale={isAdmin ? handleSingleUpscale : undefined}
                             isLoading={isFetchingSpaceImages}
                           />
                         )}
@@ -1658,6 +1716,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
                           onReorder={handleReorderGeneratedImages}
                           onSingleRename={handleSingleRename}
                           onSingleCopy={handleSingleCopy}
+                          onSingleUpscale={isAdmin ? handleSingleUpscale : undefined}
                           isLoading={isFetchingSpaceImages}
                           showCompare={true}
                         />
@@ -1768,6 +1827,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
             setShowRenameModal(false);
             setImageToRename(null);
           }}
+        />
+      )}
+
+      {/* Upscale Image Modal */}
+      {imageToUpscale && (
+        <UpscaleImageModal
+          isOpen={showUpscaleModal}
+          image={imageToUpscale}
+          onConfirm={handleUpscaleConfirm}
+          onCancel={() => {
+            setShowUpscaleModal(false);
+            setImageToUpscale(null);
+          }}
+          isUpscaling={isUpscaling}
+          upscaleProgress={upscaleProgress}
+          errorMessage={upscaleErrorMessage}
         />
       )}
 

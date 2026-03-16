@@ -14,6 +14,7 @@ interface SortableAssetCardProps {
   onRename?: () => void;
   onDelete?: () => void;
   onCopy?: () => void;
+  onUpscale?: () => void;
   renderPreview?: () => React.ReactNode;
   showViewButton?: boolean;
   editLabel?: string;
@@ -29,6 +30,7 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
   onRename,
   onDelete,
   onCopy,
+  onUpscale,
   renderPreview,
   showViewButton,
   editLabel,
@@ -56,6 +58,7 @@ const SortableAssetCard: React.FC<SortableAssetCardProps> = ({
         onRename={onRename}
         onDelete={onDelete}
         onCopy={onCopy}
+        onUpscale={onUpscale}
         renderPreview={renderPreview}
         showViewButton={showViewButton}
         editLabel={editLabel}

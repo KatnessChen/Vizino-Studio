@@ -78,6 +78,7 @@ interface GalleryProps {
   onSingleRename?: (imageId: string) => void;
   onSingleDelete?: (imageId: string) => void;
   onSingleCopy?: (imageId: string) => void;
+  onSingleUpscale?: (imageId: string) => void;
   uploadButtonText?: string;
   uploadModalTitle?: string;
   batchUploadMode?: 'image' | 'asset';
@@ -111,6 +112,7 @@ const Gallery: React.FC<GalleryProps> = ({
   onSingleRename,
   onSingleDelete,
   onSingleCopy,
+  onSingleUpscale,
   uploadButtonText = 'Images',
   uploadModalTitle = 'Upload Images',
   batchUploadMode = 'image',
@@ -656,6 +658,7 @@ const Gallery: React.FC<GalleryProps> = ({
                   onRename={onSingleRename ? () => onSingleRename(image.id) : undefined}
                   onDelete={onSingleDelete ? () => onSingleDelete(image.id) : undefined}
                   onCopy={onSingleCopy ? () => onSingleCopy(image.id) : undefined}
+                  onUpscale={onSingleUpscale ? () => onSingleUpscale(image.id) : undefined}
                   renderPreview={renderItemPreview ? () => renderItemPreview(image) : undefined}
                   showViewButton={showViewButton}
                   editLabel={editLabel}

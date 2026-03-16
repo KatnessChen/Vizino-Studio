@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { EyeFilled, SettingOutlined, CheckCircleFilled } from '@ant-design/icons';
-import { Dropdown } from 'antd';
+import { EyeFilled, SettingOutlined, CheckCircleFilled, ArrowUpOutlined } from '@ant-design/icons';
+import { Dropdown, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import { Texture, Item, ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import { devWarn } from '@/utils/devLogger';
 import MyButton from '../button/MyButton';
+import { RESOLUTION_2K } from '@/constants/constants';
 
 type Asset = Texture | Item | ImageData;
 
@@ -20,6 +21,7 @@ interface AssetCardProps {
   onRename?: () => void;
   onDelete?: () => void;
   onCopy?: () => void;
+  onUpscale?: () => void;
   renderPreview?: () => React.ReactNode;
   showViewButton?: boolean;
   editLabel?: string;
@@ -36,6 +38,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   onRename,
   onDelete,
   onCopy,
+  onUpscale,
   renderPreview,
   showViewButton = true,
   editLabel = 'Edit',
@@ -100,6 +103,33 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onViewDetails();
       },
     },
+    // Scale Up option - show for all ImageData when onUpscale is provided
+    // Disabled with tooltip when resolution is already above 2K
+    onUpscale &&
+      isImageData &&
+      (() => {
+        const resolution = (asset as ImageData).currentResolution;
+        const isAlreadyUpscaled = resolution && resolution !== RESOLUTION_2K;
+        return {
+          key: 'upscale',
+          label: isAlreadyUpscaled ? (
+            <Tooltip title="Image has already been scaled up" placement="left">
+              <span>Scale Up</span>
+            </Tooltip>
+          ) : (
+            <Tooltip title="Use AI Upscale to infer image details" placement="left">
+              <span>Scale Up</span>
+            </Tooltip>
+          ),
+          disabled: !!isAlreadyUpscaled,
+          onClick: isAlreadyUpscaled
+            ? undefined
+            : ({ domEvent }: { domEvent: React.MouseEvent }) => {
+                domEvent.stopPropagation();
+                onUpscale();
+              },
+        };
+      })(),
     onDelete && {
       key: 'delete',
       label: 'Delete',
@@ -112,7 +142,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   ].filter(Boolean) as Exclude<MenuProps['items'], undefined>;
 
   // Show gear icon if any operation is available
-  const hasOperations = onRename || onCopy || onDelete;
+  const hasOperations = onRename || onCopy || onDelete || onUpscale;
   return (
     <div
       onClick={(e) => onSelect?.(e)}
