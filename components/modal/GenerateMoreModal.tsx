@@ -8,7 +8,7 @@ import {
   lazy,
 } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch } from 'antd';
+import { Modal, Button, Input, Alert, Tooltip, Drawer, Typography, Tabs, Switch, List, Flex } from 'antd';
 import { message } from '@/utils/antd';
 
 import {
@@ -17,9 +17,8 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   LoadingOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
-import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
-import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import InfoIconWithTooltip from '@/components/ui/InfoIconWithTooltip';
 import VPointsIcon from '@/components/icons/VPointsIcon';
 import SavedPromptList from '@/components/SavedPromptList';
@@ -1526,52 +1525,30 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                         {/* Magic Prompts List */}
                         <div className="overflow-auto flex-1">
                           <List
-                            sx={{
-                              width: '100%',
-                              bgcolor: 'background.paper',
-                              paddingBottom: 0,
-                              height: '334px',
-                            }}
-                          >
-                            {magicPromptsList.map((item) => (
-                              <ListItem
-                                key={item.taskName}
-                                sx={{
-                                  padding: '8px 12px',
-                                  borderBottom: '1px solid #f0f0f0',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s',
-                                  '&:hover': {
-                                    backgroundColor: '#f5f5f5',
-                                  },
-                                }}
+                            className="w-full bg-white h-[334px]"
+                            dataSource={magicPromptsList}
+                            renderItem={(item) => (
+                              <List.Item
+                                className="px-3 py-2 border-b border-[#f0f0f0] cursor-pointer transition-colors hover:bg-[#f5f5f5]"
                                 onClick={(e) => handlePickMagicPrompt(e, item.taskName, item.label)}
                               >
-                                <Box
-                                  sx={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'flex-start',
-                                    gap: 1,
-                                  }}
-                                >
+                                <Flex justify="space-between" align="flex-start" gap={4} className="w-full">
                                   <span>{item.label}</span>
-                                  <MuiTooltip title="Use this magic prompt">
-                                    <IconButton
+                                  <Tooltip title="Use this magic prompt">
+                                    <Button
+                                      type="text"
                                       size="small"
+                                      icon={<CopyOutlined style={{ fontSize: '1rem' }} />}
                                       onClick={(e) =>
                                         handlePickMagicPrompt(e, item.taskName, item.label)
                                       }
-                                      sx={{ flexShrink: 0 }}
-                                    >
-                                      <CopyIcon sx={{ fontSize: '1rem' }} />
-                                    </IconButton>
-                                  </MuiTooltip>
-                                </Box>
-                              </ListItem>
-                            ))}
-                          </List>
+                                      className="flex-none"
+                                    />
+                                  </Tooltip>
+                                </Flex>
+                              </List.Item>
+                            )}
+                          />
                         </div>
                       </>
                     )}
