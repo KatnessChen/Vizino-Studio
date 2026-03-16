@@ -141,12 +141,11 @@ export const useImageUpscaling = ({
         let filePath: string;
         let width: number;
         let height: number;
-        let newFileName: string;
 
         // Generate consistent file name for upscaled image
         const extension = image.mimeType.split('/')[1] || 'png';
         const upscaleId = `${image.id}_${targetResolution.toLowerCase()}`;
-        newFileName = `${upscaleId}.${extension}`;
+        const newFileName = `${upscaleId}.${extension}`;
 
         if (upscaleResult.downloadUrl) {
           // Step 3A: Large image - Cloud Function already uploaded to Firebase Storage

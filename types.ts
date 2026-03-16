@@ -6,7 +6,6 @@ import {
   ASSET_TEXTURE,
   ASSET_ITEM,
   ImageResolution,
-  RESOLUTION_2K,
 } from '@/constants/constants';
 
 export interface AppImageData {

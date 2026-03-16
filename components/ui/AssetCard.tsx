@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EyeFilled, SettingOutlined, CheckCircleFilled, ArrowUpOutlined } from '@ant-design/icons';
+import { EyeFilled, SettingOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { Dropdown, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import { Texture, Item, ImageData } from '@/types';
