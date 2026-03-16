@@ -1,0 +1,25 @@
+{
+  "name": "vizino-cloud-functions",
+  "version": "1.0.0",
+  "description": "Cloud Functions for Vizino Studio",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && npx functions-framework --target=upscaleImage --port=8080 --source=dist/",
+    "deploy": "npm run build && gcloud functions deploy upscaleImage --gen2 --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point upscaleImage --source . --region us-central1 --timeout 300s --memory 512MB",
+    "deploy:prod": "npm run build && gcloud functions deploy upscaleImage --gen2 --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point upscaleImage --source . --region us-central1 --timeout 300s --memory 512MB --set-secrets REPLICATE_API_TOKEN=REPLICATE_API_TOKEN:latest"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.3.0",
+    "firebase-admin": "^12.0.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
