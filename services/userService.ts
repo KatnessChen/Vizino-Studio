@@ -112,11 +112,13 @@ export const getUser = async (uid: string): Promise<User | null> => {
  * @param uid - User ID
  * @param usageKey - Gemini task name or feature key (e.g., 'thinking_mode')
  * @param byOwnKey - Whether this usage is from user's own API key (true) or V Points (false)
+ * @param amount - Amount to increment by (default 1)
  */
 export const incrementTaskUsage = async (
   uid: string,
   usageKey: GeminiTaskName,
-  byOwnKey: boolean = false
+  byOwnKey: boolean = false,
+  amount: number = 1
 ): Promise<void> => {
   return withTracking(
     'firestore_increment_task_usage',
@@ -132,7 +134,7 @@ export const incrementTaskUsage = async (
           ...currentUsage,
           [usageKey]: {
             ...(currentUsage[usageKey] || { onVPoints: 0, onOwnKey: 0 }),
-            [trackingKey]: (currentUsage[usageKey]?.[trackingKey] || 0) + 1,
+            [trackingKey]: (currentUsage[usageKey]?.[trackingKey] || 0) + amount,
           },
         };
 
@@ -143,12 +145,12 @@ export const incrementTaskUsage = async (
           },
           { merge: true }
         );
-        devLog(`Usage incremented: ${usageKey} (${byOwnKey ? 'own key' : 'V Points'})`);
+        devLog(`Usage incremented by ${amount}: ${usageKey} (${byOwnKey ? 'own key' : 'V Points'})`);
       } else {
         devWarn('User not found, cannot increment usage');
       }
     },
-    { usageKey, byOwnKey }
+    { usageKey, byOwnKey, amount }
   );
 };
 

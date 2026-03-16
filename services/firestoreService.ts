@@ -726,6 +726,58 @@ export async function updateImageName(
 }
 
 /**
+ * Updates image fields after upscaling (download URL, resolution, dimensions, etc.)
+ */
+export async function updateImageUpscaleFields(
+  userId: string,
+  projectId: string,
+  spaceId: string,
+  imageId: string,
+  updates: {
+    imageDownloadUrl: string;
+    storageFilePath: string;
+    name: string;
+    width: number;
+    height: number;
+    aspect_ratio: number;
+    currentResolution: string;
+    isUpscaled: boolean;
+    evolutionChain: ImageOperation[];
+  }
+): Promise<void> {
+  return withTracking(
+    'firestore_update_image_upscale',
+    async () => {
+      if (!userId || !projectId || !spaceId || !imageId) {
+        throw new Error(
+          'User ID, Project ID, Space ID, and Image ID are required to update image.'
+        );
+      }
+
+      const docRef = doc(
+        db,
+        'users',
+        userId,
+        'projects',
+        projectId,
+        'spaces',
+        spaceId,
+        'images',
+        imageId
+      );
+
+      await updateDoc(docRef, {
+        ...updates,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
+
+      devLog('Image upscale fields updated in Firestore:', imageId);
+    },
+    { projectId, spaceId, imageId }
+  );
+}
+
+/**
  * Soft deletes images by marking them as deleted in Firestore.
  * Hard deletes the actual image files from Firebase Storage.
  *
