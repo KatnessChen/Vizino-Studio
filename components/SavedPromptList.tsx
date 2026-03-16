@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Input, Modal, Skeleton } from 'antd';
+import { Input, Modal, Skeleton, List, Tooltip, Button, Flex, Typography } from 'antd';
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { message } from '@/utils/antd';
 import { devError } from '@/utils/devLogger';
-import { List, ListItem, Box, Tooltip as MuiTooltip, IconButton } from '@mui/material';
-import { ContentCopy as CopyIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import MyEmpty from '@/components/ui/MyEmpty';
 import { CustomPrompt } from '@/types';
+
+const { Text } = Typography;
 
 interface SavedPromptListProps {
   prompts: CustomPrompt[];
@@ -106,77 +107,51 @@ const SavedPromptList: React.FC<SavedPromptListProps> = ({
           </div>
         ) : (
           <List
-            sx={{
-              width: '100%',
-              bgcolor: 'background.paper',
-              paddingBottom: 0,
-              height: '334px', // hardcoded height to make both columns same height
-            }}
-          >
-            {filteredPrompts.map((prompt: CustomPrompt, index) => (
-              <ListItem
+            className="w-full bg-white h-[334px] overflow-auto"
+            dataSource={filteredPrompts}
+            renderItem={(prompt: CustomPrompt, index) => (
+              <List.Item
                 key={prompt.id || index}
-                sx={{
-                  padding: '8px 12px',
-                  borderBottom: '1px solid #f0f0f0',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                  },
-                }}
+                className="px-3 py-2 border-b border-[#f0f0f0] cursor-pointer transition-colors hover:bg-[#f5f5f5]"
                 onClick={(e) => handleClickPrompt(e, prompt.content)}
               >
-                <Box
-                  sx={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    gap: 1,
-                  }}
-                >
+                <Flex justify="space-between" align="flex-start" gap={8} className="w-full">
                   {/* Prompt Content */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: 'block',
-                        whiteSpace: 'normal',
-                        wordBreak: 'break-word',
-                      }}
+                  <div className="flex-1 min-w-0">
+                    <Text
+                      className="block overflow-hidden text-ellipsis whitespace-normal break-words"
                     >
                       {prompt.content}
-                    </span>
-                  </Box>
+                    </Text>
+                  </div>
 
                   {/* Action Buttons */}
-                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                    <MuiTooltip title="Use this prompt">
-                      <IconButton
+                  <Flex gap={4} shrink={0}>
+                    <Tooltip title="Use this prompt">
+                      <Button
+                        type="text"
                         size="small"
+                        icon={<CopyOutlined style={{ fontSize: '1rem' }} />}
                         onClick={(e) => handleClickPrompt(e, prompt.content)}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                    </MuiTooltip>
-                    <MuiTooltip title="Delete prompt">
-                      <IconButton
+                        className="flex-none"
+                      />
+                    </Tooltip>
+                    <Tooltip title="Delete prompt">
+                      <Button
+                        type="text"
                         size="small"
+                        danger
+                        icon={<DeleteOutlined style={{ fontSize: '1rem' }} />}
                         onClick={(e) => handleDeletePrompt(e, prompt.id!)}
                         disabled={isDeletingPrompt}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        <DeleteIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                    </MuiTooltip>
-                  </Box>
-                </Box>
-              </ListItem>
-            ))}
-          </List>
+                        className="flex-none"
+                      />
+                    </Tooltip>
+                  </Flex>
+                </Flex>
+              </List.Item>
+            )}
+          />
         )}
       </div>
     </>
