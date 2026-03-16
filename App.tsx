@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, Suspense, lazy } from 'react';
 import { App as AntdApp } from 'antd';
 import { Provider } from 'react-redux';
 import '@/styles/main.css';
@@ -10,15 +10,24 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { store } from './stores/store';
 import { ROUTES } from './constants/routes';
 import Header from './components/layout/Header';
-import LandingPage from './pages/LandingPage';
-import AdminSettingPage from './pages/AdminSettingPage';
-import UserProfilePage from './pages/UserProfilePage';
-import NotFoundPage from './pages/NotFoundPage';
 import LoginRequiredModal from './components/modal/LoginRequiredModal';
 import { GuestOnboardingTourRef } from './components/GuestOnboardingTour';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AntdStaticHelper } from './utils/antd';
 import GeminiClientManager from './components/GeminiClientManager';
+
+// Lazy load pages for better performance
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const AdminSettingPage = lazy(() => import('./pages/AdminSettingPage'));
+const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+// Loading component for Suspense
+const PageLoader = () => (
+  <div className="h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 // Main Layout Component - allows both authenticated and guest users
 const MainLayout: React.FC = () => {
@@ -26,11 +35,7 @@ const MainLayout: React.FC = () => {
   const tourRef = useRef<GuestOnboardingTourRef>(null);
 
   if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   // Allow both authenticated and guest users to access the main app
@@ -40,12 +45,14 @@ const MainLayout: React.FC = () => {
         <Header />
         <div className="flex-1 overflow-hidden">
           <div className="app-viewport">
-            <Routes>
-              <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
-              <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
-              <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path={ROUTES.HOME} element={<LandingPage tourRef={tourRef} />} />
+                <Route path={ROUTES.PROJECT} element={<LandingPage tourRef={tourRef} />} />
+                <Route path={ROUTES.SPACE} element={<LandingPage tourRef={tourRef} />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
           </div>
         </div>
         {/* Global Login Required Modal */}
@@ -60,11 +67,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -82,7 +85,9 @@ const ProtectedPageLayout: React.FC = () => {
         <div className="h-screen flex flex-col overflow-hidden">
           <Header />
           <div className="flex-1 overflow-auto">
-            <Outlet />
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
       </ErrorBoundary>
