@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Modal, Button, Input, Typography, Collapse, Flex } from 'antd';
+import { Modal, Button, Input, Typography, Collapse } from 'antd';
 import { CloseOutlined, DownOutlined } from '@ant-design/icons';
 import { getRecolorTaskDefaultPrompt, getAddTextureDefaultPrompt } from '@/services/gemini/prompts';
 import { GeminiTask, GEMINI_TASKS } from '@/services/gemini/geminiTasks';
@@ -69,7 +69,7 @@ const CustomPromptModal: React.FC<CustomPromptModalProps> = ({
           disabled={task.customPromptRequired && !prompt.trim()}
         >
           {prompt.trim() ? 'Use Custom Prompt' : 'Use Default Prompt'}
-        </Button>
+        </Button>,
       ]}
       title={
         <Title level={4} className="m-0">
@@ -102,17 +102,17 @@ const CustomPromptModal: React.FC<CustomPromptModalProps> = ({
           />
         </div>
 
-        <Collapse 
-          ghost 
+        <Collapse
+          ghost
           expandIcon={({ isActive }) => <DownOutlined rotate={isActive ? 180 : 0} />}
           className="bg-gray-50 rounded-lg border border-gray-200"
         >
-          <Panel 
+          <Panel
             header={
               <Text className="text-xs font-semibold text-gray-700">
                 {isRecolorTask ? 'Default Recolor Prompt' : 'Default Texture Prompt'}
               </Text>
-            } 
+            }
             key="1"
           >
             <div className="p-4 bg-white rounded border border-gray-200">

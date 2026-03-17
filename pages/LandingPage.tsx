@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Timestamp } from 'firebase/firestore';
@@ -14,20 +14,12 @@ import {
   CustomPromptAssetType,
   ImageResolution,
 } from '@/constants/constants';
-import GenerateMoreModal, { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
 import Gallery from '@/components/Gallery';
 import EmptyState from '@/components/EmptyState';
-import GenericConfirmModal from '@/components/modal/GenericConfirmModal';
-import CopyImageModal from '@/components/modal/CopyImageModal';
-import MoveImageModal from '@/components/modal/MoveImageModal';
-import RenameImageModal from '@/components/modal/RenameImageModal';
-import UpscaleImageModal from '@/components/modal/UpscaleImageModal';
 import MyBreadcrumb from '@/components/ui/MyBreadcrumb';
-import GreetingModal from '@/components/modal/GreetingModal';
 import Footer from '@/components/layout/Footer';
 import AsideSection from '@/components/layout/AsideSection';
 import ColorGallery from '@/components/select/ColorGallery';
-import AssetRenameModal from '@/components/modal/AssetRenameModal';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import { useSelectionHandler } from '@/hooks/useSelectionHandler';
 import { useImageUpscaling } from '@/hooks/useImageUpscaling';
@@ -46,7 +38,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
-import { downloadFile, buildDownloadFilename } from '@/utils';
+import { downloadFile, buildDownloadFilename } from '@/utils/downloadUtils';
 import { generateRoute } from '@/constants/routes';
 import { checkImageLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
@@ -91,6 +83,17 @@ import {
   setHasSeenGreeting,
   setShowLoginRequiredModal,
 } from '@/stores/guestStore';
+import type { GenerateMoreModalRef } from '@/components/modal/GenerateMoreModal';
+
+// LAZY LOADED MODALS
+const GenerateMoreModal = lazy(() => import('@/components/modal/GenerateMoreModal'));
+const GenericConfirmModal = lazy(() => import('@/components/modal/GenericConfirmModal'));
+const CopyImageModal = lazy(() => import('@/components/modal/CopyImageModal'));
+const MoveImageModal = lazy(() => import('@/components/modal/MoveImageModal'));
+const RenameImageModal = lazy(() => import('@/components/modal/RenameImageModal'));
+const UpscaleImageModal = lazy(() => import('@/components/modal/UpscaleImageModal'));
+const GreetingModal = lazy(() => import('@/components/modal/GreetingModal'));
+const AssetRenameModal = lazy(() => import('@/components/modal/AssetRenameModal'));
 
 interface LandingPageProps {
   tourRef: React.RefObject<GuestOnboardingTourRef | null>;
@@ -110,7 +113,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email.toLowerCase()) : false;
 
   // Ref for GenerateMoreModal to trigger generation from Tour
-  const generateModalRef = useRef<GenerateMoreModalRef>(null);
+  const generateModalRef = useRef<GenerateMoreModalRef | null>(null);
 
   const isAppInitiated = useSelector(selectIsAppInitiated);
   const initError = useSelector(selectInitError);
@@ -407,7 +410,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
           ? (a as Texture).textureImageDownloadUrl
           : (a as Item).itemImageDownloadUrl
       )
-      .join('\n');
+      .join('');
 
     navigator.clipboard
       .writeText(urls)
@@ -770,7 +773,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
       setDeleteConfirmConfig({
         title: 'Delete Image',
-        message: `Are you sure you want to delete ${selectedImageIds.size} selected ${imageType} image(s)?\n\nThis action cannot be undone.`,
+        message: `Are you sure you want to delete ${selectedImageIds.size} selected ${imageType} image(s)?
+
+This action cannot be undone.`,
         onConfirm: async () => {
           try {
             setIsDeletingImages(true);
@@ -1730,150 +1735,135 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         </div>
         <Footer />
       </main>
+      <Suspense fallback={<div />}>
+        {showDeleteConfirmModal && deleteConfirmConfig && (
+          <GenericConfirmModal
+            isOpen={showDeleteConfirmModal}
+            title={deleteConfirmConfig.title}
+            message={deleteConfirmConfig.message}
+            confirmButtonText="Delete"
+            cancelButtonText="Cancel"
+            confirmButtonColor="red"
+            onConfirm={deleteConfirmConfig.onConfirm}
+            onCancel={() => {
+              setShowDeleteConfirmModal(false);
+              setDeleteConfirmConfig(null);
+            }}
+            isLoading={isDeletingImages}
+          />
+        )}
 
-      {/* Generic Delete Confirmation Modal */}
-      {showDeleteConfirmModal && deleteConfirmConfig && (
-        <GenericConfirmModal
-          isOpen={showDeleteConfirmModal}
-          title={deleteConfirmConfig.title}
-          message={deleteConfirmConfig.message}
-          confirmButtonText="Delete"
-          cancelButtonText="Cancel"
-          confirmButtonColor="red"
-          onConfirm={deleteConfirmConfig.onConfirm}
+        {showCopyModal && imageTypeToCopy && (
+          <CopyImageModal
+            isOpen={showCopyModal}
+            numberOfImages={
+              imageTypeToCopy === 'original'
+                ? selectedOriginalImageIds.size
+                : selectedUpdatedImageIds.size
+            }
+            imageType={imageTypeToCopy}
+            onConfirm={handleCopyConfirm}
+            onCancel={() => {
+              setShowCopyModal(false);
+              setImageTypeToCopy(null);
+            }}
+            isLoading={isCopyingImages}
+          />
+        )}
+
+        {showMoveModal && imagesToMove.length > 0 && (
+          <MoveImageModal
+            isOpen={showMoveModal}
+            numberOfImages={imagesToMove.length}
+            onConfirm={handleMoveConfirm}
+            onCancel={() => {
+              setShowMoveModal(false);
+              setImagesToMove([]);
+              setImageTypeToMove(null);
+            }}
+            isLoading={isMovingImage}
+            allowCopyAsOriginal={
+              imagesToMove.length > 0 && imagesToMove.every((img) => !!img.parentImageId) && !!user
+            }
+          />
+        )}
+
+        {isGenerateModalOpen && (
+          <GenerateMoreModal
+            ref={generateModalRef}
+            isOpen={isGenerateModalOpen}
+            sourceImage={sourceImage}
+            sourceAsset={
+              selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name && !sourceImage
+                ? selectedColor || selectedTexture || selectedItem
+                : null
+            }
+            userId={user?.uid}
+            onSuccess={() => {
+              dispatch(setIsGenerateModalOpen(false));
+            }}
+            onCancel={() => dispatch(setIsGenerateModalOpen(false))}
+            onError={setErrorMessage}
+            onErrorAction={setErrorAction}
+            assetType={customPromptAssetType}
+            onGenerateClick={() => {
+              tourRef.current?.closeTour();
+            }}
+          />
+        )}
+
+        {imageToRename && (
+          <RenameImageModal
+            isOpen={showRenameModal}
+            image={imageToRename}
+            onConfirm={handleConfirmRename}
+            onCancel={() => {
+              setShowRenameModal(false);
+              setImageToRename(null);
+            }}
+          />
+        )}
+
+        {imageToUpscale && (
+          <UpscaleImageModal
+            isOpen={showUpscaleModal}
+            image={imageToUpscale}
+            onConfirm={handleUpscaleConfirm}
+            onCancel={() => {
+              setShowUpscaleModal(false);
+              setImageToUpscale(null);
+            }}
+            isUpscaling={isUpscaling}
+            upscaleProgress={upscaleProgress}
+            errorMessage={upscaleErrorMessage}
+          />
+        )}
+
+        <AssetRenameModal
+          isOpen={showAssetRenameModal}
+          asset={assetToRename}
+          onConfirm={handleAssetRenameConfirm}
           onCancel={() => {
-            setShowDeleteConfirmModal(false);
-            setDeleteConfirmConfig(null);
+            setShowAssetRenameModal(false);
+            setAssetToRename(null);
+            setAssetTypeToRename(null);
           }}
-          isLoading={isDeletingImages}
-        />
-      )}
-
-      {/* Copy Image Modal */}
-      {showCopyModal && imageTypeToCopy && (
-        <CopyImageModal
-          isOpen={showCopyModal}
-          numberOfImages={
-            imageTypeToCopy === 'original'
-              ? selectedOriginalImageIds.size
-              : selectedUpdatedImageIds.size
+          type={assetTypeToRename || 'texture'}
+          existingNames={
+            new Set(
+              (assetTypeToRename === 'texture' ? textures : items).map((a) => a.name.toLowerCase())
+            )
           }
-          imageType={imageTypeToCopy}
-          onConfirm={handleCopyConfirm}
-          onCancel={() => {
-            setShowCopyModal(false);
-            setImageTypeToCopy(null);
-          }}
-          isLoading={isCopyingImages}
         />
-      )}
 
-      {/* Move Image Modal */}
-      {showMoveModal && imagesToMove.length > 0 && (
-        <MoveImageModal
-          isOpen={showMoveModal}
-          numberOfImages={imagesToMove.length}
-          onConfirm={handleMoveConfirm}
-          onCancel={() => {
-            setShowMoveModal(false);
-            setImagesToMove([]);
-            setImageTypeToMove(null);
-          }}
-          isLoading={isMovingImage}
-          allowCopyAsOriginal={
-            imagesToMove.length > 0 && imagesToMove.every((img) => !!img.parentImageId) && !!user
-          }
+        <GreetingModal
+          open={isGreetingModalOpen}
+          onSignIn={handleGreetingSignIn}
+          onTakeTour={handleGreetingTakeTour}
+          onClose={handleCloseGreetingModal}
         />
-      )}
-
-      {/* Generate More Modal */}
-      {/* Generate More Modal */}
-      {isGenerateModalOpen && (
-        <GenerateMoreModal
-          ref={generateModalRef}
-          isOpen={isGenerateModalOpen}
-          // logic: IF Custom Prompt AND no sourceImage, try to use asset.
-          sourceImage={sourceImage}
-          sourceAsset={
-            selectedTaskNames[0] === GEMINI_TASKS.CUSTOM_PROMPT.task_name && !sourceImage
-              ? selectedColor || selectedTexture || selectedItem
-              : null
-          }
-          userId={user?.uid}
-          onSuccess={() => {
-            // onSuccess usually closes the modal, so we just dispatch false
-            dispatch(setIsGenerateModalOpen(false));
-            // trigger refresh or other logic if needed?
-            // handleGenerateMoreSuccess(); // If this existed, call it. But simple close is likely enough based on current store logic that updates optimistic.
-          }}
-          onCancel={() => dispatch(setIsGenerateModalOpen(false))}
-          onError={setErrorMessage}
-          onErrorAction={setErrorAction}
-          assetType={customPromptAssetType}
-          onGenerateClick={() => {
-            // Close the tour when generate button is clicked
-            tourRef.current?.closeTour();
-          }}
-        />
-      )}
-
-      {/* Rename Image Modal */}
-      {imageToRename && (
-        <RenameImageModal
-          isOpen={showRenameModal}
-          image={imageToRename}
-          onConfirm={handleConfirmRename}
-          onCancel={() => {
-            setShowRenameModal(false);
-            setImageToRename(null);
-          }}
-        />
-      )}
-
-      {/* Upscale Image Modal */}
-      {imageToUpscale && (
-        <UpscaleImageModal
-          isOpen={showUpscaleModal}
-          image={imageToUpscale}
-          onConfirm={handleUpscaleConfirm}
-          onCancel={() => {
-            setShowUpscaleModal(false);
-            setImageToUpscale(null);
-          }}
-          isUpscaling={isUpscaling}
-          upscaleProgress={upscaleProgress}
-          errorMessage={upscaleErrorMessage}
-        />
-      )}
-
-      {/* Asset Rename Modal */}
-      <AssetRenameModal
-        isOpen={showAssetRenameModal}
-        asset={assetToRename}
-        onConfirm={handleAssetRenameConfirm}
-        onCancel={() => {
-          setShowAssetRenameModal(false);
-          setAssetToRename(null);
-          setAssetTypeToRename(null);
-        }}
-        type={assetTypeToRename || 'texture'}
-        existingNames={
-          new Set(
-            (assetTypeToRename === 'texture' ? textures : items).map((a) => a.name.toLowerCase())
-          )
-        }
-      />
-
-      {/* Guest Onboarding Tour */}
+      </Suspense>
       <GuestOnboardingTour ref={tourRef} generateModalRef={generateModalRef} />
-
-      {/* Initial Greeting Modal for Guests */}
-      <GreetingModal
-        open={isGreetingModalOpen}
-        onSignIn={handleGreetingSignIn}
-        onTakeTour={handleGreetingTakeTour}
-        onClose={handleCloseGreetingModal}
-      />
     </div>
   );
 };

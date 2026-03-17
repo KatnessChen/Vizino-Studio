@@ -118,15 +118,13 @@ const SavedPromptList: React.FC<SavedPromptListProps> = ({
                 <Flex justify="space-between" align="flex-start" gap={8} className="w-full">
                   {/* Prompt Content */}
                   <div className="flex-1 min-w-0">
-                    <Text
-                      className="block overflow-hidden text-ellipsis whitespace-normal break-words"
-                    >
+                    <Text className="block overflow-hidden text-ellipsis whitespace-normal break-words">
                       {prompt.content}
                     </Text>
                   </div>
 
                   {/* Action Buttons */}
-                  <Flex gap={4} shrink={0}>
+                  <Flex gap={4} className="flex-shrink-0">
                     <Tooltip title="Use this prompt">
                       <Button
                         type="text"

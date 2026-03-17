@@ -111,8 +111,6 @@ async function pollPrediction(
   throw new Error('Upscaling timed out');
 }
 
-
-
 /**
  * Check if image should be uploaded to Firebase Storage (for large files)
  */

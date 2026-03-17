@@ -1,13 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Typography, Breadcrumb, Dropdown, Button, Modal, Alert, Input, Flex, Skeleton } from 'antd';
-import { 
-  PlusOutlined, 
-  DownOutlined, 
+import {
+  Typography,
+  Breadcrumb,
+  Dropdown,
+  Button,
+  Modal,
+  Alert,
+  Input,
+  Flex,
+  Skeleton,
+} from 'antd';
+import {
+  PlusOutlined,
+  DownOutlined,
   ThunderboltOutlined,
   HomeOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { devError } from '@/utils/devLogger';
 import GenericConfirmModal from '../modal/GenericConfirmModal';
@@ -542,7 +552,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
 
   if (!isAppInitiated) {
     return (
-      <Flex align="center" gap={16} p={16}>
+      <Flex align="center" gap={16} className="p-4">
         <Skeleton.Button active style={{ width: 200, height: 25 }} />
         <Skeleton.Button active style={{ width: 200, height: 25 }} />
       </Flex>
@@ -551,7 +561,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
 
   return (
     <>
-      <Flex align="center" gap={16} pt={24} px={24} pb={0}>
+      <Flex align="center" gap={16} className="pt-6 px-6 pb-0">
         <Breadcrumb
           items={breadcrumbItems}
           style={{

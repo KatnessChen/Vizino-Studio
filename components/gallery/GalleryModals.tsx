@@ -15,16 +15,18 @@ interface GalleryModalsProps {
   renderItemPreview?: (image: ImageData) => React.ReactNode;
   detailModalTitle?: string;
   onSingleRename?: (imageId: string) => void;
-  
+
   imageForGenerationHistory: ImageData | null;
   showGenerationHistoryModal: boolean;
   onCloseGenerationHistoryModal: () => void;
-  
+
   onUploadImage?: unknown;
   onUploadError?: unknown;
   showBatchUploadModal: boolean;
   setShowBatchUploadModal: (show: boolean) => void;
-  handleBatchUpload: (files: any) => Promise<void>;
+  handleBatchUpload: (
+    files: Array<{ file: File; width: number; height: number; name?: string; description?: string }>
+  ) => Promise<void>;
   totalImageCount: number;
   uploadModalTitle: string;
   batchUploadMode: 'image' | 'asset';
@@ -43,11 +45,11 @@ const GalleryModals: React.FC<GalleryModalsProps> = ({
   renderItemPreview,
   detailModalTitle,
   onSingleRename,
-  
+
   imageForGenerationHistory,
   showGenerationHistoryModal,
   onCloseGenerationHistoryModal,
-  
+
   onUploadImage,
   onUploadError,
   showBatchUploadModal,
