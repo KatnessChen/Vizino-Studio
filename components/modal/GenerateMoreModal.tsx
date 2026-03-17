@@ -42,7 +42,7 @@ import {
 } from '@/services/gemini/geminiTasks';
 import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
 import { incrementTaskUsage } from '@/services/userService';
-import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
+import { createImage, fetchSpaceImages } from '@/services/firestoreService';
 import { formatImageOperationData } from '@/utils/imageOperationUtils';
 import { base64ToFile } from '@/utils/fileUtils';
 import { extractImageDimensions } from '@/utils/imageUtils';
@@ -531,6 +531,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       activeProjectId,
       fetchPrompts,
       setErrorMessage,
+      onSuccess,
     ]);
 
     // Expose handleGenerate to parent via ref

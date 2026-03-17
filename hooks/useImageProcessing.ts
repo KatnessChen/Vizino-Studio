@@ -97,9 +97,10 @@ export const useImageProcessing = ({
 
         setIsProcessingImage(false);
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         devError('AI Generation failed:', error);
-        setErrorMessage(error.response?.data?.message || error.message || 'Generation failed');
+        const errorMessage = (error as any).response?.data?.message || (error as any).message || 'Generation failed';
+        setErrorMessage(errorMessage);
         setIsProcessingImage(false);
         return null;
       }

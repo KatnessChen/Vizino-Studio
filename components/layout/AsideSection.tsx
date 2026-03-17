@@ -14,7 +14,6 @@ import {
   selectSelectedTaskNames,
   selectSelectedAssets,
   setIsGenerateModalOpen,
-  selectSourceImage,
   setSourceImage,
 } from '@/stores/taskStore';
   import {

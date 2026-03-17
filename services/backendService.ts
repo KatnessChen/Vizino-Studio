@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { Project, Space, ImageData, Color, Texture, Item } from '@/types';
+import { Project, Space, ImageData, Color } from '@/types';
 
 export const backendService = {
   // Projects
@@ -79,7 +79,7 @@ export const backendService = {
     spaceId: string;
     taskName: string;
     customPrompt?: string;
-    options?: any;
+    options?: Record<string, any>;
   }): Promise<ImageData> {
     const response = await apiClient.post('/ai/generate', payload);
     return response.data;
@@ -95,7 +95,7 @@ export const backendService = {
   },
 
   // User
-  async getMe(): Promise<any> {
+  async getMe(): Promise<Record<string, any>> {
     const response = await apiClient.get('/users/me');
     return response.data;
   },
