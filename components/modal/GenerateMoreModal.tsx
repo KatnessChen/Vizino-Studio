@@ -324,10 +324,9 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       cancelProcessing,
     } = useImageProcessing({
       userId,
-      guestSessionId,
+      projectId: activeProjectId || undefined,
+      spaceId: activeSpaceId || undefined,
       selectedTaskName: activeTaskName || GEMINI_TASKS.RECOLOR_WALL.task_name,
-      thinkingMode,
-      hasEnabledOwnKey,
       options: {
         selectedColor,
         selectedTexture,
@@ -475,36 +474,39 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         hasCustomPrompt: !!customPrompt.trim(),
       });
 
-      const result = await processImage(effectiveSource, customPrompt.trim() || undefined);
+      const result = await processImage(sourceImage!, customPrompt.trim() || undefined, {
+        selectedColor,
+        selectedTexture,
+        selectedItem,
+      });
 
       if (result) {
-        devLogContext('[GenerateMoreModal] Processing successful, result:', {
-          hasMimeType: !!result.mimeType,
-          hasBase64: !!result.base64,
-          base64Length: result.base64?.length || 0,
+        devLogContext('[GenerateMoreModal] Image generation succeeded:', {
+          hasData: !!result,
+          id: result.id,
         });
 
-        // Save custom prompt immediately after a successful generation for authenticated users
+        // Reset state and close modal immediately
+        setCustomPrompt('');
+        setGeneratedImage(null);
+        setErrorMessage(null);
+        setValidationError(null);
+        setIsSavingImage(false);
+
+        // Reset sourceImage in Redux
+        dispatch(setSourceImage(null));
+
+        // Save customPrompt to Redux for later use
         const promptToSave = customPrompt.trim() || undefined;
-        if (isAuthenticated && userId && activeProjectId && activeTaskName && promptToSave) {
-          (async () => {
-            try {
-              await saveCustomPrompt(userId, activeProjectId, activeTaskName, promptToSave);
-              // Refresh prompts list so it appears in the Saved Prompts panel
-              try {
-                await fetchPrompts();
-              } catch (fetchErr) {
-                devWarn('Failed to refresh prompts after saving:', fetchErr);
-              }
-              message.success('Prompt saved');
-            } catch (saveErr) {
-              devWarn('Failed to save custom prompt on generate:', saveErr);
-            }
-          })();
+        if (promptToSave) {
+          dispatch(setReduxCustomPrompt(promptToSave));
         }
 
-        setGeneratedImage(result);
-        setShowConfirmationModal(true);
+        // Show success message
+        message.success('Image generated and saved successfully!');
+
+        // Close modal and trigger refresh in parent
+        onSuccess();
       }
     }, [
       guestHasUsedGeneration,

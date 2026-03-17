@@ -14,9 +14,14 @@ import {
   selectSelectedTaskNames,
   selectSelectedAssets,
   setIsGenerateModalOpen,
+  selectSourceImage,
   setSourceImage,
 } from '@/stores/taskStore';
-import { Color, Texture, Item, ImageData as AppImageData } from '@/types';
+  import {
+  selectActiveProjectId,
+  selectActiveSpaceId,
+  } from '@/stores/projectStore';
+  import { Color, Texture, Item, ImageData as AppImageData } from '@/types';
 import {
   selectHasGeneratedImage,
   selectGuestImages,
@@ -59,6 +64,8 @@ const AsideSection: React.FC = () => {
   }, [isGuestMode, guestImages, storeUpdatedImages]);
 
   const selectedTaskNames = useSelector(selectSelectedTaskNames);
+  const activeProjectId = useSelector(selectActiveProjectId);
+  const activeSpaceId = useSelector(selectActiveSpaceId);
   const selectedAssets = useSelector(selectSelectedAssets);
   const hasGeneratedImage = useSelector(selectHasGeneratedImage);
 
@@ -81,12 +88,9 @@ const AsideSection: React.FC = () => {
   // Use image processing hook to get sourceImage state
   const { isProcessingImage } = useImageProcessing({
     userId: user?.uid,
+    projectId: activeProjectId || undefined,
+    spaceId: activeSpaceId || undefined,
     selectedTaskName: selectedTaskNames[0] || null,
-    options: {
-      selectedColor,
-      selectedTexture,
-      selectedItem,
-    },
   });
 
   // Get the single selected image (if exactly 1 is selected)

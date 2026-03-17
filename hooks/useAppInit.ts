@@ -4,15 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { devError } from '@/utils/devLogger';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppDispatch } from '@/stores/store';
-import {
-  setProjects,
-  setActiveProjectId,
-  setActiveSpaceId,
-  setSpaceImages,
-  setIsAppInitiated,
-  setInitError,
-} from '@/stores/projectStore';
-import { fetchProjects, fetchSpaceImages } from '@/services/firestoreService';
+import { setProjects, setActiveProjectId, setActiveSpaceId, setSpaceImages, setIsAppInitiated, setInitError } from '@/stores/projectStore';
+import { backendService } from '@/services/backendService';
 import { generateRoute } from '@/constants/routes';
 import { extractShortId } from '@/utils/stringUtils';
 
@@ -66,7 +59,7 @@ export const useAppInit = () => {
         dispatch(setInitError(null));
 
         // Fetch all projects for the user
-        const projects = await fetchProjects(user.uid);
+        const projects = await backendService.getProjects();
         dispatch(setProjects(projects));
 
         if (projects.length === 0) {
@@ -106,7 +99,7 @@ export const useAppInit = () => {
           dispatch(setActiveSpaceId(selectedSpace.id));
 
           // Fetch images for the selected space
-          const images = await fetchSpaceImages(user.uid, selectedProject.id, selectedSpace.id);
+          const images = await backendService.getImages(selectedProject.id, selectedSpace.id);
           dispatch(
             setSpaceImages({
               projectId: selectedProject.id,
