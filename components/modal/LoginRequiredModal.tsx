@@ -115,6 +115,7 @@ const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ onLoginSuccess,
       centered
       maskClosable={true}
       closable={true}
+      aria-label="Sign in required"
     >
       <div className="flex flex-col items-center py-6 px-4 gap-6">
         {/* Icon */}

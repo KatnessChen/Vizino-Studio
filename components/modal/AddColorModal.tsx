@@ -192,6 +192,7 @@ const AddColorModal: React.FC<AddColorModalProps> = ({ open, onClose, onAdd }) =
               type="color"
               value={normalizeColorInput(colorHex) || DEFAULT_COLOR_PICKER_VALUE}
               onChange={(e) => setColorHex(e.target.value)}
+              aria-label="Pick color value"
               style={{
                 width: '50px',
                 height: '40px',

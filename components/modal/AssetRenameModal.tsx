@@ -135,6 +135,7 @@ const AssetRenameModal: React.FC<AssetRenameModalProps> = ({
                 type="color"
                 value={/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex) ? hex : '#ffffff'}
                 onChange={(e) => setHex(e.target.value.toUpperCase())}
+                aria-label="Pick color"
                 style={{
                   position: 'absolute',
                   inset: 0,

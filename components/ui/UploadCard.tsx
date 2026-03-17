@@ -79,6 +79,7 @@ const UploadCard: React.FC<UploadCardProps> = ({
         accept="image/*"
         onChange={(e) => handleFileChange(e.target.files)}
         disabled={isLimitReached}
+        aria-label="Upload image file"
       />
 
       {/* Upload area matching AssetCard height */}

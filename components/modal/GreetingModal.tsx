@@ -19,6 +19,7 @@ const GreetingModal: React.FC<GreetingModalProps> = ({ open, onSignIn, onTakeTou
       closable={false}
       centered
       width={480}
+      aria-label="Welcome to Vizino AI"
       styles={{
         body: { padding: '40px 32px' },
         mask: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0, 0, 0, 0.45)' },

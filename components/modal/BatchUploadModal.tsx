@@ -321,6 +321,7 @@ const BatchUploadModal: React.FC<BatchUploadModalProps> = ({
         multiple
         onChange={handleFileInputChange}
         style={{ display: 'none' }}
+        aria-label="Upload multiple files"
       />
 
       {/* Upload area */}

@@ -1,0 +1,8 @@
+# Vizino AI - Robots.txt
+# https://www.robotstxt.org/
+
+User-agent: *
+Allow: /
+
+# Sitemap location (update when sitemap is available)
+# Sitemap: https://vizino.ai/sitemap.xml

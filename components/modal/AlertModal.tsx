@@ -114,14 +114,19 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, type, title, message, o
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="alert-modal-title"
+    >
       <div
         className={`${styles.bgColor} border-2 ${styles.borderColor} rounded-lg shadow-xl max-w-md w-full mx-4`}
       >
         <div className="p-6">
           <div className="flex items-center mb-4">
             <div className="flex-shrink-0">{renderIcon()}</div>
-            <h3 className={`ml-3 text-lg font-bold ${styles.titleColor}`}>{title}</h3>
+            <h3 id="alert-modal-title" className={`ml-3 text-lg font-bold ${styles.titleColor}`}>{title}</h3>
           </div>
 
           <p className={`${styles.messageColor} text-sm leading-relaxed`}>{message}</p>
