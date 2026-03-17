@@ -43,7 +43,8 @@ import {
 import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
 import { incrementTaskUsage } from '@/services/userService';
 import { createImage, fetchSpaceImages, saveCustomPrompt } from '@/services/firestoreService';
-import { formatImageOperationData, base64ToFile } from '@/utils';
+import { formatImageOperationData } from '@/utils/imageOperationUtils';
+import { base64ToFile } from '@/utils/fileUtils';
 import { extractImageDimensions } from '@/utils/imageUtils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {

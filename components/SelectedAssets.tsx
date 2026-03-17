@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Typography } from 'antd';
 import { devWarn } from '@/utils/devLogger';
 import { imageCache } from '@/utils/imageCache';
-import { imageDownloadUrlToBase64 } from '@/utils';
+import { imageDownloadUrlToBase64 } from '@/utils/fileUtils';
 import { cardHeight } from '@/components/layout/AsideSection';
 import { ImageData, Asset } from '@/types';
 import { ASSET_COLOR, ASSET_TEXTURE, ASSET_ITEM } from '@/constants/constants';

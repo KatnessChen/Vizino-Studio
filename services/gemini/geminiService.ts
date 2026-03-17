@@ -16,7 +16,7 @@ import {
 } from '@/constants/constants';
 import { GEMINI_ERRORS } from './geminiApiErrors';
 import { storage } from '../firestoreService';
-import { fetchImageAsBase64, getBase64FromImageData } from '@/utils';
+import { fetchImageAsBase64, getBase64FromImageData } from '@/utils/imageUtils';
 import { devWarn, devError, devLog } from '@/utils/devLogger';
 import { withTracking } from '../analyticsService';
 import { mockProcessImageWithTask, mockGenerateOptimizedPrompt } from './mockGeminiService';

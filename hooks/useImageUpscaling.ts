@@ -13,7 +13,7 @@ import { updateImageUpscaleFields } from '@/services/firestoreService';
 import { updateImageUpscaleData } from '@/stores/projectStore';
 import { devLog, devError, devWarn } from '@/utils/devLogger';
 import { incrementTaskUsage } from '@/services/userService';
-import { base64ToFile } from '@/utils';
+import { base64ToFile } from '@/utils/fileUtils';
 import { extractImageDimensions } from '@/utils/imageUtils';
 import { getUpscaleFactor } from '@/constants/constants';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';

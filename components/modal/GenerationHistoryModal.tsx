@@ -3,7 +3,8 @@ import { Modal, Button, Typography } from 'antd';
 import { ArrowDownOutlined } from '@ant-design/icons';
 import { devWarn } from '@/utils/devLogger';
 import { ImageData } from '@/types';
-import { imageCache, formatTimestamp } from '@/utils';
+import { imageCache } from '@/utils/imageCache';
+import { formatTimestamp } from '@/utils/fileUtils';
 
 interface GenerationHistoryModalProps {
   isOpen: boolean;

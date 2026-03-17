@@ -1,5 +1,5 @@
 import { indexedDBService, type CacheEntry } from '@/services/indexedDBService';
-import { imageDownloadUrlToBase64 } from '@/utils';
+import { imageDownloadUrlToBase64 } from './fileUtils';
 import { devWarn } from '@/utils/devLogger';
 import { ImageData } from '@/types';
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import { devWarn } from '@/utils/devLogger';
-import { formatTimestamp } from '@/utils';
+import { formatTimestamp } from '@/utils/fileUtils';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
 import { storage } from '@/services/firestoreService';
 import { Button, Modal } from 'antd';
