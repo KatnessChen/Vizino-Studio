@@ -14,6 +14,39 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('firebase')) {
+                return 'firebase-vendor';
+              }
+              if (id.includes('antd')) {
+                return 'antd-vendor';
+              }
+              if (id.includes('@mui') || id.includes('@emotion')) {
+                return 'mui-vendor';
+              }
+              if (id.includes('@dnd-kit')) {
+                return 'dnd-kit-vendor';
+              }
+              if (id.includes('react-dom')) {
+                return 'react-dom-vendor';
+              }
+              if (id.includes('@google/generative-ai')) {
+                return 'google-genai-vendor';
+              }
+              if (id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
+                return 'redux-vendor';
+              }
+              // Catch-all for other node_modules
+              return 'vendor';
+            }
+          },
+        },
+      },
+    },
     esbuild: {
       // Remove all console.* calls in production
       drop: mode === 'production' ? ['console', 'debugger'] : [],
