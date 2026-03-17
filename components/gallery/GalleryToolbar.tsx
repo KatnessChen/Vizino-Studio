@@ -4,15 +4,13 @@ import {
   BarsOutlined, 
   AppstoreOutlined, 
   PlusOutlined,
-  LockOutlined 
-} from '@ant-design/icons';
-import {
-  DriveFileMoveOutline,
-  Downloading as DownloadIcon,
+  LockOutlined,
+  FolderOutlined,
+  DownloadOutlined as DownloadIcon,
   DeleteOutlined as DeleteIcon,
-  Close as CloseIcon,
-  ContentCopy as CopyIcon,
-} from '@mui/icons-material';
+  CloseOutlined as CloseIcon,
+  CopyOutlined as CopyIcon,
+} from '@ant-design/icons';
 import ImagesComparingButton from '../button/ImagesComparingButton';
 import { ImageData } from '@/types';
 
@@ -143,7 +141,7 @@ const GalleryToolbar: React.FC<GalleryToolbarProps> = ({
                 <Button
                   type="text"
                   size="small"
-                  icon={<DriveFileMoveOutline style={iconStyle} />}
+                  icon={<FolderOutlined style={iconStyle} />}
                   onClick={onBulkMove}
                   style={toolbarButtonStyle}
                 />

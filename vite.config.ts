@@ -25,9 +25,6 @@ export default defineConfig(({ mode }) => {
               if (id.includes('antd')) {
                 return 'antd-vendor';
               }
-              if (id.includes('@mui') || id.includes('@emotion')) {
-                return 'mui-vendor';
-              }
               if (id.includes('@dnd-kit')) {
                 return 'dnd-kit-vendor';
               }
