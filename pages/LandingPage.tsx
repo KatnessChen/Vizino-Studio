@@ -1293,7 +1293,7 @@ This action cannot be undone.`,
         style={{ height: 'calc(100vh - var(--header-height))' }}
       >
         <div className="bg-gray-100 flex-1">
-          <div className="flex items-end justify-between pr-6">
+          <div className="flex items-end justify-between px-6 pt-6">
             <MyBreadcrumb onStartTour={() => tourRef.current?.openTour()} />
             {imageLimitInfo && (
               <Tag variant="outlined" color="purple">

@@ -90,13 +90,9 @@ const UploadCard: React.FC<UploadCardProps> = ({
         }`}
       >
         <UploadIcon
-          sx={{
-            fontSize: 48,
-            color: isLimitReached ? 'action.disabled' : 'text.secondary',
-            transition: 'color 0.2s',
-            '&:hover': isLimitReached ? {} : { color: 'primary.main' },
-          }}
-          className={isLimitReached ? '' : 'group-hover:text-blue-400'}
+          className={`text-4xl transition-colors ${
+            isLimitReached ? 'text-gray-400' : 'text-gray-500 group-hover:text-blue-500'
+          }`}
         />
         <p
           className={`mt-2 text-sm font-semibold transition-colors ${

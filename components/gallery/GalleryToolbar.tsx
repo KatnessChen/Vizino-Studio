@@ -1,8 +1,8 @@
 import React from 'react';
 import { Button, Tooltip, Segmented } from 'antd';
-import { 
-  BarsOutlined, 
-  AppstoreOutlined, 
+import {
+  BarsOutlined,
+  AppstoreOutlined,
   PlusOutlined,
   LockOutlined,
   FolderOutlined,
