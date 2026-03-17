@@ -79,7 +79,7 @@ export const backendService = {
     spaceId: string;
     taskName: string;
     customPrompt?: string;
-    options?: Record<string, any>;
+    options?: Record<string, unknown>;
   }): Promise<ImageData> {
     const response = await apiClient.post('/ai/generate', payload);
     return response.data;
@@ -95,7 +95,7 @@ export const backendService = {
   },
 
   // User
-  async getMe(): Promise<Record<string, any>> {
+  async getMe(): Promise<Record<string, unknown>> {
     const response = await apiClient.get('/users/me');
     return response.data;
   },
