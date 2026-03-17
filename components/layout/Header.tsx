@@ -1,11 +1,14 @@
 import React from 'react';
 import { Avatar, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '../../contexts/AuthContext';
+import { setShowLoginRequiredModal } from '@/stores/guestStore';
 
 const Header: React.FC = () => {
   const { user } = useAuth();
+  const dispatch = useDispatch();
   const ALLOWED_EMAILS = (process.env.VITE_ADMIN_EMAILS || '')
     .split(',')
     .map((e) => e.trim().toLowerCase())
@@ -15,8 +18,14 @@ const Header: React.FC = () => {
 
   const navigate = useNavigate();
 
-  // Clicking the Avatar should navigate directly to the User Profile
-  const goToUserProfile = () => navigate(ROUTES.USER_PROFILE);
+  // Clicking the Avatar should navigate to User Profile if logged in, otherwise show login modal
+  const goToUserProfile = () => {
+    if (user) {
+      navigate(ROUTES.USER_PROFILE);
+    } else {
+      dispatch(setShowLoginRequiredModal(true));
+    }
+  };
 
   return (
     <>
@@ -46,7 +55,7 @@ const Header: React.FC = () => {
             )}
             <div 
               onClick={goToUserProfile}
-              className="p-0 border-2 border-white/30 rounded-full hover:border-white/50 cursor-pointer transition-all duration-200"
+              className={`p-0 border-2 ${user ? 'border-white/30 hover:border-white/50' : 'border-gray-400/30 hover:border-gray-400/50'} rounded-full cursor-pointer transition-all duration-200`}
             >
               <Avatar
                 alt={user?.displayName || 'User'}
