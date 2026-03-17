@@ -130,8 +130,9 @@ Found X uncommitted files with the following logical groupings:
 
 ## Next Steps
 
-**Ready to proceed?** Please select a commit number to stage (recommended: start with #1), or ask me to:
+**Ready to proceed?** Please select a commit number to stage (recommended: start with #1), ask me to:
 
+- **Quick commit all**: Say `"commit all"`, `"ok"`, `"go"`, `"proceed"`, or `"just do it"` to auto-stage and commit all in recommended order
 - Re-analyze with different groupings
 - Merge or split commits
 - Show detailed file diffs
@@ -145,6 +146,40 @@ When user says "Let's do commit #X" or "Stage commit #X":
 1. **Verify the commit selection**: Confirm which files will be staged
 2. **Stage files using git add**: Use `git add` commands for each file
 3. **Provide commit message**: Generate detailed commit message following Conventional Commits
+
+### Quick Commit All (Shortcut)
+
+**When user says**: "commit all" / "ok" / "go" / "just do it" / "proceed" (after analysis)
+
+Automatically proceed with staging and committing **all grouped commits in recommended order**:
+
+1. Stage **Commit #1** → provide commit message → confirm and commit
+2. Stage **Commit #2** → provide commit message → confirm and commit
+3. Continue for remaining commits until all are committed
+
+**Output format**:
+
+```markdown
+## Auto-Committing All Changes
+
+Stage and commit in recommended order:
+
+### 1️⃣ Staging Commit #1: ...
+✅ Files staged (X files)
+✅ Committed: `<commit hash>`
+
+### 2️⃣ Staging Commit #2: ...
+✅ Files staged (X files)
+✅ Committed: `<commit hash>`
+
+[Continue...]
+
+## ✅ All commits complete!
+
+Final status: Your branch is now 5 commits ahead of origin/develop
+
+Ready to push?
+```
 
 ### Staging Commands Format
 
@@ -345,6 +380,10 @@ Before staging:
 
 **Assistant**: [Performs Step 1: Analysis and presents grouped commits]
 
+---
+
+**Option A - Pick & Choose**:
+
 **User**: "Let's do commit #1"
 
 **Assistant**: [Performs Step 2: Stages files and provides commit message]
@@ -352,6 +391,18 @@ Before staging:
 **User**: "Approved, committed. Next?"
 
 **Assistant**: [Shows progress and suggests commit #2]
+
+---
+
+**Option B - Commit All (Recommended for Small Changes)**:
+
+**User**: "Analyze my changes and suggest commits"
+
+**Assistant**: [Performs Step 1: Analysis and presents grouped commits]
+
+**User**: "go"
+
+**Assistant**: [Auto-stages and commits all in recommended order, showing each commit hash]
 
 ---
 
@@ -397,4 +448,7 @@ When you're ready, I will:
 3. Provide recommendations for commit order
 4. Guide you through staging each commit
 
-**Just say**: "Analyze my changes" or "Start commit workflow"
+**Just say one of**:
+- `"Analyze my changes"` - For manual review before committing
+- `"commit all"` / `"ok"` / `"go"` / `"proceed"` - Auto-stage and commit all in recommended order (after analysis)
+- `"Start commit workflow"` - For step-by-step guidance
