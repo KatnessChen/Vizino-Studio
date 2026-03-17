@@ -28,8 +28,14 @@ export default defineConfig(({ mode }) => {
               if (id.includes('@dnd-kit')) {
                 return 'dnd-kit-vendor';
               }
-              if (id.includes('react-dom')) {
-                return 'react-dom-vendor';
+              // Keep react, react-dom, and scheduler together to avoid circular dependency
+              if (
+                id.includes('react-dom') ||
+                id.includes('react/') ||
+                id.includes('/react.') ||
+                id.includes('scheduler')
+              ) {
+                return 'react-vendor';
               }
               if (id.includes('@google/generative-ai')) {
                 return 'google-genai-vendor';

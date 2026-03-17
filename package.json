@@ -55,6 +55,5 @@
     "typescript-eslint": "^8.50.1",
     "vite": "^6.2.0",
     "vitest": "^4.0.17"
-  },
-  "packageManager": "pnpm@8.0.0+sha512.0abb2f77c2ca6fe4a8101fdb431459aed4ade518bc83d8e63e0e8c2b27b1313235a5d2dde3880fc1557a7192eada36183efe6afa00033e46136d8afc49e14278"
+  }
 }
