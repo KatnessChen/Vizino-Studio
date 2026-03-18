@@ -25,6 +25,7 @@ import { useImageUpscaling } from '@/hooks/useImageUpscaling';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, Texture, Item, Color, Asset } from '@/types';
 import { backendService } from '@/services/backendService';
+import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
@@ -287,12 +288,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   const [imageToUpscale, setImageToUpscale] = useState<ImageData | null>(null);
 
   // Mapped assets for Galleries
+  // Ensure imageDownloadUrl is always populated so AssetCard can display the preview image.
+  // Textures use textureImageDownloadUrl and Items use itemImageDownloadUrl as their primary URL;
+  // we copy those into imageDownloadUrl so the generic AssetCard renderer works.
   const mappedTextures = useMemo(() => {
-    return textures as unknown as ImageData[];
+    return (textures as unknown as Texture[]).map((t) => ({
+      ...t,
+      imageDownloadUrl: t.textureImageDownloadUrl || t.imageDownloadUrl || '',
+    })) as unknown as ImageData[];
   }, [textures]);
 
   const mappedItems = useMemo(() => {
-    return items as unknown as ImageData[];
+    return (items as unknown as Item[]).map((i) => ({
+      ...i,
+      imageDownloadUrl: i.itemImageDownloadUrl || i.imageDownloadUrl || '',
+    })) as unknown as ImageData[];
   }, [items]);
 
   const handleTextureUpload = async (
@@ -520,7 +530,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       }
 
       const tempImageId = crypto.randomUUID();
-      const now = new Date().toISOString();
 
       // Calculate optimistic order value (max current order + 1)
       const currentMaxOrder = Math.max(0, ...originalImages.map((img) => img.order ?? 0));
@@ -543,8 +552,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         order: optimisticOrder,
         isDeleted: false,
         deletedAt: null,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date()),
         description: metadata.description,
         // Add optimistic dimensions
         width: metadata.width,
@@ -919,7 +928,7 @@ This action cannot be undone.`,
       }
 
       // Fetch updated space images to sync with server
-      const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+      const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
       dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
       // Clear selection and close modal
@@ -939,7 +948,7 @@ This action cannot be undone.`,
 
       // Rollback - refresh from server
       try {
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+        const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
       } catch (refreshError) {
         devError('Failed to refresh images:', refreshError);
@@ -1103,7 +1112,7 @@ This action cannot be undone.`,
 
         // If copying as originals is requested, perform that flow
         if (copyAsOriginal) {
-          const copyPromises = imagesToCopyAsOriginal.map((image) =>
+          const copyPromises = imagesToMove.map((image: ImageData) =>
             backendService.copyImageAsOriginal(
               activeProjectId!,
               activeSpaceId!,
@@ -1124,8 +1133,8 @@ This action cannot be undone.`,
 
           // Refresh both source and target spaces
           const [sourceImages, targetImages] = await Promise.all([
-            fetchSpaceImages(user.uid, activeProjectId, activeSpaceId),
-            fetchSpaceImages(user.uid, activeProjectId, finalTargetSpaceId),
+            backendService.getImages(activeProjectId!, activeSpaceId!),
+            backendService.getImages(activeProjectId!, finalTargetSpaceId),
           ]);
 
           dispatch(
