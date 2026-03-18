@@ -113,7 +113,7 @@ export const backendService = {
   async getTextures(projectId: string): Promise<Record<string, unknown>[]> {
     const response = await apiClient.get(`/assets/${projectId}/textures`);
     return response.data;
-  }
+  },
 
   async uploadTexture(projectId: string, name: string, file: File, description?: string): Promise<Record<string, unknown>> {
     const formData = new FormData();
@@ -124,16 +124,16 @@ export const backendService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
-  }
+  },
 
   async deleteTexture(projectId: string, textureId: string): Promise<void> {
     await apiClient.delete(`/assets/${projectId}/textures/${textureId}`);
-  }
+  },
 
   async getItems(projectId: string): Promise<Record<string, unknown>[]> {
     const response = await apiClient.get(`/assets/${projectId}/items`);
     return response.data;
-  }
+  },
 
   async uploadItem(projectId: string, name: string, file: File, description?: string): Promise<Record<string, unknown>> {
     const formData = new FormData();
@@ -144,7 +144,7 @@ export const backendService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
-  }
+  },
 
   async deleteItem(projectId: string, itemId: string): Promise<void> {
     await apiClient.delete(`/assets/${projectId}/items/${itemId}`);
