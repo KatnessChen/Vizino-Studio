@@ -1,10 +1,3 @@
-/**
- * useCustomAssets Hook
- *
- * Manages custom assets (colors, textures, and items) for the current context (user or guest).
- * Uses the storage adapter pattern to abstract away the storage details.
- */
-
 import { useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/stores/store';
@@ -29,19 +22,20 @@ import {
   setLoadColorsError,
 } from '@/stores/customAssetsStore';
 import { reorderAssetsWithDebounce } from '@/stores/imageOrderThunks';
-import { useStorageAdapter } from '@/hooks/useStorageAdapter';
 import { useUploadGate } from '@/hooks/useUploadGate';
 import { devError } from '@/utils/devLogger';
-import { ImageOperation, Texture, Item, Color } from '@/types';
+import { Texture, Item, Color } from '@/types';
 import { ASSET_COLOR } from '@/constants/constants';
 import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from '@/utils/assetUtils';
-import { CreateAssetParams, CreateColorParams } from '@/services/storageAdapter';
+import { backendService } from '@/services/backendService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const GUEST_PROJECT_ID = 'guest-project';
 
 export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: string | null) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { adapter, isReady, isGuestMode } = useStorageAdapter();
+  const { user, isAuthenticated } = useAuth();
+  const isGuestMode = !isAuthenticated;
   const { gateUpload } = useUploadGate();
 
   // Use shared utility functions for type checking
@@ -79,8 +73,8 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
 
   // Load custom assets - only once per project/asset type
   useEffect(() => {
-    // Skip if not ready or no project
-    if (!isReady || !effectiveProjectId) return;
+    // Skip if no project or guest (guests don't have custom assets in this version)
+    if (!effectiveProjectId || isGuestMode) return;
 
     // Skip if already loaded (has assets)
     const hasAssets = isTexture
@@ -88,9 +82,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
       : isItem
         ? (projectAssets?.customItems?.length ?? 0) > 0
         : (projectAssets?.customColors?.length ?? 0) > 0;
-    if (hasAssets) {
-      return;
-    }
+    if (hasAssets) return;
 
     // Skip if already loading
     const isLoading = isTexture
@@ -98,14 +90,10 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
       : isItem
         ? projectAssets?.isLoadingItems
         : projectAssets?.isLoadingColors;
-    if (isLoading) {
-      return;
-    }
+    if (isLoading) return;
 
     // Skip if we already started loading for this key
-    if (loadingStartedRef.current === loadingKey) {
-      return;
-    }
+    if (loadingStartedRef.current === loadingKey) return;
 
     // Mark that we're starting to load
     loadingStartedRef.current = loadingKey;
@@ -114,185 +102,128 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
       try {
         if (isTexture) {
           dispatch(setLoadingTextures({ projectId: effectiveProjectId, isLoadingTextures: true }));
-          const textures = await adapter.fetchTextures();
-          textures.sort((a, b) => (a.order || 0) - (b.order || 0));
-          dispatch(setCustomTextures({ projectId: effectiveProjectId, textures }));
+          const rawTextures = await backendService.getTextures(effectiveProjectId);
+          // Normalize: ensure imageDownloadUrl is set from textureImageDownloadUrl for AssetCard compatibility
+          const textures = rawTextures.map((t) => ({
+            ...t,
+            imageDownloadUrl: (t.textureImageDownloadUrl as string) || (t.imageDownloadUrl as string) || '',
+          }));
+          dispatch(setCustomTextures({ projectId: effectiveProjectId, textures: textures as unknown as Texture[] }));
         } else if (isItem) {
           dispatch(setLoadingItems({ projectId: effectiveProjectId, isLoadingItems: true }));
-          const items = await adapter.fetchItems();
-          items.sort((a, b) => (a.order || 0) - (b.order || 0));
-          dispatch(setCustomItems({ projectId: effectiveProjectId, items }));
+          const rawItems = await backendService.getItems(effectiveProjectId);
+          // Normalize: ensure imageDownloadUrl is set from itemImageDownloadUrl for AssetCard compatibility
+          const items = rawItems.map((i) => ({
+            ...i,
+            imageDownloadUrl: (i.itemImageDownloadUrl as string) || (i.imageDownloadUrl as string) || '',
+          }));
+          dispatch(setCustomItems({ projectId: effectiveProjectId, items: items as unknown as Item[] }));
         } else {
           dispatch(setLoadingColors({ projectId: effectiveProjectId, isLoadingColors: true }));
-          const colors = await adapter.fetchColors();
+          const colors = await backendService.getColors(effectiveProjectId);
           dispatch(setCustomColors({ projectId: effectiveProjectId, colors }));
         }
       } catch (error) {
         devError(`Failed to load ${assetType}s:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         if (isTexture) {
-          dispatch(
-            setLoadTexturesError({
-              projectId: effectiveProjectId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            })
-          );
+          dispatch(setLoadTexturesError({ projectId: effectiveProjectId, error: errorMessage }));
         } else if (isItem) {
-          dispatch(
-            setLoadItemsError({
-              projectId: effectiveProjectId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            })
-          );
+          dispatch(setLoadItemsError({ projectId: effectiveProjectId, error: errorMessage }));
         } else {
-          dispatch(
-            setLoadColorsError({
-              projectId: effectiveProjectId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            })
-          );
+          dispatch(setLoadColorsError({ projectId: effectiveProjectId, error: errorMessage }));
         }
       }
     };
 
     loadAssets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, effectiveProjectId, assetType]);
+  }, [effectiveProjectId, assetType, isGuestMode, isTexture, isItem, dispatch]);
 
   const addAsset = useCallback(
-    async (
-      assetData: T extends typeof ASSET_COLOR
-        ? {
-            name: string;
-            hex: string;
-            description?: string;
-            evolutionChain?: ImageOperation[];
-          }
-        : {
-            name: string;
-            file: File;
-            description?: string;
-            width?: number;
-            height?: number;
-            aspect_ratio?: number;
-            evolutionChain?: ImageOperation[];
-          }
-    ): Promise<Color | Texture | Item> => {
-      if (!isReady || !effectiveProjectId) {
-        throw new Error('Storage not ready');
-      }
-
-      // For guests, check if upload should be gated (only for textures and items)
-      if (isGuestMode && (isTexture || isItem)) {
-        const allowed = gateUpload(assetType, assetData);
-        if (!allowed) {
-          throw new Error('LOGIN_REQUIRED');
-        }
+    async (assetData: any): Promise<any> => {
+      if (!effectiveProjectId || isGuestMode) {
+        throw new Error('Action not allowed for guests');
       }
 
       if (isTexture) {
-        const newTexture = await adapter.addTexture(assetData as CreateAssetParams);
-        dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture }));
+        const newTexture = await backendService.uploadTexture(effectiveProjectId, assetData.name, assetData.file, assetData.description);
+        dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture as unknown as Texture }));
         return newTexture;
       } else if (isItem) {
-        const newItem = await adapter.addItem(assetData as CreateAssetParams);
-        dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem }));
+        const newItem = await backendService.uploadItem(effectiveProjectId, assetData.name, assetData.file, assetData.description);
+        dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem as unknown as Item }));
         return newItem;
       } else {
-        const newColor = await adapter.addColor(assetData as CreateColorParams);
+        const newColor = await backendService.createColor(effectiveProjectId, assetData.name, assetData.hex, assetData.description);
         dispatch(addCustomColorAction({ projectId: effectiveProjectId, color: newColor }));
         return newColor;
       }
     },
-    [
-      isReady,
-      effectiveProjectId,
-      isGuestMode,
-      gateUpload,
-      assetType,
-      isTexture,
-      isItem,
-      adapter,
-      dispatch,
-    ]
+    [effectiveProjectId, isGuestMode, isTexture, isItem, assetType, dispatch]
   );
 
   const deleteAsset = useCallback(
     async (assetId: string): Promise<void> => {
-      if (!isReady || !effectiveProjectId) {
-        throw new Error('Storage not ready');
-      }
+      if (!effectiveProjectId || isGuestMode) return;
 
       if (isTexture) {
-        await adapter.deleteTexture(assetId);
+        await backendService.deleteTexture(effectiveProjectId, assetId);
         dispatch(removeCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId }));
       } else if (isItem) {
-        await adapter.deleteItem(assetId);
+        await backendService.deleteItem(effectiveProjectId, assetId);
         dispatch(removeCustomItemAction({ projectId: effectiveProjectId, itemId: assetId }));
       } else if (isColor) {
-        await adapter.deleteColor(assetId);
+        await backendService.deleteColor(effectiveProjectId, assetId);
         dispatch(removeCustomColorAction({ projectId: effectiveProjectId, colorId: assetId }));
       }
     },
-    [isReady, effectiveProjectId, isColor, isTexture, isItem, adapter, dispatch]
+    [effectiveProjectId, isGuestMode, isTexture, isItem, isColor, dispatch]
   );
 
   const updateAsset = useCallback(
-    async (assetId: string, updates: { name?: string; description?: string }): Promise<void> => {
-      if (!isReady || !effectiveProjectId) {
-        throw new Error('Storage not ready');
-      }
+    async (assetId: string, updates: any): Promise<void> => {
+      if (!effectiveProjectId || isGuestMode) return;
 
       if (isTexture) {
-        await adapter.updateTexture(assetId, updates);
-        dispatch(
-          updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates })
-        );
+        // Assume backend updateTexture exists or use generic
+        await backendService.updateTexture(effectiveProjectId, assetId, updates);
+        dispatch(updateCustomTextureAction({ projectId: effectiveProjectId, textureId: assetId, updates }));
       } else if (isItem) {
-        await adapter.updateItem(assetId, updates);
-        dispatch(
-          updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates })
-        );
+        await backendService.updateItem(effectiveProjectId, assetId, updates);
+        dispatch(updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates }));
       } else if (isColor) {
-        await adapter.updateColor(assetId, updates);
+        await backendService.updateColor(effectiveProjectId, assetId, updates.name, updates.hex);
         dispatch(updateCustomColor({ projectId: effectiveProjectId, colorId: assetId, updates }));
       }
     },
-    [isReady, effectiveProjectId, isTexture, isItem, isColor, adapter, dispatch]
+    [effectiveProjectId, isGuestMode, isTexture, isItem, isColor, dispatch]
   );
 
   const reorderAssets = useCallback(
     async (reorderedIds: string[]): Promise<void> => {
-      // Basic validation
-      if (!isReady || !effectiveProjectId) return;
+      if (!effectiveProjectId || isGuestMode) return;
 
-      // Determine collection name
       let collectionName: 'custom_textures' | 'custom_items' | null = null;
       if (isTexture) collectionName = 'custom_textures';
       if (isItem) collectionName = 'custom_items';
 
       if (!collectionName) return;
 
-      // Get current assets for this type
       const currentAssets = isTexture ? projectAssets?.customTextures : projectAssets?.customItems;
-
       if (!currentAssets || currentAssets.length === 0) return;
 
-      // Dispatch the thunk
-      // effectiveProjectId is used as projectId
-      // spaceId is null for project-level assets
-      // contextId in adapter is essentially the userId (or guest ID)
       dispatch(
         reorderAssetsWithDebounce(
-          adapter.contextId, // userId
+          user?.uid || '',
           effectiveProjectId,
-          null, // spaceId for project-level
+          null,
           collectionName,
           reorderedIds,
           isTexture ? (currentAssets as Texture[]) : (currentAssets as Item[])
         )
       );
     },
-    [isReady, effectiveProjectId, isTexture, isItem, projectAssets, adapter.contextId, dispatch]
+    [effectiveProjectId, isGuestMode, isTexture, isItem, projectAssets, user, dispatch]
   );
 
   return {

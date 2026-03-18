@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUser } from '@/services/userService';
+import { backendService } from '@/services/backendService';
 import { devWarn, devError } from '@/utils/devLogger';
 import { User } from '@/types';
 import {
@@ -92,8 +92,13 @@ export const useCreditCheck = ({
 
     try {
       setIsLoading(true);
-      const user = await getUser(userId);
-      setUserData(user);
+      const userDataFromBackend = await backendService.getMe();
+      // Map backend data to User type
+      const mappedUser = {
+        uid: userId,
+        ...userDataFromBackend
+      } as User;
+      setUserData(mappedUser);
     } catch (error) {
       devError('[useCreditCheck] Failed to fetch user data:', error);
     } finally {
