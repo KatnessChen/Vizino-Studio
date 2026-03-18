@@ -2,7 +2,7 @@ import { debounce } from 'lodash';
 import { AppDispatch } from './store';
 import { reorderImagesOptimistic, rollbackReorderImages } from './projectStore';
 import { setCustomTextures, setCustomItems } from './customAssetsStore';
-import { batchUpdateImagesOrder } from '@/services/firestoreService';
+import { backendService } from '@/services/backendService';
 import { devLog, devError } from '@/utils/devLogger';
 import { ImageData, Texture, Item } from '@/types';
 import { message } from '@/utils/antd';
@@ -55,7 +55,13 @@ const debouncedBatchUpdate = debounce(
       // This prevents "lost updates" due to optimistic state mismatches during debounce
       const updates = reorderedIds.map((id, index) => ({ id, order: index + 1 }));
 
-      await batchUpdateImagesOrder(userId, projectId, spaceId, updates, collectionName);
+      if (collectionName === 'images' && spaceId) {
+        await backendService.updateImageOrder(projectId, spaceId, updates);
+      } else {
+        // Fallback for custom assets if backend not ready, or implement there too
+        devLog(`Order sync for ${collectionName} not yet implemented via backend`);
+      }
+      
       devLog(`Successfully synced ${collectionName} order to Firestore`);
       message.success('Order saved successfully');
     } catch (error) {

@@ -47,17 +47,7 @@ import {
   selectActiveProject,
 } from '@/stores/projectStore';
 import { resetTaskState } from '@/stores/taskStore';
-import {
-  createProject,
-  updateProject,
-  deleteProject,
-  createSpace,
-  updateSpace,
-  deleteSpace,
-  fetchSpaceImages,
-  fetchColors,
-  fetchTextures,
-} from '@/services/firestoreService';
+import { backendService } from '@/services/backendService';
 import {
   setCustomColors,
   setCustomTextures,
@@ -123,7 +113,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
   useEffect(() => {
     const autoFetchSpaceImages = async () => {
       if (user && activeProjectId && activeSpaceId) {
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+        const images = await backendService.getImages(activeProjectId, activeSpaceId);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
       }
     };
@@ -167,8 +157,8 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
           dispatch(setLoadingTextures({ projectId, isLoadingTextures: true }));
 
           const [colors, textures] = await Promise.all([
-            fetchColors(user.uid, projectId),
-            fetchTextures(user.uid, projectId),
+            backendService.getColors(projectId),
+            backendService.getTextures(projectId),
           ]);
 
           dispatch(setCustomColors({ projectId, colors }));
@@ -220,7 +210,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         onConfirm: async () => {
           if (!user) return;
           try {
-            await deleteProject(user.uid, projectId);
+            await backendService.deleteProject(projectId);
             dispatch(removeProject(projectId));
 
             // Navigate to home or first available project after deletion
@@ -263,7 +253,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         onConfirm: async () => {
           if (!user) return;
           try {
-            await deleteSpace(user.uid, projectId, spaceId);
+            await backendService.deleteSpace(projectId, spaceId);
             dispatch(removeSpace({ projectId, spaceId }));
 
             // Navigate to first available space or project after deletion
@@ -309,7 +299,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             setModalProcessing(false);
             return;
           }
-          const newProject = await createProject(user.uid, userInputValue);
+          const newProject = await backendService.createProject(userInputValue);
           dispatch(addProject(newProject));
           dispatch(setActiveProjectId(newProject.id));
           dispatch(resetTaskState());
@@ -328,7 +318,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
             setModalProcessing(false);
             return;
           }
-          const newSpace = await createSpace(user.uid, activeProjectId, userInputValue);
+          const newSpace = await backendService.createSpace(activeProjectId, userInputValue);
           dispatch(addSpace({ projectId: activeProjectId, space: newSpace }));
           dispatch(setActiveSpaceId(newSpace.id));
           dispatch(resetTaskState());
@@ -342,7 +332,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         }
         case ModalMode.EDIT_PROJECT: {
           if (!editingEntityIds.projectId) throw Error('Project Id not exist');
-          await updateProject(user.uid, editingEntityIds.projectId, userInputValue);
+          await backendService.updateProject(editingEntityIds.projectId, userInputValue);
           dispatch(
             updateProjectAction({ projectId: editingEntityIds.projectId, name: userInputValue })
           );
@@ -351,8 +341,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         case ModalMode.EDIT_SPACE: {
           if (!editingEntityIds.projectId || !editingEntityIds.spaceId)
             throw Error('Project Id or Space Id not exist');
-          await updateSpace(
-            user.uid,
+          await backendService.updateSpace(
             editingEntityIds.projectId,
             editingEntityIds.spaceId,
             userInputValue

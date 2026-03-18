@@ -37,9 +37,6 @@ export default defineConfig(({ mode }) => {
               ) {
                 return 'react-vendor';
               }
-              if (id.includes('@google/generative-ai')) {
-                return 'google-genai-vendor';
-              }
               if (id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
                 return 'redux-vendor';
               }

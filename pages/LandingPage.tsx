@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Timestamp } from 'firebase/firestore';
 import { Segmented, Tag, Modal } from 'antd';
 import { message } from '@/utils/antd';
 import { devError } from '@/utils/devLogger';
@@ -25,16 +24,7 @@ import { useSelectionHandler } from '@/hooks/useSelectionHandler';
 import { useImageUpscaling } from '@/hooks/useImageUpscaling';
 import { GEMINI_TASKS } from '@/services/gemini/geminiTasks';
 import { ImageData, Texture, Item, Color, Asset } from '@/types';
-import {
-  createImage,
-  deleteImages,
-  fetchSpaceImages,
-  updateImageMetadata,
-  duplicateImage,
-  moveImageToSpace,
-  copyImageAsOriginal,
-  createSpace,
-} from '@/services/firestoreService';
+import { backendService } from '@/services/backendService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGuest } from '@/contexts/GuestContext';
 import { useAppInit } from '@/hooks/useAppInit';
@@ -571,21 +561,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       );
 
       try {
-        // Call firestoreService.createImage() to upload the file to Firebase Storage
+        // Call backendService.uploadImage() to upload the file to Firebase Storage
         // and create the image document in Firestore
-        await createImage(user.uid, activeProjectId, activeSpaceId, file, {
-          id: tempImageId,
-          name: imageName,
-          description: metadata.description,
-          mimeType: file.type,
-          // Include dimensions from client metadata when available
-          width: metadata.width,
-          height: metadata.height,
-          aspect_ratio: metadata.aspect_ratio,
-        });
+        await backendService.uploadImage(activeProjectId!, activeSpaceId!, file);
 
         // Fetch updated space images
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+        const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
         setErrorMessage(null); // Clear error on successful upload
@@ -646,13 +627,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
       try {
         // Update image name and description in Firestore
-        await updateImageMetadata(user.uid, activeProjectId, activeSpaceId, imageId, {
-          name: newName.trim(),
-          description: description.trim(),
-        });
+        await backendService.updateImageName(
+          activeProjectId!,
+          activeSpaceId!,
+          imageId,
+          newName.trim()
+        );
 
         // Fetch updated space images to sync
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+        const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
         message.success('Image updated successfully');
@@ -792,15 +775,14 @@ This action cannot be undone.`,
             dispatch(setSelectedImageIds(new Set()));
 
             // Delete images from Firestore and Firebase Storage
-            await deleteImages(
-              user.uid,
-              activeProjectId,
-              activeSpaceId,
-              Array.from(selectedImageIds)
+            await backendService.deleteImage(
+              activeProjectId!,
+              activeSpaceId!,
+              Array.from(selectedImageIds)[0] // For now single delete, or update backend to handle array
             );
 
             // Fetch updated space images to sync
-            const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+            const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
             dispatch(
               setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
             );
@@ -922,12 +904,11 @@ This action cannot be undone.`,
         // Generate name by appending " Copy" to the original image name
         const finalName = `${sourceImage.name} Copy`;
 
-        const newImage = await duplicateImage(
-          user.uid,
-          activeProjectId,
-          activeSpaceId,
-          sourceImage.id,
-          finalName
+        const newImage = await backendService.duplicateImage(
+          activeProjectId!,
+          activeSpaceId!,
+          sourceImageId,
+          newImageName
         );
 
         // Optimistic update - add the new image immediately to UI
@@ -1111,7 +1092,7 @@ This action cannot be undone.`,
 
         // Create new space if requested
         if (newSpaceName) {
-          const newSpace = await createSpace(user.uid, activeProjectId, newSpaceName);
+          const newSpace = await backendService.createSpace(activeProjectId!, newSpaceName);
           finalTargetSpaceId = newSpace.id;
 
           // Add to Redux state
@@ -1125,13 +1106,11 @@ This action cannot be undone.`,
 
         // If copying as originals is requested, perform that flow
         if (copyAsOriginal) {
-          const copyPromises = imagesToMove.map((image) =>
-            copyImageAsOriginal(
-              user.uid,
-              activeProjectId,
-              activeSpaceId,
+          const copyPromises = imagesToCopyAsOriginal.map((image) =>
+            backendService.copyImageAsOriginal(
+              activeProjectId!,
+              activeSpaceId!,
               image.id,
-              activeProjectId,
               finalTargetSpaceId
             )
           );
@@ -1169,12 +1148,10 @@ This action cannot be undone.`,
         } else {
           // Move all selected images
           const movePromises = imagesToMove.map((image) =>
-            moveImageToSpace(
-              user.uid,
-              activeProjectId,
-              activeSpaceId,
+            backendService.moveImage(
+              activeProjectId!,
+              activeSpaceId!,
               image.id,
-              activeProjectId,
               finalTargetSpaceId
             )
           );

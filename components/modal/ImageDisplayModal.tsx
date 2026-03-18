@@ -3,8 +3,6 @@ import { ImageData } from '@/types';
 import { imageCache } from '@/utils/imageCache';
 import { devWarn } from '@/utils/devLogger';
 import { formatTimestamp } from '@/utils/fileUtils';
-import { getMetadata, ref as storageRef } from 'firebase/storage';
-import { storage } from '@/services/firestoreService';
 import { Button, Modal } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 
@@ -79,16 +77,7 @@ const ImageDisplayModal: React.FC<ImageDisplayModalProps> = ({
           return;
         }
 
-        // 2) Actual size from storage metadata
-        if (image.storageFilePath) {
-          const metadata = await getMetadata(storageRef(storage, image.storageFilePath));
-          if (metadata && typeof metadata.size === 'number') {
-            setFileSizeMB(bytesToMBString(metadata.size));
-            return;
-          }
-        }
-
-        // 3) Fallback from data URI
+        // 2) Fallback from data URI or just skip direct firebase metadata call for now
         if (image.imageDownloadUrl && image.imageDownloadUrl.startsWith('data:')) {
           const parts = image.imageDownloadUrl.split('base64,');
           if (parts.length === 2) {

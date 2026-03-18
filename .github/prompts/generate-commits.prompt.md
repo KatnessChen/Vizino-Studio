@@ -20,6 +20,8 @@ This is an **interactive multi-step workflow**:
 4. **Review Phase**: Provide commit message for user review
 5. **Repeat**: Continue until all changes are committed
 
+> **Important:** Do not push to remote automatically without explicit user permission. Always ensure you are on the **develop** branch before staging or committing anything.
+
 ## Step 1: Initial Analysis
 
 When invoked, perform the following:

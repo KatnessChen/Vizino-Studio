@@ -42,7 +42,6 @@ import {
 } from '@/services/gemini/geminiTasks';
 import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
 import { incrementTaskUsage } from '@/services/userService';
-import { createImage, fetchSpaceImages } from '@/services/firestoreService';
 import { formatImageOperationData } from '@/utils/imageOperationUtils';
 import { base64ToFile } from '@/utils/fileUtils';
 import { extractImageDimensions } from '@/utils/imageUtils';
@@ -55,6 +54,7 @@ import {
   removeImageOptimistic,
 } from '@/stores/projectStore';
 import { saveFeedback } from '@/services/feedbackService';
+import { backendService } from '@/services/backendService';
 
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';

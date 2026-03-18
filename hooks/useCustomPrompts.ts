@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchAllCustomPrompts, deleteCustomPrompt } from '@/services/firestoreService';
+import { backendService } from '@/services/backendService';
 import {
   setCustomPrompts,
   setLoadingPrompts,
@@ -30,11 +30,11 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
   const isLoading = useSelector(selectIsLoadingPromptsForProject(projectId || ''));
   const error = useSelector(selectLoadPromptsErrorForProject(projectId || ''));
 
-  // Fetch all prompts from Firestore
+  // Fetch all prompts from Backend
   const fetchPrompts = useCallback(async () => {
-    if (!userId || !projectId) {
+    if (!projectId) {
       dispatch(
-        setLoadPromptsError({ projectId: projectId || '', error: 'Missing userId or projectId' })
+        setLoadPromptsError({ projectId: projectId || '', error: 'Missing projectId' })
       );
       return;
     }
@@ -42,7 +42,7 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
     dispatch(setLoadingPrompts({ projectId, isLoadingPrompts: true }));
 
     try {
-      const fetchedPrompts = await fetchAllCustomPrompts(userId, projectId);
+      const fetchedPrompts = await backendService.getPrompts(projectId);
       dispatch(
         setCustomPrompts({
           projectId,
@@ -58,18 +58,18 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
         })
       );
     }
-  }, [userId, projectId, dispatch]);
+  }, [projectId, dispatch]);
 
   // Delete a single prompt
   const deletePrompt = useCallback(
     async (promptId: string) => {
-      if (!userId || !projectId) {
-        throw new Error('Missing userId or projectId');
+      if (!projectId) {
+        throw new Error('Missing projectId');
       }
 
       try {
-        // Delete from Firestore
-        await deleteCustomPrompt(userId, projectId, promptId);
+        // Delete from Backend
+        await backendService.deletePrompt(projectId, promptId);
         
         // Remove from Redux store
         dispatch(removeCustomPrompt({ projectId, promptId }));
@@ -78,7 +78,7 @@ export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
         throw new Error(errorMessage);
       }
     },
-    [userId, projectId, dispatch]
+    [projectId, dispatch]
   );
 
   // Filter prompts by keyword
