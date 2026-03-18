@@ -3,14 +3,16 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
+  getAuth,
   signOut,
   onAuthStateChanged,
   User,
   setPersistence,
   browserLocalPersistence,
 } from 'firebase/auth';
-import { auth } from './firebaseService';
-import { createOrUpdateUser } from './userService';
+import { app } from '@/config/firebaseConfig';
+
+const auth = getAuth(app);
 import { devLog, devError } from '@/utils/devLogger';
 import { withTracking } from './analyticsService';
 
@@ -51,14 +53,6 @@ export const signInWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-
-      // Create or update user in Firestore
-      await createOrUpdateUser({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      });
 
       return {
         success: true,
@@ -101,14 +95,6 @@ export const handleRedirectResult = async () => {
       // User just returned from Google sign-in page
       const user = result.user;
       devLog('Processing redirect authentication result');
-
-      // Create or update user in Firestore
-      await createOrUpdateUser({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      });
 
       return {
         success: true,

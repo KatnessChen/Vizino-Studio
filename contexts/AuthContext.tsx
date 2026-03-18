@@ -4,7 +4,6 @@ import { onAuthChange } from '@/services/authService';
 import { getAdminSettings, setAdminSettings, AdminSettings } from '@/utils/storageUtils';
 import { devError } from '@/utils/devLogger';
 import { User } from '@/types';
-import { initializeUsage } from '@/services/userService';
 import { identifyUser, resetAnalytics } from '@/services/analyticsService';
 
 interface AuthContextType {
@@ -26,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserData = async (authUser: { uid: string; email: string | null; displayName: string | null; photoURL: string | null }) => {
     try {
       const userData = await backendService.getMe();
-      
+
       setUser({
         uid: authUser.uid,
         email: authUser.email,
@@ -50,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: authUser.email,
         displayName: authUser.displayName,
         photoURL: authUser.photoURL,
-        usage: initializeUsage(),
+        usage: {} as User['usage'],
         lastLoginAt: new Date(),
       } as User);
     } finally {
