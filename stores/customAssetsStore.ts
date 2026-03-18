@@ -185,6 +185,7 @@ export const customAssetsStore = createSlice({
       const projectAssets = getOrCreateProjectAssets(state, action.payload.projectId);
       projectAssets.customItems = action.payload.items;
       projectAssets.isLoadingItems = false;
+      projectAssets.loadItemsError = null;
     },
 
     addCustomItem: (state, action: PayloadAction<{ projectId: string; item: Item }>) => {

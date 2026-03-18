@@ -51,13 +51,17 @@ import { backendService } from '@/services/backendService';
 import {
   setCustomColors,
   setCustomTextures,
+  setCustomItems,
   setLoadingColors,
   setLoadingTextures,
+  setLoadingItems,
   setLoadColorsError,
   setLoadTexturesError,
+  setLoadItemsError,
 } from '@/stores/customAssetsStore';
 import { setSelectedAssets } from '@/stores/taskStore';
 import { setSelectedOriginalImageIds, setSelectedUpdatedImageIds } from '@/stores/imageStore';
+import { Texture, Item } from '@/types';
 import { selectHasGeneratedImage } from '@/stores/guestStore';
 import { generateRoute } from '@/constants/routes';
 
@@ -155,28 +159,36 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
         try {
           dispatch(setLoadingColors({ projectId, isLoadingColors: true }));
           dispatch(setLoadingTextures({ projectId, isLoadingTextures: true }));
+          dispatch(setLoadingItems({ projectId, isLoadingItems: true }));
 
-          const [colors, textures] = await Promise.all([
+          const [colors, textures, items] = await Promise.all([
             backendService.getColors(projectId),
             backendService.getTextures(projectId),
+            backendService.getItems(projectId),
           ]);
 
           dispatch(setCustomColors({ projectId, colors }));
-          dispatch(setCustomTextures({ projectId, textures }));
+          // Normalize: ensure imageDownloadUrl is derived from the asset-specific URL fields
+          dispatch(setCustomTextures({
+            projectId,
+            textures: (textures as unknown as Texture[]).map((t) => ({
+              ...t,
+              imageDownloadUrl: t.textureImageDownloadUrl || t.imageDownloadUrl || '',
+            })),
+          }));
+          dispatch(setCustomItems({
+            projectId,
+            items: (items as unknown as Item[]).map((i) => ({
+              ...i,
+              imageDownloadUrl: i.itemImageDownloadUrl || i.imageDownloadUrl || '',
+            })),
+          }));
         } catch (error) {
           devError('Failed to load custom assets:', error);
-          dispatch(
-            setLoadColorsError({
-              projectId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            })
-          );
-          dispatch(
-            setLoadTexturesError({
-              projectId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            })
-          );
+          const errMsg = error instanceof Error ? error.message : 'Unknown error';
+          dispatch(setLoadColorsError({ projectId, error: errMsg }));
+          dispatch(setLoadTexturesError({ projectId, error: errMsg }));
+          dispatch(setLoadItemsError({ projectId, error: errMsg }));
         }
       };
 
