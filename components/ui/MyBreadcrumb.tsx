@@ -452,7 +452,7 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
     }
 
     // Authenticated user with no projects
-    if (projects.length === 0) {
+    if (!projects || projects.length === 0) {
       return [
         {
           title: (
@@ -493,9 +493,10 @@ const MyBreadcrumb: React.FC<BreadcrumbProps> = ({
     ];
 
     if (activeProjectId && activeProject) {
+      const spaces = activeProject.spaces || [];
       items.push({
         title:
-          activeProject.spaces.length === 0 ? (
+          spaces.length === 0 ? (
             <Button
               icon={<PlusOutlined />}
               onClick={() => setModalMode(ModalMode.ADD_SPACE)}

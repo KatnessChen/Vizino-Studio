@@ -54,6 +54,7 @@ import {
   removeImageOptimistic,
 } from '@/stores/projectStore';
 import { saveFeedback } from '@/services/feedbackService';
+import { backendService } from '@/services/backendService';
 
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useGenerateButtonState } from '@/hooks/useGenerateButtonState';

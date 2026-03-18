@@ -67,8 +67,9 @@ export const backendService = {
     await apiClient.patch(`/projects/${projectId}/spaces/${spaceId}/images/${imageId}`, { name });
   },
 
-  async deleteImage(projectId: string, spaceId: string, imageId: string): Promise<void> {
-    await apiClient.delete(`/projects/${projectId}/spaces/${spaceId}/images/${imageId}`);
+  async deleteImage(projectId: string, spaceId: string, imageId: string | string[]): Promise<void> {
+    const payload = Array.isArray(imageId) ? { imageIds: imageId } : { imageIds: [imageId] };
+    await apiClient.delete(`/projects/${projectId}/spaces/${spaceId}/images`, { data: payload });
   },
 
   async duplicateImage(projectId: string, spaceId: string, imageId: string, newName: string): Promise<ImageData> {
@@ -189,6 +190,31 @@ export const backendService = {
   // User
   async getMe(): Promise<Record<string, unknown>> {
     const response = await apiClient.get('/users/me');
+    return response.data;
+  },
+
+  async redeemPromotionCode(code: string): Promise<any> {
+    const response = await apiClient.post('/users/promotion-code', { code });
+    return response.data;
+  },
+
+  async updateUserAiKey(geminiKey: string, isActive: boolean): Promise<any> {
+    const response = await apiClient.patch('/users/api-key', { geminiKey, isActive });
+    return response.data;
+  },
+
+  // Feedback
+  async submitFeedback(data: any): Promise<any> {
+    const response = await apiClient.post('/feedback', data);
+    return response.data;
+  },
+
+  async uploadFeedbackImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/feedback/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 };

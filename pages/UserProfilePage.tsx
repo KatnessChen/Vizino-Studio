@@ -22,10 +22,10 @@ import {
   InfoCircleOutlined,
   CopyOutlined,
 } from '@ant-design/icons';
-import { updateUserAiKey, toggleUserAiKeyStatus, decryptUserApiKey } from '@/services/userService';
-import { redeemPromotionCode } from '@/services/promotionCodeService';
+import { backendService } from '@/services/backendService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { decryptUserApiKey } from '@/services/userService';
 import { useCreditCheck } from '@/hooks/useCreditCheck';
 import { CREDIT_MULTIPLIERS } from '@/constants/constants';
 import { ROUTES } from '@/constants/routes';
@@ -62,10 +62,10 @@ const UserProfilePage: React.FC = () => {
 
     setRedeeming(true);
     try {
-      const creditsAdded = await redeemPromotionCode(user.uid, promoCode.trim());
-      message.success(`Successfully redeemed ${creditsAdded} credits!`);
+      const result = await backendService.redeemPromotionCode(promoCode.trim());
+      message.success(`Successfully redeemed credits!`);
       setPromoCode('');
-      await refresh(); // Refresh user data to show updated credit_limit
+      if ((refreshUser as any)) await (refreshUser as any)(); // Try AuthContext refreshUser
     } catch (error) {
       devError('Failed to redeem promotion code:', error);
       const errorMessage =
@@ -340,7 +340,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
     if (!apiKeyInput.trim()) return;
     setLoading(true);
     try {
-      await updateUserAiKey(user.uid, apiKeyInput.trim(), true);
+      await backendService.updateUserAiKey(apiKeyInput.trim(), true);
       setIsEditing(false);
       setApiKeyInput('');
       message.success('API Key saved');
@@ -361,10 +361,9 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
       onOk: async () => {
         setLoading(true);
         try {
-          await updateUserAiKey(user.uid, '', false);
+          await backendService.updateUserAiKey('', false);
           message.success('API Key removed');
-        } catch (error) {
-          devError(error);
+        } catch (error) {          devError(error);
           message.error('Failed to remove API Key');
         } finally {
           setLoading(false);
@@ -376,7 +375,7 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
   const handleToggleActive = async (checked: boolean) => {
     setLoading(true);
     try {
-      await toggleUserAiKeyStatus(user.uid, checked);
+      await backendService.updateUserAiKey(user?.apiKey?.geminiKey || '', checked);
     } catch (error) {
       devError(error);
       message.error('Failed to update');

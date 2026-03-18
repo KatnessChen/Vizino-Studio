@@ -520,7 +520,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
       }
 
       const tempImageId = crypto.randomUUID();
-      const now = Timestamp.fromDate(new Date());
+      const now = new Date().toISOString();
 
       // Calculate optimistic order value (max current order + 1)
       const currentMaxOrder = Math.max(0, ...originalImages.map((img) => img.order ?? 0));
@@ -774,11 +774,11 @@ This action cannot be undone.`,
 
             dispatch(setSelectedImageIds(new Set()));
 
-            // Delete images from Firestore and Firebase Storage
+            // Delete images from Backend
             await backendService.deleteImage(
               activeProjectId!,
               activeSpaceId!,
-              Array.from(selectedImageIds)[0] // For now single delete, or update backend to handle array
+              Array.from(selectedImageIds)
             );
 
             // Fetch updated space images to sync
@@ -795,7 +795,7 @@ This action cannot be undone.`,
             devError('Failed to delete images:', error);
 
             // Rollback - refresh from server
-            const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+            const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
             dispatch(
               setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
             );

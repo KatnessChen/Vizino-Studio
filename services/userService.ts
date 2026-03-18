@@ -15,7 +15,7 @@ const convertFirestoreUser = (data: DocumentData): User => {
     displayName: data.displayName,
     photoURL: data.photoURL,
     usage: data.usage,
-    lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
+    lastLoginAt: data.lastLoginAt ? (typeof data.lastLoginAt.toDate === 'function' ? data.lastLoginAt.toDate() : new Date(data.lastLoginAt)) : new Date(),
     apiKey: data.apiKey
       ? {
           geminiKey: data.apiKey.geminiKey,

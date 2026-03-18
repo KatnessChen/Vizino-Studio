@@ -8,7 +8,7 @@ import { GeminiTaskName } from '@/services/gemini/geminiTasks';
 import { getFileExtension } from '@/utils/downloadUtils';
 import { removeExtension, generateTimestamp } from '@/utils/fileNameUtils';
 import CustomizeImageNameForm from '@/components/form/CustomizeImageNameForm';
-import { saveFeedback, uploadFeedbackImage } from '@/services/feedbackService';
+import { backendService } from '@/services/backendService';
 
 const { TextArea } = Input;
 const MAX_IMAGE_NAME_LENGTH = 50;
@@ -208,25 +208,26 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
         const submitRejectFeedback = async () => {
           try {
             devLog('[ConfirmImageUpdateModal] Submitting feedback for rejected image...');
-            const tempUrl = await uploadFeedbackImage(
-              generatedImage.base64,
-              generatedImage.mimeType,
-              userId || guestSessionId || 'anonymous'
+            const { url: tempUrl } = await backendService.uploadFeedbackImage(
+              base64ToFile(generatedImage.base64, generatedImage.mimeType, 'feedback.png')
             );
 
-            await saveFeedback({
-              sourceImageDownloadUrl: originalImage?.imageDownloadUrl || '',
-              generatedImageDownloadUrl: tempUrl,
-              taskName: taskName || 'unknown',
-              isSaved: false,
-              rate: rating,
-              comments: comment,
-              userId: userId || guestSessionId || 'anonymous',
-              options: {
-                prompt: customPrompt,
-                sourceColorHex: originalHex,
-                generatedColorHex: generatedImage.hex,
-                selectedColor: selectedColor
+            await backendService.submitFeedback({
+              type: 'generation_rejected',
+              rating,
+              comment,
+              context: {
+                sourceImageDownloadUrl: originalImage?.imageDownloadUrl || '',
+                generatedImageDownloadUrl: tempUrl,
+                taskName: taskName || 'unknown',
+                isSaved: false,
+                userId: userId || guestSessionId || 'anonymous',
+                options: {
+                  prompt: customPrompt,
+                  sourceColorHex: originalHex,
+                },
+              }
+            });
                   ? {
                       id: selectedColor.id,
                       name: selectedColor.name,
