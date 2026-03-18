@@ -97,8 +97,8 @@ export const backendService = {
     return response.data;
   },
 
-  async createColor(projectId: string, name: string, hex: string): Promise<Color> {
-    const response = await apiClient.post(`/assets/${projectId}/colors`, { name, hex });
+  async createColor(projectId: string, name: string, hex: string, description?: string): Promise<Color> {
+    const response = await apiClient.post(`/assets/${projectId}/colors`, { name, hex, description });
     return response.data;
   },
 
@@ -127,6 +127,11 @@ export const backendService = {
     return response.data;
   },
 
+  async updateTexture(projectId: string, textureId: string, updates: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const response = await apiClient.patch(`/assets/${projectId}/textures/${textureId}`, updates);
+    return response.data;
+  },
+
   async deleteTexture(projectId: string, textureId: string): Promise<void> {
     await apiClient.delete(`/assets/${projectId}/textures/${textureId}`);
   },
@@ -147,6 +152,11 @@ export const backendService = {
     return response.data;
   },
 
+  async updateItem(projectId: string, itemId: string, updates: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const response = await apiClient.patch(`/assets/${projectId}/items/${itemId}`, updates);
+    return response.data;
+  },
+
   async deleteItem(projectId: string, itemId: string): Promise<void> {
     await apiClient.delete(`/assets/${projectId}/items/${itemId}`);
   },
@@ -159,7 +169,7 @@ export const backendService = {
     taskName: string;
     customPrompt?: string;
     options?: Record<string, unknown>;
-  }): Promise<ImageData> {
+  }): Promise<ImageData & { hex?: string }> {
     const response = await apiClient.post('/ai/generate', payload);
     return response.data;
   },
@@ -170,6 +180,11 @@ export const backendService = {
     scale?: 2 | 4;
   }): Promise<{ success: boolean; outputUrl: string; id: string }> {
     const response = await apiClient.post('/ai/upscale', payload);
+    return response.data;
+  },
+
+  async optimizePrompt(taskName: string, userPrompt: string, context?: any): Promise<{ optimizedPrompt: string }> {
+    const response = await apiClient.post('/ai/optimize-prompt', { taskName, userPrompt, context });
     return response.data;
   },
 
