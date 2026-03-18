@@ -22,7 +22,7 @@ interface UseCustomPromptsOptions {
  * Provides access to cached prompts, loading states, and fetch/search/delete operations
  */
 export const useCustomPrompts = (options: UseCustomPromptsOptions) => {
-  const { userId, projectId } = options;
+  const { projectId } = options;
   const dispatch = useDispatch();
 
   // Selectors

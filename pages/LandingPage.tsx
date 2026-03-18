@@ -599,7 +599,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleRenameImage = useCallback(
-    async (imageId: string, newName: string, description: string) => {
+    async (imageId: string, newName: string) => {
       if (!user) {
         setErrorMessage('Please log in to update images.');
         return;
@@ -644,7 +644,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
         devError('Failed to update image:', error);
 
         // Rollback - refresh from server
-        const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+        const images = await backendService.getImages(activeProjectId!, activeSpaceId!);
         dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
 
         setErrorMessage('Failed to save updated image. Please try again.');
@@ -679,10 +679,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
   );
 
   const handleConfirmRename = useCallback(
-    (imageId: string, newName: string, description: string) => {
+    (imageId: string, newName: string) => {
       setShowRenameModal(false);
       setImageToRename(null);
-      handleRenameImage(imageId, newName, description);
+      handleRenameImage(imageId, newName);
     },
     [handleRenameImage]
   );
@@ -692,8 +692,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ tourRef }) => {
 
     try {
       dispatch(setIsFetchingSpaceImages(true));
-      // Fetch updated space images from Firestore
-      const images = await fetchSpaceImages(user.uid, activeProjectId, activeSpaceId);
+      // Fetch updated space images from Backend
+      const images = await backendService.getImages(activeProjectId, activeSpaceId);
       dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
     } catch (error) {
       devError('Failed to refresh images:', error);
@@ -901,14 +901,11 @@ This action cannot be undone.`,
       const imagesToCopyArray = imagesToCopy.filter((img) => selectedImageIds.has(img.id));
 
       for (const sourceImage of imagesToCopyArray) {
-        // Generate name by appending " Copy" to the original image name
-        const finalName = `${sourceImage.name} Copy`;
-
         const newImage = await backendService.duplicateImage(
           activeProjectId!,
           activeSpaceId!,
-          sourceImageId,
-          newImageName
+          sourceImage.id,
+          `${sourceImage.name} Copy`
         );
 
         // Optimistic update - add the new image immediately to UI

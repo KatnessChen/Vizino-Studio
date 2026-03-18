@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [adminSettings, setAdminSettingsState] = useState<AdminSettings>(() => getAdminSettings());
 
-  const fetchUserData = async (authUser: any) => {
+  const fetchUserData = async (authUser: { uid: string; email: string | null; displayName: string | null; photoURL: string | null }) => {
     try {
       const userData = await backendService.getMe();
       

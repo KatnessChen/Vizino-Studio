@@ -127,9 +127,10 @@ export const useImageUpscaling = ({
         }, 500);
 
         return true;
-      } catch (error: any) {
+      } catch (error: unknown) {
         devError('[Upscaling] Upscaling failed:', error);
-        setErrorMessage(error.message || 'Upscaling failed');
+        const errorMessage = error instanceof Error ? error.message : 'Upscaling failed';
+        setErrorMessage(errorMessage);
         setIsUpscaling(false);
         setUpscaleProgress(0);
         return false;
