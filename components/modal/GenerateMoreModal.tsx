@@ -40,10 +40,9 @@ import {
   hasDefaultPrompt,
   isThinkingModeAvailable,
 } from '@/services/gemini/geminiTasks';
-import { generateOptimizedPrompt } from '@/services/gemini/geminiService';
-import { incrementTaskUsage } from '@/services/userService';
 import { formatImageOperationData } from '@/utils/imageOperationUtils';
-import { base64ToFile } from '@/utils/fileUtils';
+import { base64ToFile, imageDownloadUrlToBase64 } from '@/utils/fileUtils';
+import { removeExtension } from '@/utils/fileNameUtils';
 import { extractImageDimensions } from '@/utils/imageUtils';
 import { checkOperationLimit, getLimitExceededMessage } from '@/utils/limitationUtils';
 import {
@@ -53,7 +52,6 @@ import {
   addImageOptimistic,
   removeImageOptimistic,
 } from '@/stores/projectStore';
-import { saveFeedback } from '@/services/feedbackService';
 import { backendService } from '@/services/backendService';
 
 import { useImageProcessing } from '@/hooks/useImageProcessing';
@@ -67,7 +65,7 @@ import {
 } from '@/stores/taskStore';
 import { useCustomPrompts } from '@/hooks/useCustomPrompts';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
-import { devWarn, devError, devLog, devLogContext } from '@/utils/devLogger';
+import { devError, devLog, devLogContext } from '@/utils/devLogger';
 const ConfirmImageUpdateModal = lazy(() => import('./ConfirmImageUpdateModal'));
 import SelectedAssets from '@/components/SelectedAssets';
 import { MAX_OPERATIONS_PER_IMAGE, MAX_CUSTOM_PROMPT_LENGTH } from '@/constants/constants';
@@ -81,6 +79,31 @@ import CreditExhaustedModal from './CreditExhaustedModal';
 
 export interface GenerateMoreModalRef {
   triggerGenerate: () => Promise<void>;
+}
+
+/**
+ * Builds a human-readable suggested filename for a generated image based on the
+ * active task and selected asset, so users see a descriptive default name instead
+ * of the raw backend storage filename.
+ */
+function buildSuggestedImageName(
+  taskName: string | null,
+  originalName: string,
+  color?: Color | null,
+  texture?: Texture | null,
+  item?: Item | null
+): string {
+  const base = removeExtension(originalName);
+  if (taskName === GEMINI_TASKS.RECOLOR_WALL.task_name && color?.name) {
+    return `${base}_recolor_${color.name}`;
+  }
+  if (taskName === GEMINI_TASKS.ADD_TEXTURE.task_name && texture?.name) {
+    return `${base}_texture_${texture.name}`;
+  }
+  if (taskName === GEMINI_TASKS.ADD_HOME_ITEM.task_name && item?.name) {
+    return `${base}_item_${item.name}`;
+  }
+  return `${base}_gen`;
 }
 
 interface GenerateMoreModalProps {
@@ -159,6 +182,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       hex?: string;
       name?: string;
     } | null>(null);
+    const [pendingGeneratedImageId, setPendingGeneratedImageId] = useState<string | null>(null);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [isSavingImage, setIsSavingImage] = useState(false);
     const [isDefaultPromptExpanded, setIsDefaultPromptExpanded] = useState(false);
@@ -474,7 +498,12 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         hasCustomPrompt: !!customPrompt.trim(),
       });
 
-      const result = await processImage(sourceImage!, customPrompt.trim() || undefined, {
+      if (!effectiveOriginalImage) {
+        setErrorMessage('No source image or asset to generate from.');
+        return;
+      }
+
+      const result = await processImage(effectiveOriginalImage, customPrompt.trim() || undefined, {
         selectedColor,
         selectedTexture,
         selectedItem,
@@ -486,27 +515,46 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           id: result.id,
         });
 
-        // Reset state and close modal immediately
-        setCustomPrompt('');
-        setGeneratedImage(null);
-        setErrorMessage(null);
-        setValidationError(null);
-        setIsSavingImage(false);
-
-        // Reset sourceImage in Redux
-        dispatch(setSourceImage(null));
-
-        // Save customPrompt to Redux for later use
-        const promptToSave = customPrompt.trim() || undefined;
-        if (promptToSave) {
-          dispatch(setReduxCustomPrompt(promptToSave));
+        // Image was generated and saved on the backend.
+        // Add it to Redux immediately for instant gallery feedback.
+        if (activeProjectId && activeSpaceId) {
+          dispatch(
+            addImageOptimistic({
+              projectId: activeProjectId,
+              spaceId: activeSpaceId,
+              image: result,
+            })
+          );
         }
 
-        // Show success message
-        message.success('Image generated and saved successfully!');
+        // Store the ID so we can delete it if the user cancels the review.
+        setPendingGeneratedImageId(result.id);
 
-        // Close modal and trigger refresh in parent
-        onSuccess();
+        // Fetch the generated image as base64 to display in the Before & After modal.
+        try {
+          const base64 = await imageDownloadUrlToBase64(result.imageDownloadUrl);
+          const suggestedName = buildSuggestedImageName(
+            activeTaskName,
+            sourceImage?.name || 'image',
+            selectedColor,
+            selectedTexture,
+            selectedItem
+          );
+          // For color_adjustment the backend returns hex (generated color code) and
+          // stores the AI-suggested color name in result.name.
+          const generatedHex = result.hex;
+          const displayName = generatedHex ? result.name : suggestedName;
+          setGeneratedImage({ base64, mimeType: result.mimeType, hex: generatedHex, name: displayName });
+          setShowConfirmationModal(true);
+        } catch (fetchError) {
+          devError('[GenerateMoreModal] Failed to fetch generated image for preview:', fetchError);
+          // Fallback: refresh the gallery and succeed without the review modal.
+          if (activeProjectId && activeSpaceId) {
+            const images = await backendService.getImages(activeProjectId, activeSpaceId);
+            dispatch(setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images }));
+          }
+          onSuccess();
+        }
       }
     }, [
       guestHasUsedGeneration,
@@ -529,7 +577,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       hasCreditExceeded,
       setShowCreditExhaustedModal,
       activeProjectId,
-      fetchPrompts,
+      activeSpaceId,
       setErrorMessage,
       onSuccess,
     ]);
@@ -686,19 +734,11 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         }
 
         // Call the backend to generate optimized prompt
-        const optimizedPrompt = await generateOptimizedPrompt(
-          task,
+        const { optimizedPrompt } = await backendService.optimizePrompt(
+          activeTaskName!,
           customPrompt.trim(),
-          mainImageBase64,
-          mainImageMimeType,
-          undefined, // signal
           additionalContext
         );
-
-        // Record usage for prompt optimization (only for authenticated users)
-        if (userId) {
-          void incrementTaskUsage(userId, GEMINI_TASKS.OPTIMIZE_PROMPT.task_name);
-        }
 
         // Set the optimized prompt in the textarea
         setCustomPrompt(optimizedPrompt);
@@ -721,7 +761,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
       selectedItem,
       selectedTexture,
       selectedColor,
-      userId,
     ]);
 
     const handleClose = () => {
@@ -837,7 +876,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
               // Refresh space images as requested
               if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
-                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                const images = await backendService.getImages(activeProjectId, activeSpaceId);
                 dispatch(
                   setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
                 );
@@ -861,7 +900,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
               // Refresh space images as requested
               if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
-                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                const images = await backendService.getImages(activeProjectId, activeSpaceId);
                 dispatch(
                   setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
                 );
@@ -885,7 +924,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
               // Refresh space images as requested
               if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
-                const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
+                const images = await backendService.getImages(activeProjectId, activeSpaceId);
                 dispatch(
                   setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
                 );
@@ -950,107 +989,42 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           );
 
           // For authenticated users, use optimistic updates and save to users/
+          // For authenticated users, image was already saved by backendService.generateImage().
+          // No redundant upload needed — just close the modal and refresh.
           if (isAuthenticated && userId && activeProjectId && activeSpaceId) {
-            // Create optimistic image object
-            const optimisticImage = {
-              id: tempImageId,
-              name: imageName,
-              assetType: ASSET_IMAGE,
-              mimeType: imageData.mimeType,
-              spaceId: activeSpaceId,
-              evolutionChain: [operation],
-              parentImageId: effectiveOriginalImage.id,
-              imageDownloadUrl: `data:${imageData.mimeType};base64,${imageData.base64}`,
-              storageFilePath: '',
-              order: 0,
-              isDeleted: false,
-              deletedAt: null,
-              createdAt: now,
-              updatedAt: now,
-            };
-
-            // Add optimistic image to Redux store immediately for better UX
-            dispatch(
-              addImageOptimistic({
-                projectId: activeProjectId,
-                spaceId: activeSpaceId,
-                image: optimisticImage,
-              })
-            );
-
-            // Reset state and close modal immediately for better UX
+            // Reset state and close the confirmation modal immediately.
             setCustomPrompt('');
             setGeneratedImage(null);
             setErrorMessage(null);
             setValidationError(null);
             setIsSavingImage(false);
-
-            // Reset sourceImage in Redux
             dispatch(setSourceImage(null));
 
-            // Save customPrompt to Redux for later use
             const promptToSave = finalDescription.trim() || undefined;
             if (promptToSave) {
               dispatch(setReduxCustomPrompt(promptToSave));
+              // Persist the custom prompt to the backend (per-project)
+              backendService
+                .savePrompt(activeProjectId, activeTaskName, promptToSave)
+                .catch((e) => devError('[GenerateMoreModal] Failed to save prompt:', e));
             }
 
-            // Show success message
             message.success('Image saved successfully!');
-
-            // Close modal immediately
             onSuccess();
 
-            // Save processed image to Firestore in background
-            try {
-              // Extract dimensions from generated image base64
-              const dimensions = await extractImageDimensions(imageData.base64, imageData.mimeType);
+            // Refresh image list + submit feedback in the background.
+            backendService
+              .getImages(activeProjectId, activeSpaceId)
+              .then((images) => {
+                dispatch(
+                  setSpaceImages({ projectId: activeProjectId, spaceId: activeSpaceId, images })
+                );
 
-              await createImage(
-                userId,
-                activeProjectId,
-                activeSpaceId,
-                null,
-                {
-                  id: tempImageId,
-                  name: imageName,
-                  mimeType: imageData.mimeType,
-                  description: finalDescription,
-                  width: dimensions.width,
-                  height: dimensions.height,
-                  aspect_ratio: dimensions.aspect_ratio,
-                },
-                {
-                  base64: imageData.base64,
-                  base64MimeType: imageData.mimeType,
-                  parentImage: sourceImage,
-                  operation,
-                }
-              );
-
-              // Fetch updated space images to get real Firebase Storage URL
-              const images = await fetchSpaceImages(userId, activeProjectId, activeSpaceId);
-              dispatch(
-                setSpaceImages({
-                  projectId: activeProjectId,
-                  spaceId: activeSpaceId,
-                  images,
-                })
-              );
-
-              // Submit feedback if provided (for authenticated users)
-              if (feedbackData) {
-                setTimeout(() => {
-                  const submitFeedback = async () => {
-                    try {
-                      // Find the saved image URL from the fetched images
-                      const savedImage = images.find((img) => img.id === tempImageId);
-                      if (!savedImage?.imageDownloadUrl) {
-                        devWarn('[GenerateMoreModal] Could not find saved image URL for feedback');
-                        return;
-                      }
-
-                      devLogContext('[GenerateMoreModal] Submitting feedback for saved image...');
-                      await saveFeedback({
+                if (feedbackData && pendingGeneratedImageId) {
+                  const savedImage = images.find((img) => img.id === pendingGeneratedImageId);
+                  if (savedImage?.imageDownloadUrl) {
+                    backendService
+                      .submitFeedback({
                         sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
                         generatedImageDownloadUrl: savedImage.imageDownloadUrl,
                         taskName: activeTaskName || 'unknown',
@@ -1061,11 +1035,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                         options: {
                           prompt: finalDescription,
                           selectedColor: selectedColor
-                            ? {
-                                id: selectedColor.id,
-                                name: selectedColor.name,
-                                hex: selectedColor.hex,
-                              }
+                            ? { id: selectedColor.id, name: selectedColor.name, hex: selectedColor.hex }
                             : undefined,
                           selectedTexture: selectedTexture
                             ? {
@@ -1082,29 +1052,17 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                               }
                             : undefined,
                         },
-                      });
-                      devLog(
-                        '[GenerateMoreModal] Feedback submitted successfully (authenticated)!'
-                      );
-                    } catch (e) {
-                      devError('[GenerateMoreModal] Failed to submit feedback:', e);
-                    }
-                  };
-                  void submitFeedback();
-                }, 100);
-              }
-            } catch (saveError) {
-              devError('Failed to save processed image:', saveError);
-              // Rollback optimistic update on error
-              dispatch(
-                removeImageOptimistic({
-                  projectId: activeProjectId,
-                  spaceId: activeSpaceId,
-                  imageId: tempImageId,
-                })
-              );
-              message.error('Failed to save image. Please try again.');
-            }
+                      })
+                      .then(() =>
+                        devLog('[GenerateMoreModal] Feedback submitted successfully (authenticated)!')
+                      )
+                      .catch((e) => devError('[GenerateMoreModal] Failed to submit feedback:', e));
+                  }
+                }
+              })
+              .catch((e) => devError('[GenerateMoreModal] Failed to refresh images after save:', e));
+
+            return;
           } else if (guestSessionId) {
             // Guests save their generated image to local IndexedDB storage
             const now = Timestamp.fromDate(new Date());
@@ -1152,7 +1110,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     const savedImageUrl = guestImageData.imageDownloadUrl;
 
                     devLog('[GenerateMoreModal] Submitting feedback for saved image (guest)...');
-                    await saveFeedback({
+                    await backendService.submitFeedback({
                       sourceImageDownloadUrl: effectiveOriginalImage?.imageDownloadUrl || '',
                       generatedImageDownloadUrl: savedImageUrl,
                       taskName: activeTaskName || 'unknown',
@@ -1238,13 +1196,30 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
         effectiveOriginalImage,
         markImageGenerated,
         adminSettings.mock_limit_reached,
+        pendingGeneratedImageId,
       ]
     );
 
     const handleCancelConfirmation = useCallback(() => {
       setShowConfirmationModal(false);
       setGeneratedImage(null);
-    }, []);
+
+      // Image was pre-saved by the backend — delete it if the user rejects.
+      if (pendingGeneratedImageId && activeProjectId && activeSpaceId) {
+        backendService
+          .deleteImage(activeProjectId, activeSpaceId, pendingGeneratedImageId)
+          .catch((e) => devError('[GenerateMoreModal] Failed to delete rejected image:', e));
+        // Optimistically remove it from the Redux store as well.
+        dispatch(
+          removeImageOptimistic({
+            projectId: activeProjectId,
+            spaceId: activeSpaceId,
+            imageId: pendingGeneratedImageId,
+          })
+        );
+      }
+      setPendingGeneratedImageId(null);
+    }, [pendingGeneratedImageId, activeProjectId, activeSpaceId, dispatch]);
 
     // const lastOperation = sourceImage?.evolutionChain[sourceImage.evolutionChain.length - 1];
 
@@ -1527,7 +1502,7 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
                     ) : (
                       <>
                         {/* Magic Prompts List */}
-                        <div className="overflow-auto flex-1">
+                        <div className="overflow-auto flex-1 p-3">
                           <List
                             className="w-full bg-white h-[334px]"
                             dataSource={magicPromptsList}

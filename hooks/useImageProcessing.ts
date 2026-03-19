@@ -68,7 +68,7 @@ export const useImageProcessing = ({
         selectedTexture?: Texture | null;
         selectedItem?: Item | null;
       }
-    ): Promise<ImageData | null> => {
+    ): Promise<(ImageData & { hex?: string }) | null> => {
       if (!userId || !projectId || !spaceId) {
         setErrorMessage('Context (User/Project/Space) is required.');
         return null;

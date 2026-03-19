@@ -9,6 +9,7 @@ import { getFileExtension } from '@/utils/downloadUtils';
 import { removeExtension, generateTimestamp } from '@/utils/fileNameUtils';
 import CustomizeImageNameForm from '@/components/form/CustomizeImageNameForm';
 import { backendService } from '@/services/backendService';
+import { base64ToFile } from '@/utils/fileUtils';
 
 const { TextArea } = Input;
 const MAX_IMAGE_NAME_LENGTH = 50;
@@ -225,29 +226,28 @@ const ConfirmImageUpdateModal: React.FC<ConfirmImageUpdateModalProps> = ({
                 options: {
                   prompt: customPrompt,
                   sourceColorHex: originalHex,
+                  selectedColor: selectedColor
+                    ? {
+                        id: selectedColor.id,
+                        name: selectedColor.name,
+                        hex: selectedColor.hex,
+                      }
+                    : undefined,
+                  selectedTexture: selectedTexture
+                    ? {
+                        id: selectedTexture.id,
+                        name: selectedTexture.name,
+                        textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
+                      }
+                    : undefined,
+                  selectedItem: selectedItem
+                    ? {
+                        id: selectedItem.id,
+                        name: selectedItem.name,
+                        itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
+                      }
+                    : undefined,
                 },
-              }
-            });
-                  ? {
-                      id: selectedColor.id,
-                      name: selectedColor.name,
-                      hex: selectedColor.hex,
-                    }
-                  : undefined,
-                selectedTexture: selectedTexture
-                  ? {
-                      id: selectedTexture.id,
-                      name: selectedTexture.name,
-                      textureImageDownloadUrl: selectedTexture.textureImageDownloadUrl,
-                    }
-                  : undefined,
-                selectedItem: selectedItem
-                  ? {
-                      id: selectedItem.id,
-                      name: selectedItem.name,
-                      itemImageDownloadUrl: selectedItem.itemImageDownloadUrl,
-                    }
-                  : undefined,
               },
             });
             devLog('[ConfirmImageUpdateModal] Rejection feedback submitted!');
