@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { getAuth } from 'firebase/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://vizino-studio-backend-dev-31937902243.us-central1.run.app';
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) {
+  throw new Error('VITE_API_URL is not set. Please configure it in your .env file.');
+}
 
 const apiClient = axios.create({
   baseURL: API_URL,
