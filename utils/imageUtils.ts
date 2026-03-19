@@ -1,4 +1,3 @@
-import { ref, getBytes, FirebaseStorage } from 'firebase/storage';
 import { devError } from '@/utils/devLogger';
 import { ImageData } from '@/types';
 
@@ -30,38 +29,6 @@ export async function fetchImageAsBase64(url: string, signal?: AbortSignal): Pro
   const blob = await response.blob();
   return await blobToBase64(blob);
 }
-
-/**
- * Fetches image data from Firebase Storage or a direct URL and converts to base64.
- *
- * @param storage Firebase Storage instance
- * @param imageData Image data object
- * @returns Promise resolving to base64 string
- */
-export const getBase64FromImageData = async (storage: FirebaseStorage, imageData: ImageData) => {
-  const storageFilePath = imageData.storageFilePath;
-
-  // If no storage path, try to fetch directly from imageDownloadUrl
-  if (!storageFilePath) {
-    if (imageData.imageDownloadUrl) {
-      return await fetchImageAsBase64(imageData.imageDownloadUrl);
-    }
-    throw new Error(`Storage path missing for image: ${imageData.id}`);
-  }
-
-  try {
-    const storageRef = ref(storage, storageFilePath);
-    const bytes = await getBytes(storageRef);
-    const blob = new Blob([bytes], { type: imageData.mimeType });
-
-    return await blobToBase64(blob);
-  } catch (error) {
-    devError(`Failed to fetch image from Storage path: ${storageFilePath}`, error);
-    throw new Error(
-      `Failed to fetch image from Storage: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-};
 
 /**
  * Extract image dimensions from base64 data

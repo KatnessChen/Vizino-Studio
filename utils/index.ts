@@ -16,7 +16,7 @@ import {
   extractShortId,
 } from './stringUtils';
 import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from './assetUtils';
-import { blobToBase64, fetchImageAsBase64, getBase64FromImageData } from './imageUtils';
+import { blobToBase64, fetchImageAsBase64 } from './imageUtils';
 
 export {
   MIME_TYPE_MAP,
@@ -37,7 +37,6 @@ export {
   extractShortId,
   blobToBase64,
   fetchImageAsBase64,
-  getBase64FromImageData,
 };
 
 export type { AssetKind };
