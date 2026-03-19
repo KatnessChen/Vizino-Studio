@@ -1,5 +1,4 @@
-import { devError } from '@/utils/devLogger';
-import { ImageData } from '@/types';
+
 
 /**
  * Convert Blob to Base64 string (without prefix)

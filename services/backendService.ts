@@ -183,7 +183,7 @@ export const backendService = {
     return response.data;
   },
 
-  async optimizePrompt(taskName: string, userPrompt: string, context?: any): Promise<{ optimizedPrompt: string }> {
+  async optimizePrompt(taskName: string, userPrompt: string, context?: Record<string, unknown>): Promise<{ optimizedPrompt: string }> {
     const response = await apiClient.post('/ai/optimize-prompt', { taskName, userPrompt, context });
     return response.data;
   },
@@ -208,20 +208,19 @@ export const backendService = {
     return response.data;
   },
 
-  async redeemPromotionCode(code: string): Promise<any> {
+  async redeemPromotionCode(code: string): Promise<{ message: string; creditsAdded?: number }> {
     const response = await apiClient.post('/users/promotion-code', { code });
     return response.data;
   },
 
-  async updateUserAiKey(geminiKey: string, isActive: boolean): Promise<any> {
+  async updateUserAiKey(geminiKey: string, isActive: boolean): Promise<{ message: string }> {
     const response = await apiClient.patch('/users/api-key', { geminiKey, isActive });
     return response.data;
   },
 
   // Feedback
-  async submitFeedback(data: any): Promise<any> {
-    const response = await apiClient.post('/feedback', data);
-    return response.data;
+  async submitFeedback(data: Record<string, unknown>): Promise<void> {
+    await apiClient.post('/feedback', data);
   },
 
   async uploadFeedbackImage(file: File): Promise<{ url: string }> {

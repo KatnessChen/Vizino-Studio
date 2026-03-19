@@ -1,4 +1,4 @@
-export const generateOptimizedPrompt = async (...args: any[]) => {
+export const generateOptimizedPrompt = async (...args: unknown[]) => {
   console.error('generateOptimizedPrompt called on frontend with args:', args);
   throw new Error('This function should now be handled by the backend.');
 };

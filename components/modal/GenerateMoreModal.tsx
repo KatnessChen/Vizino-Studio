@@ -671,25 +671,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
           });
         };
 
-        // Get the main room image (effectiveSource)
-        let mainImageBase64: string;
-        let mainImageMimeType: string;
-
-        if (effectiveSource.assetType === ASSET_TEXTURE) {
-          const texture = effectiveSource as Texture;
-          mainImageBase64 = await fetchAsBase64(texture.textureImageDownloadUrl);
-          mainImageMimeType = texture.mimeType || 'image/jpeg';
-        } else if (effectiveSource.assetType === ASSET_ITEM) {
-          const item = effectiveSource as Item;
-          mainImageBase64 = await fetchAsBase64(item.itemImageDownloadUrl);
-          mainImageMimeType = item.mimeType || 'image/jpeg';
-        } else {
-          // It's ImageData
-          const imgData = effectiveSource as ImageData;
-          mainImageBase64 = await fetchAsBase64(imgData.imageDownloadUrl || '');
-          mainImageMimeType = imgData.mimeType;
-        }
-
         // Build additional context based on task type
         type AdditionalContextType = {
           textureImage?: { base64: string; mimeType: string };
@@ -976,7 +957,6 @@ const GenerateMoreModal = forwardRef<GenerateMoreModalRef, GenerateMoreModalProp
 
           const tempImageId = crypto.randomUUID();
           const imageName = customName;
-          const now = Timestamp.fromDate(new Date());
 
           // Create ImageOperation for evolution chain
           const operation: ImageOperation = formatImageOperationData(

@@ -24,8 +24,7 @@ import {
 import { reorderAssetsWithDebounce } from '@/stores/imageOrderThunks';
 import { useUploadGate } from '@/hooks/useUploadGate';
 import { devError } from '@/utils/devLogger';
-import { Texture, Item, Color } from '@/types';
-import { ASSET_COLOR } from '@/constants/constants';
+import { Texture, Item } from '@/types';
 import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from '@/utils/assetUtils';
 import { backendService } from '@/services/backendService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,7 +35,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
   const dispatch = useDispatch<AppDispatch>();
   const { user, isAuthenticated } = useAuth();
   const isGuestMode = !isAuthenticated;
-  const { gateUpload } = useUploadGate();
+  useUploadGate();
 
   // Use shared utility functions for type checking
   const isTexture = isTextureAsset(assetType);
@@ -140,7 +139,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
   }, [effectiveProjectId, assetType, isGuestMode, isTexture, isItem, dispatch]);
 
   const addAsset = useCallback(
-    async (assetData: any): Promise<any> => {
+    async (assetData: Record<string, unknown>): Promise<unknown> => {
       if (!effectiveProjectId || isGuestMode) {
         throw new Error('Action not allowed for guests');
       }
@@ -181,7 +180,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
   );
 
   const updateAsset = useCallback(
-    async (assetId: string, updates: any): Promise<void> => {
+    async (assetId: string, updates: Record<string, unknown>): Promise<void> => {
       if (!effectiveProjectId || isGuestMode) return;
 
       if (isTexture) {

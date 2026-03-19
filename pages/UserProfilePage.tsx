@@ -49,7 +49,7 @@ interface ApiKeyManagerUser {
 const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser } = useAuth();
-  const { isLoading, totalCredits, usagePercentage, usage, refresh, limit } = useCreditCheck({
+  const { isLoading, totalCredits, usagePercentage, usage, limit } = useCreditCheck({
     userId: user?.uid,
   });
 
@@ -62,7 +62,7 @@ const UserProfilePage: React.FC = () => {
 
     setRedeeming(true);
     try {
-      const result = await backendService.redeemPromotionCode(promoCode.trim());
+      await backendService.redeemPromotionCode(promoCode.trim());
       message.success(`Successfully redeemed credits!`);
       setPromoCode('');
       await refreshUser();

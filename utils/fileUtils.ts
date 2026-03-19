@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 import { devLog } from '@/utils/devLogger';
 import { imageCache } from './imageCache';
 
@@ -85,7 +84,9 @@ async function imageDownloadUrlToBase64(imageDownloadUrl: string): Promise<strin
  * @param timestamp The timestamp to format (can be ISO string, Date object, or Firestore Timestamp).
  * @returns A formatted date string in the format "Dec 22, 2025, 03:45 PM".
  */
-function formatTimestamp(timestamp: any): string {
+type Timestamp = string | Date | { toDate: () => Date } | { _seconds: number };
+
+function formatTimestamp(timestamp: Timestamp | null | undefined): string {
   if (!timestamp) return '-';
   
   let date: Date;

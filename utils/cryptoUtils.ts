@@ -41,7 +41,8 @@ export const decryptUserApiKey = (encryptedKey: string): string => {
   try {
     const xored = atob(encryptedKey);
     const decrypted = xorCipher(xored);
-    const sanitized = decrypted.replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
+    // eslint-disable-next-line no-control-regex
+    const sanitized = decrypted.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim();
     if (sanitized.length !== decrypted.trim().length) {
       devWarn(
         '[CryptoUtils] Decrypted API key contained control characters.',
