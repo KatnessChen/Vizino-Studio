@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Modal, message } from 'antd';
 import { Color, ImageData, Asset } from '@/types';
 import { PRESET_COLOR, ASSET_COLOR } from '@/constants/constants';
-import { useCustomAssets } from '@/hooks/useCustomAssets';
+import { useCustomAssets, AssetInput } from '@/hooks/useCustomAssets';
 import { setSelectedAssets, selectSelectedAssets } from '@/stores/taskStore';
 import { sortColorsBySpectrum, getTextColor } from '@/utils/colorUtils';
 import { useGuest } from '@/contexts/GuestContext';
@@ -212,7 +212,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
               assetType: 'color',
               description: color.description || '',
             };
-            await addColor(newColor);
+            await addColor(newColor as unknown as AssetInput);
           }
           message.success(`Duplicated ${colors.length} color${colors.length > 1 ? 's' : ''}`);
           // Clear selection after duplication
@@ -300,7 +300,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
                   assetType: ASSET_COLOR,
                   description: color.description || '',
                 };
-                await addColor(newColor);
+                await addColor(newColor as unknown as AssetInput);
                 message.success('Color duplicated');
               } catch {
                 message.error('Failed to duplicate color');
@@ -315,7 +315,7 @@ const ColorGallery: React.FC<ColorGalleryProps> = ({ title = 'Colors', onSelect 
           open={isAddColorModalOpen}
           onClose={() => setIsAddColorModalOpen(false)}
           onAdd={async (color) => {
-            await addColor(color);
+            await addColor(color as unknown as AssetInput);
             dispatch(setSelectedAssets([color]));
           }}
           existingColors={availableColors}

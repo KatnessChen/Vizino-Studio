@@ -84,9 +84,13 @@ async function imageDownloadUrlToBase64(imageDownloadUrl: string): Promise<strin
  * @param timestamp The timestamp to format (can be ISO string, Date object, or Firestore Timestamp).
  * @returns A formatted date string in the format "Dec 22, 2025, 03:45 PM".
  */
-type Timestamp = string | Date | { toDate: () => Date } | { _seconds: number };
+interface FirestoreTimestampLike {
+  toDate?: () => Date;
+  _seconds?: number;
+}
+type TimestampInput = string | Date | FirestoreTimestampLike;
 
-function formatTimestamp(timestamp: Timestamp | null | undefined): string {
+function formatTimestamp(timestamp: TimestampInput | null | undefined): string {
   if (!timestamp) return '-';
   
   let date: Date;
@@ -97,13 +101,13 @@ function formatTimestamp(timestamp: Timestamp | null | undefined): string {
     date = timestamp;
   } else if (typeof timestamp.toDate === 'function') {
     // Firestore Timestamp object
-    date = timestamp.toDate();
+    date = timestamp.toDate!();
   } else if (typeof timestamp._seconds === 'number') {
     // JSON serialized Firestore Timestamp
     date = new Date(timestamp._seconds * 1000);
   } else {
     // Fallback
-    date = new Date(timestamp);
+    date = new Date(String(timestamp));
   }
 
   // Final check for invalid date

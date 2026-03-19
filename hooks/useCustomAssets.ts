@@ -24,12 +24,27 @@ import {
 import { reorderAssetsWithDebounce } from '@/stores/imageOrderThunks';
 import { useUploadGate } from '@/hooks/useUploadGate';
 import { devError } from '@/utils/devLogger';
-import { Texture, Item } from '@/types';
+import { Texture, Item, Color } from '@/types';
 import { AssetKind, isTextureAsset, isItemAsset, isColorAsset } from '@/utils/assetUtils';
 import { backendService } from '@/services/backendService';
 import { useAuth } from '@/contexts/AuthContext';
 
 const GUEST_PROJECT_ID = 'guest-project';
+
+export interface AssetInput {
+  name: string;
+  hex?: string;
+  file?: File;
+  description?: string;
+  [key: string]: unknown;
+}
+
+export interface AssetUpdate {
+  name?: string;
+  hex?: string;
+  description?: string;
+  [key: string]: unknown;
+}
 
 export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: string | null) => {
   const dispatch = useDispatch<AppDispatch>();
@@ -139,21 +154,21 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
   }, [effectiveProjectId, assetType, isGuestMode, isTexture, isItem, dispatch]);
 
   const addAsset = useCallback(
-    async (assetData: Record<string, unknown>): Promise<unknown> => {
+    async (assetData: AssetInput): Promise<Texture | Item | Color> => {
       if (!effectiveProjectId || isGuestMode) {
         throw new Error('Action not allowed for guests');
       }
 
       if (isTexture) {
-        const newTexture = await backendService.uploadTexture(effectiveProjectId, assetData.name, assetData.file, assetData.description);
+        const newTexture = await backendService.uploadTexture(effectiveProjectId, assetData.name as string, assetData.file as File, assetData.description as string | undefined);
         dispatch(addCustomTextureAction({ projectId: effectiveProjectId, texture: newTexture as unknown as Texture }));
-        return newTexture;
+        return newTexture as unknown as Texture;
       } else if (isItem) {
-        const newItem = await backendService.uploadItem(effectiveProjectId, assetData.name, assetData.file, assetData.description);
+        const newItem = await backendService.uploadItem(effectiveProjectId, assetData.name as string, assetData.file as File, assetData.description as string | undefined);
         dispatch(addCustomItemAction({ projectId: effectiveProjectId, item: newItem as unknown as Item }));
-        return newItem;
+        return newItem as unknown as Item;
       } else {
-        const newColor = await backendService.createColor(effectiveProjectId, assetData.name, assetData.hex, assetData.description);
+        const newColor = await backendService.createColor(effectiveProjectId, assetData.name as string, assetData.hex as string, assetData.description as string | undefined);
         dispatch(addCustomColorAction({ projectId: effectiveProjectId, color: newColor }));
         return newColor;
       }
@@ -180,7 +195,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
   );
 
   const updateAsset = useCallback(
-    async (assetId: string, updates: Record<string, unknown>): Promise<void> => {
+    async (assetId: string, updates: AssetUpdate): Promise<void> => {
       if (!effectiveProjectId || isGuestMode) return;
 
       if (isTexture) {
@@ -191,7 +206,7 @@ export const useCustomAssets = <T extends AssetKind>(assetType: T, projectId: st
         await backendService.updateItem(effectiveProjectId, assetId, updates);
         dispatch(updateCustomItemAction({ projectId: effectiveProjectId, itemId: assetId, updates }));
       } else if (isColor) {
-        await backendService.updateColor(effectiveProjectId, assetId, updates.name, updates.hex);
+        await backendService.updateColor(effectiveProjectId, assetId, updates.name as string, updates.hex as string);
         dispatch(updateCustomColor({ projectId: effectiveProjectId, colorId: assetId, updates }));
       }
     },
