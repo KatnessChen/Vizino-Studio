@@ -25,7 +25,7 @@ import {
 import { backendService } from '@/services/backendService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { decryptUserApiKey } from '@/services/userService';
+import { encryptUserApiKey, decryptUserApiKey } from '@/utils/cryptoUtils';
 import { useCreditCheck } from '@/hooks/useCreditCheck';
 import { CREDIT_MULTIPLIERS } from '@/constants/constants';
 import { ROUTES } from '@/constants/routes';
@@ -48,7 +48,7 @@ interface ApiKeyManagerUser {
  */
 const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, refreshUser } = useAuth();
   const { isLoading, totalCredits, usagePercentage, usage, refresh, limit } = useCreditCheck({
     userId: user?.uid,
   });
@@ -65,7 +65,7 @@ const UserProfilePage: React.FC = () => {
       const result = await backendService.redeemPromotionCode(promoCode.trim());
       message.success(`Successfully redeemed credits!`);
       setPromoCode('');
-      if ((refreshUser as any)) await (refreshUser as any)(); // Try AuthContext refreshUser
+      await refreshUser();
     } catch (error) {
       devError('Failed to redeem promotion code:', error);
       const errorMessage =
@@ -340,7 +340,8 @@ const ApiKeyManager: React.FC<{ user: ApiKeyManagerUser }> = ({ user }) => {
     if (!apiKeyInput.trim()) return;
     setLoading(true);
     try {
-      await backendService.updateUserAiKey(apiKeyInput.trim(), true);
+      const encryptedKey = encryptUserApiKey(apiKeyInput.trim());
+      await backendService.updateUserAiKey(encryptedKey, true);
       setIsEditing(false);
       setApiKeyInput('');
       message.success('API Key saved');
